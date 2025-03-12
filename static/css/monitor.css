@@ -1,0 +1,439 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+@font-face {
+    font-family:yjsz;
+    src: url('../fonts/yjsz.ttf');
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f0f2f5;
+    color:#011635;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 导航栏样式 */
+.nav-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    background: #011635;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.nav-left {
+    justify-self: start;
+}
+
+.logo {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #1890ff;
+    font-weight: bold;
+}
+
+.nav-right {
+    justify-self: end;
+    display: flex;
+    gap: 1rem;
+}
+
+.action-btn {
+    background: #1890ff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    background: #40a9ff;
+    transform: translateY(-2px);
+}
+
+.action-btn:disabled {
+    background: #d9d9d9;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 主容器样式 */
+.main-container {
+    margin-top: 3%;
+    flex: 1;
+    padding: 2rem;
+    padding-left: 150px;
+    padding-right: 150px;
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
+    padding-bottom: 70px;
+    justify-content: center;
+}
+
+/* 状态栏样式 */
+.status-bar {
+    display: flex;
+    gap: 2rem;
+    background: #011635;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 0 auto;
+    margin-top: 80px;
+    width: 85%;  /* 与监控网格宽度一致 */
+    justify-content: center;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #1a2b47;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+}
+
+.status-label {
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.status-value {
+    font-weight: 500;
+    color: #1890ff;
+    font-size: 1rem;
+}
+
+.status-value.normal {
+    color: #52c41a;
+}
+
+/* 监控网格样式 */
+.monitor-grid {
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;  
+    gap: 2rem;
+    flex: 2;
+    width: 75%;  /* 增加网格宽度 */
+    margin-top: -5%;  /* 调整上边距 */
+}
+
+.monitor-grid.single-view {
+    grid-template-columns: 1fr;
+}
+
+/* 监控项目样式 */
+.monitor-item {
+    background: #011635;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 100%;
+    margin-top: 0;  /* 移除负边距 */
+    padding: 15px;  /* 添加内边距 */
+}
+
+/* 视频容器样式 */
+.video-container {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: #000;
+    margin: 0 auto;
+    margin-bottom: 15px;  /* 添加底部间距 */
+}
+
+video, canvas.overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 监控信息样式 */
+.monitor-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    color: #e6e6e6;
+    margin-bottom: 10px;  /* 添加底部间距 */
+}
+
+.monitor-info2 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    color: #e6e6e6;
+    margin-bottom: 10px;  /* 添加底部间距 */
+}
+
+.location {
+    font-weight: 500;
+    color: #fff;
+}
+
+.status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background: #1a2b47;
+    color: #fff;
+    margin-top: 3rem;  /* 增加上边距 */
+}
+
+.status.online {
+    background: #f6ffed;
+    color: #52c41a;
+}
+
+/* 控制按钮样式 */
+.monitor-controls {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    justify-content: center;
+    align-items: center;
+}
+
+.control-btn {
+    background: #1a2b47;
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #e6e6e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+}
+
+.control-btn:hover {
+    background: #233656;
+    transform: translateY(-2px);
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-icon {
+    font-size: 1.2rem;
+}
+
+/* 警报面板样式 */
+.alert-panel {
+    flex: 0.8;
+    background: #011635;
+    border-radius: 8px;
+    padding: 1rem 0.5rem 1rem 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    height: 525px;  /* 恢复固定高度 */
+    overflow: hidden;
+    margin-top: -5%;
+    max-width: 17%;
+    margin-right: -80px;
+    position: relative;
+}
+
+/* 监控网格单视图样式 */
+.monitor-grid.single-view + .alert-panel {
+    height: calc(100% + 5%);  /* 单视图时使用自适应高度 */
+}
+
+.alert-panel h3 {
+    margin-bottom: 1rem;
+    color: #fff;
+    text-align: center;
+    position: sticky;  /* 标题固定 */
+    top: 0;
+    background: #011635;
+    padding: 0.5rem 0;
+    z-index: 1;
+    font-size: 1.2rem;  /* 增加标题字体大小 */
+    font-weight: 500;
+}
+
+.alert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    height: calc(100% - 3rem);
+    overflow-y: overlay;
+    padding-right: 0.2rem;
+    margin-right: 0.3rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.alert-list::-webkit-scrollbar {
+    display: none;
+}
+
+.alert-item {
+    padding: 0.8rem;  /* 减小内边距 */
+    border-radius: 4px;
+    background: #1a2b47;
+    border: 1px solid #1a2b47;
+    min-height: 100px;  /* 减小最小高度 */
+    transition: all 0.3s ease;
+}
+
+.alert-item:hover {
+    background: #233656;
+    transform: translateX(-5px);
+}
+
+.alert-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;  /* 减小标题内部的间距 */
+    margin-bottom: 0.3rem;  /* 减小底部间距 */
+}
+
+.alert-time {
+    color: #888;  /* 时间显示为灰色 */
+    font-size: 0.9rem;
+    display: block;  /* 独占一行 */
+}
+
+.alert-camera {
+    color: #1890ff;  /* 摄像头信息显示为蓝色 */
+    font-weight: 500;
+    font-size: 0.9rem;
+    display: block;  /* 独占一行 */
+}
+
+.alert-content {
+    color: #fff;
+    font-size: 0.8rem;
+    line-height: 1.2;  /* 减小行高 */
+    display: block;
+    margin: 0.2rem 0;  /* 减小上下间距 */
+}
+
+.alert-confidence {
+    color: #888;  /* 置信度显示为灰色 */
+    font-size: 0.5rem;
+    display: block;  /* 独占一行 */
+    font-style: italic;
+}
+
+/* 响应式布局 */
+@media (max-width: 1200px) {
+    .monitor-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .nav-bar {
+        padding: 1rem;
+    }
+    
+    .main-container {
+        padding: 1rem;
+    }
+    
+    .status-bar {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+
+/* 移除左侧视频的额外margin */
+.monitor-item:first-child {
+    margin-right: 0;
+}
+
+/* 全屏模式下的样式 */
+.fullscreen-mode .alert-panel {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 9999;
+    height: 80vh;
+    width: 300px;
+    background: rgba(1, 22, 53, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(26, 43, 71, 0.5);
+    transition: all 0.3s ease;
+}
+
+.fullscreen-mode .alert-panel:hover {
+    background: rgba(1, 22, 53, 0.98);
+}
+
+.fullscreen-mode .alert-list {
+    height: calc(100% - 3.5rem);
+}
+
+/* 添加一个最小化按钮 */
+.alert-panel .minimize-btn {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(26, 43, 71, 0.5);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 24px;
+    text-align: center;
+}
+
+.fullscreen-mode .alert-panel .minimize-btn {
+    display: block;
+}
+
+/* 最小化状态 */
+.alert-panel.minimized {
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    padding: 0;
+    cursor: pointer;
+}
+
+.alert-panel.minimized h3,
+.alert-panel.minimized .alert-list {
+    display: none;
+}
+
+.alert-panel.minimized .minimize-btn {
+    top: 8px;
+    right: 8px;
+    transform: rotate(180deg);
+}
+
+

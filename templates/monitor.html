@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时监控 - 占道经营智能监测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<style>
+    body {
+        background-color: #002a54;
+        color: white; /* 确保文本颜色在深色背景上可读 */
+    }
+</style>
+<body class="monitor-page">
+    <!-- 顶部导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-left">
+            <img src="{{ url_for('static', filename='images/view7.png') }}" class="left-decoration" alt="装饰图">
+        </div>
+        <div class="logo">实时监控中心</div>
+        <div class="nav-right">
+            <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
+            <button class="logout-btn" onclick="window.location.href='{{ url_for('logout') }}';">
+                <span class="logout-icon">↩</span>
+                退出登录
+            </button>
+        </div>
+    </nav>
+
+    <!-- 添加状态栏 -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-label">在线摄像头：</span>
+            <span class="status-value" id="onlineCameras">0/2</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">检测率：</span>
+            <span class="status-value" id="detectionRate">0次/分钟</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="monitor-grid" id="monitorGrid">
+            <div class="monitor-item">
+                <div class="video-container">
+                    <video id="video1" autoplay muted></video>
+                    <canvas id="canvas1" class="overlay-canvas"></canvas>
+                </div>
+                <div class="monitor-info">
+                    <span class="location">监控点 A</span>
+                    <span class="status" id="status1">未连接</span>
+                </div>
+                <div class="monitor-controls">
+                    <button class="control-btn" onclick="startCamera(1)" id="startBtn1">
+                        <span class="btn-icon">▶️</span>
+                    </button>
+                    <button class="control-btn" onclick="stopCamera(1)" id="stopBtn1" disabled>
+                        <span class="btn-icon">⏹️</span>
+                    </button>
+                    <button class="control-btn" onclick="captureImage(1)" id="captureBtn1">
+                        <span class="btn-icon">📸</span>
+                    </button>
+                    <button class="control-btn" onclick="toggleRecording(1)" id="recordBtn1">
+                        <span class="btn-icon">⏺️</span>
+                    </button>
+                    <button class="control-btn" onclick="toggleFullscreen('video1')" id="fullscreenBtn1">
+                        <span class="btn-icon">🔲</span>
+                    </button>
+                </div>
+            </div>
+            <div class="monitor-item">
+                <div class="video-container">
+                    <video id="processedVideo1" autoplay muted></video>
+                    <canvas id="processedCanvas1" class="overlay-canvas"></canvas>
+                </div>
+                <div class="monitor-info2">
+                    <span class="location">处理后监控点 A</span>
+                </div>
+                <div class="monitor-controls">
+                    <button class="control-btn" onclick="captureProcessedImage(1)" id="captureProcessedBtn1">
+                        <span class="btn-icon">📸</span>
+                    </button>
+                    <button class="control-btn" onclick="toggleProcessedRecording(1)" id="recordProcessedBtn1">
+                        <span class="btn-icon">⏺️</span>
+                    </button>
+                    <button class="control-btn" onclick="toggleFullscreen('processedVideo1')" id="fullscreenProcessedBtn1">
+                        <span class="btn-icon">🔲</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="alert-panel">
+            <h3>实时警报</h3>
+            <button class="minimize-btn">−</button>
+            <div class="alert-list" id="alertList">
+                <!-- 警报会通过 JavaScript 动态添加 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部导航栏 -->
+    <div class="bottom-nav1">
+        {% if is_admin %}
+        <a href="{{ url_for('admin_home') }}" class="nav-btn">
+        {% else %}
+        <a href="{{ url_for('user_home') }}" class="nav-btn">
+        {% endif %}
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">主界面</span>
+        </a>
+    </div>
+    <div class="bottom-nav2">
+        <a href="{{ url_for('analysis') }}" class="nav-btn">
+            <span class="btn-icon">📊</span>
+            <span class="btn-text">数据分析</span>
+        </a>
+    </div>
+    <div class="bottom-nav3">
+        <a href="{{ url_for('monitor') }}" class="nav-btn active">
+            <span class="btn-icon">📷</span>
+            <span class="btn-text">实时监控</span>
+        </a>
+    </div>
+    <div class="bottom-nav4">
+        <a href="{{ url_for('history') }}" class="nav-btn">
+            <span class="btn-icon">📝</span>
+            <span class="btn-text">历史记录</span>
+        </a>
+    </div>
+    <div class="bottom-nav5">
+        <a href="{{ url_for('settings') }}" class="nav-btn">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">系统设置</span>
+        </a>
+    </div>
+    <div class="bottom-nav6">
+        <a href="{{ url_for('about') }}" class="nav-btn">
+            <span class="btn-icon">ℹ️</span>
+            <span class="btn-text">关于系统</span>
+        </a>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+    <script>
+    function toggleFullscreen(videoId) {
+        const video = document.getElementById(videoId);
+        const container = document.querySelector('.main-container');
+        
+        if (!document.fullscreenElement) {
+            video.requestFullscreen().then(() => {
+                container.classList.add('fullscreen-mode');
+            }).catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen().then(() => {
+                container.classList.remove('fullscreen-mode');
+            });
+        }
+    }
+
+    // 添加最小化功能
+    document.querySelector('.minimize-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        const alertPanel = document.querySelector('.alert-panel');
+        alertPanel.classList.toggle('minimized');
+        this.textContent = alertPanel.classList.contains('minimized') ? '+' : '−';
+    });
+
+    // 点击最小化的面板时展开
+    document.querySelector('.alert-panel').addEventListener('click', function() {
+        if (this.classList.contains('minimized')) {
+            this.classList.remove('minimized');
+            this.querySelector('.minimize-btn').textContent = '−';
+        }
+    });
+
+    // 监听全屏变化
+    document.addEventListener('fullscreenchange', function() {
+        const container = document.querySelector('.main-container');
+        if (document.fullscreenElement) {
+            container.classList.add('fullscreen-mode');
+        } else {
+            container.classList.remove('fullscreen-mode');
+            // 退出全屏时恢复面板状态
+            const alertPanel = document.querySelector('.alert-panel');
+            alertPanel.classList.remove('minimized');
+            alertPanel.querySelector('.minimize-btn').textContent = '−';
+        }
+    });
+    </script>
+</body>
+</html> 

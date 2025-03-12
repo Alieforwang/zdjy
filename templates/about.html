@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关于系统 - 占道经营智能监测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/about.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<style>
+    body {
+        background-color: #002a54;
+        color: white;
+    }
+</style>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-left">
+            <img src="{{ url_for('static', filename='images/view7.png') }}" class="left-decoration" alt="装饰图">
+        </div>
+        <div class="logo">关于系统</div>
+        <div class="nav-right">
+            <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
+            <button class="logout-btn" onclick="(function() { window.location.href='{{ url_for('logout') }}'; })();">
+                <span class="logout-icon">↩</span>
+                退出登录
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <div class="main-container">
+        <div class="about-panel">
+            <!-- 系统信息 -->
+            <div class="about-section system-info">
+                <!-- <div class="system-logo">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="系统logo">
+                </div> -->
+                <h1>灵瞳-城市治理智能感知终端</h1>
+                <p class="version">版本 1.0.0</p>
+                <p class="description">
+                    基于深度学习的智能监测系统，用于实时检测和管理城市占道经营现象。
+                </p>
+            </div>
+
+            <!-- 功能特点 -->
+            <div class="about-section features">
+                <h2>主要功能</h2>
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <span class="feature-icon">🎯</span>
+                        <h3>智能检测</h3>
+                        <p>采用先进的深度学习算法，准确识别占道经营行为</p>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📊</span>
+                        <h3>数据分析</h3>
+                        <p>提供详细的数据统计和趋势分析</p>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📷</span>
+                        <h3>实时监控</h3>
+                        <p>支持多路视频流实时监控和分析</p>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📱</span>
+                        <h3>便捷操作</h3>
+                        <p>简洁直观的用户界面，操作便捷</p>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📝</span>
+                        <h3>历史记录</h3>
+                        <p>支持查看历史记录</p>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">⚙️</span>
+                        <h3>系统设置</h3>
+                        <p>支持个性化的系统设置</p>
+                    </div>
+                </div>
+                
+            </div>
+
+            <!-- 技术信息 -->
+            <div class="about-section tech-info">
+                <h2>技术规格</h2>
+                <div class="tech-details">
+                    <div class="tech-item">
+                        <label>开发框架：</label>
+                        <span>Flask + PyTorch</span>
+                    </div>
+                    <div class="tech-item">
+                        <label>深度学习模型：</label>
+                        <span>YOLOv8</span>
+                    </div>
+                    <div class="tech-item">
+                        <label>前端技术：</label>
+                        <span>HTML5 + CSS3 + JavaScript</span>
+                    </div>
+                    <div class="tech-item">
+                        <label>数据库：</label>
+                        <span>MySQL</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 开发团队 -->
+            <div class="about-section team-info">
+                <h2>开发团队</h2>
+                <div class="team-members">
+                    <div class="member">
+                        <span class="member-avatar">👩‍💻</span>
+                        <div class="member-info">
+                            <h3>余红霞</h3>
+                            <p>指导老师</p>
+                        </div>
+                    </div>
+                    <div class="member">
+                        <span class="member-avatar">👩‍💻</span>
+                        <div class="member-info">
+                            <h3>李思语</h3>
+                            <p>项目负责人</p>
+                        </div>
+                    </div>
+                    <div class="member">
+                        <span class="member-avatar">👨‍💻</span>
+                        <div class="member-info">
+                            <h3>汪志胜</h3>
+                            <p>算法工程师</p>
+                        </div>
+                    </div>
+                    <div class="member">
+                        <span class="member-avatar">👩‍💻</span>
+                        <div class="member-info">
+                            <h3>庞倩</h3>
+                            <p>文档撰写</p>
+                        </div>
+                    </div>
+                    <div class="member">
+                        <span class="member-avatar">👨‍💻</span>
+                        <div class="member-info">
+                            <h3>翟玉虎</h3>
+                            <p>前端开发</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 联系方式 -->
+            <div class="about-section contact-info">
+                <h2>联系我们</h2>
+                <div class="contact-details">
+                    <div class="contact-item">
+                        <span class="contact-icon">📧</span>
+                        <span>zhaiyuhu@qq.com</span>
+                    </div>
+                    <div class="contact-item">
+                        <span class="contact-icon">📞</span>
+                        <span>18388765325</span>
+                    </div>
+                    <div class="contact-item">
+                        <span class="contact-icon">🌐</span>
+                        <span>http://127.0.0.1:8888</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部导航栏 -->
+    <div class="bottom-nav1">
+        {% if is_admin %}
+        <a href="{{ url_for('admin_home') }}" class="nav-btn">
+        {% else %}
+        <a href="{{ url_for('user_home') }}" class="nav-btn">
+        {% endif %}
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">主界面</span>
+        </a>
+    </div>
+    <div class="bottom-nav2">
+        <a href="{{ url_for('analysis') }}" class="nav-btn">
+            <span class="btn-icon">📊</span>
+            <span class="btn-text">数据分析</span>
+        </a>
+    </div>
+    <div class="bottom-nav3">
+        <a href="{{ url_for('monitor') }}" class="nav-btn">
+            <span class="btn-icon">📷</span>
+            <span class="btn-text">实时监控</span>
+        </a>
+    </div>
+    <div class="bottom-nav4">
+        <a href="{{ url_for('history') }}" class="nav-btn">
+            <span class="btn-icon">📝</span>
+            <span class="btn-text">历史记录</span>
+        </a>
+    </div>
+    <div class="bottom-nav5">
+        <a href="{{ url_for('settings') }}" class="nav-btn">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">系统设置</span>
+        </a>
+    </div>
+    <div class="bottom-nav6">
+        <a href="{{ url_for('about') }}" class="nav-btn active">
+            <span class="btn-icon">ℹ️</span>
+            <span class="btn-text">关于系统</span>
+        </a>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/about.js') }}"></script>
+</body>
+</html> 

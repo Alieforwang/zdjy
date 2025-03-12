@@ -1,0 +1,309 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* 主容器样式 */
+.main-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 2rem;
+    padding-bottom: 70px;
+}
+
+/* 关于面板样式 */
+.about-panel {
+    background: #011635;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    padding: 2rem;
+    width: 100%;
+    max-width: 1000px;
+    margin-top: 20px;
+}
+
+/* 系统信息样式 */
+.system-info {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.system-logo {
+    margin-bottom: 1.5rem;
+}
+
+.system-logo img {
+    width: 120px;
+    height: 120px;
+    border-radius: 20px;
+}
+
+.system-info h1 {
+    color: #40a9ff;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.version {
+    color: #e6e6e6;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.description {
+    color: #e6e6e6;
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* 功能特点样式 */
+.about-section {
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: #1a2b47;
+    border-radius: 8px;
+}
+
+.about-section h2 {
+    color: #40a9ff;
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+}
+
+.feature-item {
+    text-align: center;
+    padding: 1.5rem;
+    background: #011635;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.feature-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.feature-item h3 {
+    color: #40a9ff;
+    margin-bottom: 0.5rem;
+}
+
+.feature-item p {
+    color: #e6e6e6;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* 技术信息样式 */
+.tech-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.tech-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #011635;
+    border-radius: 8px;
+}
+
+.tech-item label {
+    color: #40a9ff;
+    font-size: 0.9rem;
+}
+
+.tech-item span {
+    color: #e6e6e6;
+    font-size: 1rem;
+}
+
+/* 团队信息样式 */
+.team-members {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+}
+
+.member {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #011635;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.member:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.member-avatar {
+    font-size: 2.5rem;
+}
+
+.member-info h3 {
+    color: #40a9ff;
+    margin-bottom: 0.3rem;
+}
+
+.member-info p {
+    color: #e6e6e6;
+    font-size: 0.9rem;
+}
+
+/* 联系信息样式 */
+.contact-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #011635;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.contact-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.contact-icon {
+    font-size: 1.5rem;
+}
+
+.contact-item span:last-child {
+    color: #e6e6e6;
+    font-size: 1rem;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+    .about-panel {
+        padding: 1rem;
+    }
+
+    .system-info h1 {
+        font-size: 1.5rem;
+    }
+
+    .feature-grid,
+    .tech-details,
+    .team-members,
+    .contact-details {
+        grid-template-columns: 1fr;
+    }
+
+    .about-section {
+        padding: 1rem;
+    }
+} 
+/* 导航栏样式 */
+.nav-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    background: #011635;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    width: 100%;
+    height: 60px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.nav-left {
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    
+}
+
+.nav-right {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #40a9ff;
+    font-weight: bold;
+}
+
+.logout-btn {
+    background: #ff4d4f;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+    background: #ff7875;
+    transform: translateY(-2px);
+}
+
+.logout-icon {
+    font-size: 1.2rem;
+}
+
+/* 装饰图片样式 */
+.left-decoration,
+.right-decoration {
+    width: 55px;
+    height: 55px;
+    object-fit: contain;
+    margin: 0;
+    transition: transform 0.3s ease;
+}
+
+.left-decoration:hover,
+.right-decoration:hover {
+    transform: scale(1.1);
+} 
