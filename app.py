@@ -12,6 +12,30 @@ import random
 import decimal
 import json
 from config import AMAP_CONFIG
+import concurrent.futures
+import threading
+
+# 线程池管理
+thread_pool_lock = threading.RLock()  # 使用可重入锁来保护线程池的创建和访问
+thread_pool_executor = None  # 初始化为None，在需要时才创建
+
+def get_thread_pool():
+    """
+    获取线程池，如果线程池不存在或已关闭则创建新的线程池
+    """
+    global thread_pool_executor, thread_pool_lock
+    
+    with thread_pool_lock:
+        # 如果线程池不存在或已关闭，则创建新的线程池
+        if thread_pool_executor is None or thread_pool_executor._shutdown:
+            # 2核CPU环境下设置为4个线程比较合适
+            thread_pool_executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=4,
+                thread_name_prefix="app_worker"
+            )
+            print("已创建新的线程池")
+        
+        return thread_pool_executor
 
 # 创建自定义的JSON编码器来处理Decimal类型
 class DecimalEncoder(json.JSONEncoder):
@@ -19,6 +43,23 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(obj, decimal.Decimal):
             return float(obj)
         return super(DecimalEncoder, self).default(obj)
+
+# 全局模型变量，避免重复加载模型
+global_model = None
+
+def get_model():
+    """获取全局模型实例，如果不存在则加载"""
+    global global_model
+    if global_model is None:
+        model_path = os.path.join('models3', 'best.pt')
+        if os.path.exists(model_path):
+            try:
+                # 加载模型时使用CPU以节省内存（如果没有GPU）
+                global_model = YOLO(model_path)
+                print("模型加载成功")
+            except Exception as e:
+                print(f"模型加载错误: {str(e)}")
+    return global_model
 
 app = Flask(__name__)
 CORS(app)
@@ -66,14 +107,19 @@ def init_db_user():
 
 @app.route('/')
 def index():
-    return render_template('index.html',
-                         amap_web_key=AMAP_CONFIG['web_key'],
-                         amap_js_key=AMAP_CONFIG['js_key'],
-                         amap_security_code=AMAP_CONFIG['security_code'])
+    # 检查用户是否已登录
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    
+    # 根据用户类型重定向到相应页面
+    if session.get('is_admin', False):
+        return redirect(url_for('admin_home'))
+    else:
+        return redirect(url_for('user_home'))
 
 @app.route('/login_page')
 def login_page():
-    return render_template('longin.html')
+    return render_template('login.html')
 
 @app.route('/register_input')
 def register_input():
@@ -146,9 +192,12 @@ def login():
                     if not is_admin and user_is_admin:
                         return jsonify({'success': False, 'message': '请使用管理员登录入口'})
                     
+                    # 设置session为永久的，并遵守配置的生存期
+                    session.permanent = True
                     session['user_id'] = user_id
                     session['username'] = username
                     session['is_admin'] = user_is_admin
+                    session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     
                     # 根据用户类型重定向到不同页面
                     if user_is_admin:
@@ -226,15 +275,30 @@ def upload_analyze():
             # 确保目录存在
             ensure_directories()
             
-            # 清理之前的上传文件
-            upload_dir = app.config['UPLOAD_FOLDER']
-            for old_file in os.listdir(upload_dir):
-                old_file_path = os.path.join(upload_dir, old_file)
-                if os.path.isfile(old_file_path):
-                    try:
-                        os.remove(old_file_path)
-                    except Exception as e:
-                        print(f"警告: 无法删除旧文件 {old_file_path}: {str(e)}")
+            # 获取线程池
+            thread_pool = get_thread_pool()
+            
+            # 清理之前的上传文件 - 保留最近10个文件以节省空间
+            def clean_old_files():
+                try:
+                    upload_dir = app.config['UPLOAD_FOLDER']
+                    files = sorted([os.path.join(upload_dir, f) for f in os.listdir(upload_dir) 
+                                if os.path.isfile(os.path.join(upload_dir, f))],
+                                key=os.path.getmtime)
+                    
+                    # 如果文件数超过10个，删除最旧的文件
+                    if len(files) > 10:
+                        for old_file in files[:-10]:
+                            try:
+                                os.remove(old_file)
+                                print(f"已删除旧文件: {old_file}")
+                            except Exception as e:
+                                print(f"警告: 无法删除旧文件 {old_file}: {str(e)}")
+                except Exception as e:
+                    print(f"清理旧文件时出错: {str(e)}")
+            
+            # 使用线程池异步清理旧文件，不阻塞主流程
+            thread_pool.submit(clean_old_files)
             
             # 生成带随机数的文件名，避免缓存问题
             import random
@@ -243,7 +307,7 @@ def upload_analyze():
             filename = secure_filename(file.filename)
             base_name, ext = os.path.splitext(filename)
             unique_filename = f"{base_name}_{random_suffix}{ext}"
-            filepath = os.path.join(upload_dir, unique_filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             
             # 保存新文件
             file.save(filepath)
@@ -254,22 +318,57 @@ def upload_analyze():
                 print(f"错误: 文件保存失败 {filepath}")
                 return jsonify({'success': False, 'message': '文件保存失败'}), 500
             
-            # 清理之前的结果文件
-            for result_file in ['static/results.jpg', 'static/results.mp4', 'static/results.avi']:
-                if os.path.exists(result_file):
-                    try:
-                        os.remove(result_file)
-                    except Exception as e:
-                        print(f"警告: 无法删除旧结果文件 {result_file}: {str(e)}")
+            # 异步清理之前的结果文件
+            def clean_result_files():
+                for result_file in ['static/results.jpg', 'static/results.mp4', 'static/results.avi']:
+                    if os.path.exists(result_file):
+                        try:
+                            os.remove(result_file)
+                        except Exception as e:
+                            print(f"警告: 无法删除旧结果文件 {result_file}: {str(e)}")
             
-            # 调用模型进行预测
-            model_path = os.path.join('models3', 'best.pt')
-            if not os.path.exists(model_path):
-                print(f"错误: 模型文件不存在 {model_path}")
-                return jsonify({'success': False, 'message': '模型文件不存在'}), 500
+            thread_pool.submit(clean_result_files)
             
+            # 获取全局模型实例
+            model = get_model()
+            if model is None:
+                print("错误: 无法加载模型")
+                return jsonify({'success': False, 'message': '模型加载失败'}), 500
+            
+            # 定义预处理函数，处理大图像
+            def preprocess_image(file_path):
+                try:
+                    # 如果文件大于5MB，尝试调整图像大小以减少内存使用
+                    file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                    if file_size > 5 and file_path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        img = cv2.imread(file_path)
+                        if img is not None:
+                            height, width = img.shape[:2]
+                            # 如果图像尺寸太大，调整大小
+                            if height > 1000 or width > 1000:
+                                scale = min(1000 / height, 1000 / width)
+                                new_size = (int(width * scale), int(height * scale))
+                                img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+                                cv2.imwrite(file_path, img)
+                                print(f"已调整图像大小: {file_path} -> {new_size}")
+                    return True
+                except Exception as e:
+                    print(f"图像预处理错误: {str(e)}")
+                    return False
+            
+            # 使用线程池异步处理图像预处理
+            preprocess_future = thread_pool.submit(preprocess_image, filepath)
             try:
-                results, is_video = predict_image(model_path, filepath)
+                # 等待预处理完成，设置超时以防止无限等待
+                preprocess_success = preprocess_future.result(timeout=10)
+                if not preprocess_success:
+                    return jsonify({'success': False, 'message': '图像预处理失败'}), 500
+                
+                # 调用预测函数
+                results, is_video = predict_image(model, filepath)
+            except concurrent.futures.TimeoutError:
+                print(f"图像预处理超时")
+                return jsonify({'success': False, 'message': '图像预处理超时'}), 500
             except Exception as e:
                 print(f"预测错误: {str(e)}")
                 return jsonify({'success': False, 'message': f'图像分析失败: {str(e)}'}), 500
@@ -286,118 +385,116 @@ def upload_analyze():
                 print(f"错误: 生成结果文件失败 {result_path}")
                 return jsonify({'success': False, 'message': '生成结果文件失败'}), 500
             
-            # 保存分析记录到数据库
-            db = DBM.DatabaseManager()
-            db.connect()
-            
-            # 获取检测结果信息
-            detect_type = "未知"
-            confidence = 0.0
-            location = "未指定"
-            
-            if hasattr(results, 'boxes') and len(results.boxes) > 0:
-                # 获取置信度最高的检测结果
-                best_box = results.boxes[0]
-                confidence = float(best_box.conf[0])
-                cls = int(best_box.cls[0])
-                class_name = results.names[cls]
-                
-                # 根据模型输出的类别名称映射到系统使用的类型值
-                type_mapping = {
-                    'ld': 'zdjy_ld',  # 流动摊位
-                    'gd': 'zdjy_gd'   # 固定摊位
-                }
-                detect_type = type_mapping.get(class_name, class_name)
-            
-            # 插入记录
-            insert_query = """
-            INSERT INTO analysis_records 
-            (user_id, file_type, file_path, result_path, detect_type, location, confidence)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """
-            params = (
-                session['user_id'],
-                'video' if is_video else 'image',
-                filepath,
-                result_path,
-                detect_type,
-                location,
-                confidence
-            )
-            
-            try:
-                db.update_data(insert_query, params)
-            except Exception as e:
-                print(f"数据库插入错误: {str(e)}")
-                # 继续执行，不要因为数据库错误而阻止用户获取结果
-            
-            # 更新统计数据
-            try:
-                today = datetime.now().date()
-                
-                # 获取当前统计数据
-                get_current_stats = """
-                SELECT daily_count, total_count 
-                FROM detection_stats 
-                WHERE user_id = %s AND detection_date = %s
-                """
-                current_stats = db.query_data(get_current_stats, (session['user_id'], today))
-                
-                if current_stats:
-                    # 更新现有记录
-                    update_stats = """
-                    UPDATE detection_stats 
-                    SET daily_count = daily_count + 1,
-                        total_count = total_count + 1
+            # 定义异步保存分析记录到数据库的函数
+            def save_analysis_record():
+                try:
+                    db = DBM.DatabaseManager()
+                    db.connect()
+                    
+                    # 获取检测结果信息
+                    detect_type = "未知"
+                    confidence = 0.0
+                    location = "未指定"
+                    
+                    if hasattr(results, 'boxes') and len(results.boxes) > 0:
+                        # 获取置信度最高的检测结果
+                        best_box = results.boxes[0]
+                        confidence = float(best_box.conf[0])
+                        cls = int(best_box.cls[0])
+                        class_name = results.names[cls]
+                        
+                        # 根据模型输出的类别名称映射到系统使用的类型值
+                        type_mapping = {
+                            'ld': 'zdjy_ld',  # 流动摊位
+                            'gd': 'zdjy_gd'   # 固定摊位
+                        }
+                        detect_type = type_mapping.get(class_name, class_name)
+                    
+                    # 插入记录
+                    insert_query = """
+                    INSERT INTO analysis_records 
+                    (user_id, file_type, file_path, result_path, detect_type, location, confidence)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """
+                    params = (
+                        session['user_id'],
+                        'video' if is_video else 'image',
+                        filepath,
+                        result_path,
+                        detect_type,
+                        location,
+                        confidence
+                    )
+                    
+                    db.update_data(insert_query, params)
+                    
+                    # 更新统计数据
+                    today = datetime.now().date()
+                    
+                    # 获取当前统计数据
+                    get_current_stats = """
+                    SELECT daily_count, total_count 
+                    FROM detection_stats 
                     WHERE user_id = %s AND detection_date = %s
                     """
-                    db.update_data(update_stats, (session['user_id'], today))
-                else:
-                    # 获取历史总数
-                    get_total = """
-                    SELECT COALESCE(MAX(total_count), 0) 
-                    FROM detection_stats 
-                    WHERE user_id = %s
-                    """
-                    total_result = db.query_data(get_total, (session['user_id'],))
-                    previous_total = total_result[0][0] if total_result else 0
+                    current_stats = db.query_data(get_current_stats, (session['user_id'], today))
                     
-                    # 插入新记录
-                    insert_stats = """
-                    INSERT INTO detection_stats 
-                    (user_id, detection_date, daily_count, total_count)
-                    VALUES (%s, %s, 1, %s)
-                    """
-                    db.update_data(insert_stats, (session['user_id'], today, previous_total + 1))
-                
-                # 获取更新后的统计数据
-                get_updated_stats = """
-                SELECT daily_count, total_count 
-                FROM detection_stats 
-                WHERE user_id = %s AND detection_date = %s
-                """
-                stats_result = db.query_data(get_updated_stats, (session['user_id'], today))
-                
-                daily_count = stats_result[0][0] if stats_result else 1
-                total_count = stats_result[0][1] if stats_result else 1
+                    if current_stats:
+                        # 更新现有记录
+                        update_stats = """
+                        UPDATE detection_stats 
+                        SET daily_count = daily_count + 1,
+                            total_count = total_count + 1
+                        WHERE user_id = %s AND detection_date = %s
+                        """
+                        db.update_data(update_stats, (session['user_id'], today))
+                    else:
+                        # 获取历史总数
+                        get_total = """
+                        SELECT COALESCE(MAX(total_count), 0) 
+                        FROM detection_stats 
+                        WHERE user_id = %s
+                        """
+                        total_result = db.query_data(get_total, (session['user_id'],))
+                        previous_total = total_result[0][0] if total_result else 0
+                        
+                        # 插入新记录
+                        insert_stats = """
+                        INSERT INTO detection_stats 
+                        (user_id, detection_date, daily_count, total_count)
+                        VALUES (%s, %s, 1, %s)
+                        """
+                        db.update_data(insert_stats, (session['user_id'], today, previous_total + 1))
+                    
+                    db.disconnect()
+                    print(f"分析记录已保存到数据库")
+                    
+                    return {
+                        'daily_count': current_stats[0][0] + 1 if current_stats else 1,
+                        'total_count': current_stats[0][1] + 1 if current_stats else previous_total + 1
+                    }
+                except Exception as e:
+                    print(f"保存分析记录错误: {str(e)}")
+                    return {'daily_count': 0, 'total_count': 0}
+            
+            # 异步保存分析记录
+            try:
+                # 再次获取线程池，以防在处理过程中线程池被关闭
+                thread_pool = get_thread_pool()
+                db_future = thread_pool.submit(save_analysis_record)
             except Exception as e:
-                print(f"统计数据更新错误: {str(e)}")
-                daily_count = 0
-                total_count = 0
+                print(f"提交数据库任务时出错: {str(e)}")
+                # 如果提交任务失败，同步执行数据库保存
+                save_analysis_record()
             
-            db.disconnect()
-            
-            print(f"文件分析成功完成: {filepath} -> {result_path}")
+            # 首先返回结果给用户，不等待数据库操作完成
             return jsonify({
                 'success': True,
                 'message': '分析完成',
                 'original_image': f'/static/uploads/{unique_filename}',
                 'result_image': f'/{result_path}',
                 'is_video': is_video,
-                'stats': {
-                    'daily_count': daily_count,
-                    'total_count': total_count
-                }
+                'async_processing': True
             })
         else:
             print(f"错误: 不支持的文件类型 {file.filename}")
@@ -510,6 +607,24 @@ def get_history():
 @app.route('/check_login')
 def check_login():
     if 'user_id' in session:
+        # 检查登录时间，计算剩余有效期
+        login_time = session.get('login_time')
+        current_time = datetime.now()
+        
+        if login_time:
+            login_datetime = datetime.strptime(login_time, '%Y-%m-%d %H:%M:%S')
+            time_elapsed = current_time - login_datetime
+            time_remaining = app.config['PERMANENT_SESSION_LIFETIME'] - time_elapsed
+            days_remaining = time_remaining.days
+            
+            return jsonify({
+                'logged_in': True,
+                'username': session.get('username', ''),
+                'user_id': session.get('user_id'),
+                'is_admin': session.get('is_admin', False),
+                'session_expires_in_days': days_remaining
+            })
+        
         return jsonify({
             'logged_in': True,
             'username': session.get('username', ''),
@@ -748,13 +863,18 @@ def analyze_frame():
         nparr = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # 加载模型
-        model_path = os.path.join('models3', 'best.pt')
-        if not os.path.exists(model_path):
-            return jsonify({'success': False, 'message': '模型文件不存在'})
-            
-        model = YOLO(model_path)
+        # 使用全局模型进行预测
+        model = get_model()
+        if model is None:
+            return jsonify({'success': False, 'message': '模型加载失败'})
         
+        # 如果图像太大，调整大小以减少内存使用
+        height, width = frame.shape[:2]
+        if height > 1000 or width > 1000:
+            scale = min(1000 / height, 1000 / width)
+            new_size = (int(width * scale), int(height * scale))
+            frame = cv2.resize(frame, new_size, interpolation=cv2.INTER_AREA)
+            
         # 进行预测
         results = model.predict(
             source=frame,
@@ -1092,6 +1212,52 @@ def get_dashboard_stats():
         print(f"获取大屏数据错误: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# 应用关闭时清理线程池资源
+@app.teardown_appcontext
+def shutdown_thread_pool(exception=None):
+    # 不需要立即关闭线程池，允许它完成正在处理的任务
+    # 系统关闭时会由cleanup_resources函数处理
+    pass
+
+# 设置进程终止时的清理函数
+def cleanup_resources():
+    print("正在清理资源...")
+    # 关闭线程池
+    global thread_pool_executor
+    if thread_pool_executor and not thread_pool_executor._shutdown:
+        try:
+            thread_pool_executor.shutdown(wait=True)  # 等待所有任务完成后关闭
+            print("线程池已关闭")
+        except Exception as e:
+            print(f"关闭线程池时出错: {str(e)}")
+    
+    # 清理其他资源
+    global global_model
+    if global_model:
+        global_model = None
+        print("模型资源已清理")
+    
+    # 尝试关闭所有数据库连接
+    try:
+        from util.DBUtil import connection_pool
+        if connection_pool:
+            # 关闭连接池中的所有连接
+            for cnx in connection_pool._cnx_queue.queue:
+                if hasattr(cnx, 'is_connected') and cnx.is_connected():
+                    try:
+                        cnx.close()
+                    except:
+                        pass
+            print("数据库连接池已清理")
+    except:
+        pass
+    
+    print("资源清理完成")
+
+# 注册清理函数
+import atexit
+atexit.register(cleanup_resources)
+
 if __name__ == '__main__':
     try:
         # 创建数据库表
@@ -1116,7 +1282,34 @@ if __name__ == '__main__':
         db.disconnect()
         print("数据库初始化完成")
         
-        # 启动应用
-        app.run(debug=True, port=8888)
+        # 服务器配置优化，适合低内存环境
+        from werkzeug.serving import run_simple
+        run_simple('0.0.0.0', 8888, app, threaded=True, processes=1)
+        # 不再使用app.run，因为它不适合生产环境
+        # app.run(debug=True, port=8888)
     except Exception as e:
         print(f"启动错误: {str(e)}")
+    finally:
+        # 确保清理资源
+        cleanup_resources()
+
+# Gunicorn配置 - 部署时使用
+# 在终端运行: gunicorn -c gunicorn_config.py app:app
+"""
+# 创建文件 gunicorn_config.py 包含以下内容:
+bind = "0.0.0.0:8888"
+workers = 2  # 对应2核CPU
+worker_class = "gevent"  # 使用gevent处理并发
+worker_connections = 500
+timeout = 60
+keepalive = 2
+
+# 内存优化
+max_requests = 500
+max_requests_jitter = 50
+
+# 日志设置
+accesslog = "access.log"
+errorlog = "error.log"
+loglevel = "warning"
+"""

@@ -2,6 +2,11 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 import os
+import gc
+import time
+import concurrent.futures
+import threading
+import queue
 
 def Predict():
     # 直接使用预训练模型创建模型.
@@ -21,18 +26,18 @@ def Predict():
     model = YOLO('runs/detect/zdjy_model_optimized_nano3/weights/best.pt')
     model.predict(source='1.jpg', **{'save': True})
 
-def predict_image(model_path, file_path):
+def predict_image(model, file_path):
     """
-    使用指定的模型对图片或视频进行推理并保存结果
+    使用给定的模型实例对图片或视频进行推理并保存结果
+    
+    参数:
+    - model: 已加载的YOLO模型实例
+    - file_path: 要处理的图片或视频文件路径
+    
+    返回:
+    - 预测结果和文件类型标识(是否为视频)
     """
     try:
-        # 加载模型
-        model = YOLO(model_path)
-        
-        # 验证源文件是否存在
-        if not os.path.exists(file_path):
-            raise Exception(f"源文件不存在: {file_path}")
-        
         # 检查文件类型
         is_video = file_path.lower().endswith(('.mp4', '.avi', '.mov'))
         
@@ -51,6 +56,15 @@ def predict_image(model_path, file_path):
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
+            # 处理分辨率过高的情况
+            max_dimension = 1280
+            if width > max_dimension or height > max_dimension:
+                # 等比例缩放
+                scale = min(max_dimension / width, max_dimension / height)
+                width = int(width * scale)
+                height = int(height * scale)
+                print(f"视频分辨率过高，已调整为: {width}x{height}")
+            
             print(f"视频信息: {width}x{height} @ {fps}fps, 总帧数: {total_frames}")
             
             # 创建输出视频
@@ -58,72 +72,196 @@ def predict_image(model_path, file_path):
             if os.path.exists(output_path):
                 os.remove(output_path)
             
-            # 使用 H264 编码器
-            fourcc = cv2.VideoWriter_fourcc(*'H264')
-            if os.name == 'nt':  # Windows
-                fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            # 尝试不同的编码器
+            fourcc_options = [
+                ('avc1', '.mp4'),  # H.264 for MP4
+                ('XVID', '.avi'),  # XVID for AVI
+                ('MJPG', '.avi')   # Motion JPEG for AVI
+            ]
             
-            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            out = None
+            for codec, ext in fourcc_options:
+                try:
+                    temp_path = f'static/results{ext}'
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    out = cv2.VideoWriter(temp_path, fourcc, fps, (width, height))
+                    if out.isOpened():
+                        output_path = temp_path
+                        break
+                except Exception as e:
+                    print(f"尝试编码器 {codec} 失败: {e}")
+                    if out:
+                        out.release()
             
-            if not out.isOpened():
-                # 如果 H264/avc1 不可用，尝试使用 XVID
-                output_path = 'static/results.avi'
-                fourcc = cv2.VideoWriter_fourcc(*'XVID')
-                out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-                
-                if not out.isOpened():
-                    raise Exception("无法创建输出视频文件")
+            if not out or not out.isOpened():
+                raise Exception("无法创建输出视频文件，所有编码器均失败")
             
             try:
                 print(f"开始处理视频: {file_path}")
-                frame_count = 0
-                processed_frames = 0
                 
-                # 计算处理间隔
-                if total_frames > 1000:
-                    process_interval = total_frames // 1000
+                # 计算处理间隔 - 视频过长时跳帧处理
+                if total_frames > 500:  # 对于长视频，增加采样间隔
+                    process_interval = max(1, total_frames // 300)
                 else:
                     process_interval = 1
-                
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
                     
-                    # 只处理特定间隔的帧
-                    if frame_count % process_interval == 0:
-                        print(f"处理第 {frame_count + 1}/{total_frames} 帧 ({(frame_count + 1) / total_frames * 100:.1f}%)")
-                        
-                        # 对当前帧进行预测
-                        results = model.predict(
-                            source=frame,
-                            save=False,
-                            conf=0.25
-                        )[0]
-                        
-                        # 在帧上绘制检测结果
-                        annotated_frame = results.plot()
-                        
-                        # 确保帧是BGR格式，并保持原始颜色
-                        if len(annotated_frame.shape) == 2:
-                            annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_GRAY2BGR)
-                        elif annotated_frame.shape[2] == 4:
-                            # 保持透明度
-                            annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_RGBA2BGR)
-                        
-                        # 写入处理后的帧
-                        out.write(annotated_frame)
-                        processed_frames += 1
+                # 创建帧处理线程池
+                # 在低内存环境下，最多使用2-3个线程处理帧
+                max_workers = min(3, os.cpu_count() or 2)  
+                frame_executor = None
+                try:
+                    frame_executor = concurrent.futures.ThreadPoolExecutor(
+                        max_workers=max_workers,
+                        thread_name_prefix="frame_worker"
+                    )
                     
-                    frame_count += 1
+                    # 使用队列来管理帧处理结果，确保按顺序写入
+                    result_queue = queue.Queue(maxsize=max_workers * 2)
+                    stop_event = threading.Event()
                     
-                print(f"视频处理完成，共处理 {processed_frames} 帧")
+                    # 处理线程计数器
+                    processed_count = {'value': 0, 'lock': threading.Lock()}
+                    
+                    # 帧处理函数
+                    def process_frame(frame_idx, frame):
+                        try:
+                            # 降低分辨率以提高处理速度
+                            if width > max_dimension or height > max_dimension:
+                                frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+                            
+                            # 对当前帧进行预测
+                            frame_results = model.predict(
+                                source=frame,
+                                save=False,
+                                conf=0.25
+                            )[0]
+                            
+                            # 在帧上绘制检测结果
+                            annotated_frame = frame_results.plot()
+                            
+                            # 确保帧是BGR格式，并保持原始颜色
+                            if len(annotated_frame.shape) == 2:
+                                annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_GRAY2BGR)
+                            elif annotated_frame.shape[2] == 4:
+                                annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_RGBA2BGR)
+                            
+                            # 将处理结果放入队列，包含帧索引以确保顺序写入
+                            result_queue.put((frame_idx, annotated_frame))
+                            
+                            # 增加处理计数
+                            with processed_count['lock']:
+                                processed_count['value'] += 1
+                                
+                            # 清理内存
+                            del frame_results
+                            return True
+                        except Exception as e:
+                            print(f"处理第 {frame_idx} 帧时出错: {e}")
+                            return False
+                    
+                    # 将帧结果按顺序写入视频的消费者线程
+                    def writer_thread():
+                        next_frame_idx = 0
+                        frame_buffer = {}  # 缓存未按顺序到达的帧
+                        
+                        while not stop_event.is_set() or not result_queue.empty() or frame_buffer:
+                            try:
+                                # 尝试获取下一个处理结果，有超时以避免无限等待
+                                frame_idx, annotated_frame = result_queue.get(timeout=0.5)
+                                
+                                # 如果是当前需要的帧，直接写入
+                                if frame_idx == next_frame_idx:
+                                    out.write(annotated_frame)
+                                    next_frame_idx += 1
+                                    
+                                    # 检查缓存中是否有后续帧可以写入
+                                    while next_frame_idx in frame_buffer:
+                                        out.write(frame_buffer.pop(next_frame_idx))
+                                        next_frame_idx += 1
+                                else:
+                                    # 否则缓存这一帧
+                                    frame_buffer[frame_idx] = annotated_frame
+                                
+                                # 报告进度
+                                if next_frame_idx % 10 == 0:
+                                    current_percent = (next_frame_idx / total_frames) * 100
+                                    print(f"视频处理进度: {current_percent:.1f}%")
+                                
+                                # 释放队列项
+                                result_queue.task_done()
+                                
+                            except queue.Empty:
+                                # 队列为空，继续等待
+                                continue
+                            except Exception as e:
+                                print(f"写入线程错误: {e}")
+                                continue
+                    
+                    # 启动写入线程
+                    writer = threading.Thread(target=writer_thread, daemon=True)
+                    writer.start()
+                    
+                    # 主线程读取视频帧并提交处理任务
+                    futures = []
+                    frame_count = 0
+                    
+                    while cap.isOpened():
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        
+                        # 只处理特定间隔的帧
+                        if frame_count % process_interval == 0:
+                            # 提交帧处理任务
+                            future = frame_executor.submit(process_frame, frame_count, frame.copy())
+                            futures.append(future)
+                            
+                            # 控制内存使用 - 限制并发任务数量
+                            while len(futures) >= max_workers * 2:
+                                # 等待一些任务完成
+                                done, futures = concurrent.futures.wait(
+                                    futures, 
+                                    return_when=concurrent.futures.FIRST_COMPLETED
+                                )
+                                # 检查已完成任务的结果
+                                for future in done:
+                                    try:
+                                        future.result()  # 获取结果，检查是否有异常
+                                    except Exception as e:
+                                        print(f"任务执行错误: {e}")
+                        
+                        frame_count += 1
+                    
+                    # 等待所有提交的任务完成
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            future.result()
+                        except Exception as e:
+                            print(f"任务执行错误: {e}")
+                    
+                    # 通知写入线程结束
+                    stop_event.set()
+                    
+                    # 等待写入线程完成
+                    if writer.is_alive():
+                        writer.join(timeout=30)  # 最多等待30秒
+                    
+                    print(f"视频处理完成，共处理 {processed_count['value']}/{total_frames} 帧")
+                    
+                finally:
+                    # 确保释放线程池资源
+                    if frame_executor:
+                        try:
+                            frame_executor.shutdown(wait=True)
+                            print("视频处理线程池已关闭")
+                        except Exception as e:
+                            print(f"关闭视频处理线程池出错: {str(e)}")
                 
             finally:
                 # 释放资源
                 cap.release()
                 out.release()
-                print(f"资源已释放")
+                print(f"视频资源已释放")
             
             # 验证输出文件
             if not os.path.exists(output_path):
@@ -133,18 +271,41 @@ def predict_image(model_path, file_path):
             
             print(f"视频文件已成功生成: {output_path}")
             
+            # 尝试处理结果
+            try:
+                results = model.predict(
+                    source=file_path,
+                    save=False,
+                    conf=0.25
+                )[0]
+            except Exception as e:
+                print(f"获取视频预测结果时出错: {e}")
+                # 创建一个空结果
+                from ultralytics.engine.results import Results
+                results = Results()
+                
         else:
-            # 处理图片
+            # 处理图片 - 检查图片大小并调整
+            img = cv2.imread(file_path)
+            if img is None:
+                raise Exception(f"无法读取图像: {file_path}")
+                
+            # 调整大图像的大小
+            max_dimension = 1280
+            height, width = img.shape[:2]
+            if width > max_dimension or height > max_dimension:
+                # 等比例缩放
+                scale = min(max_dimension / width, max_dimension / height)
+                new_width, new_height = int(width * scale), int(height * scale)
+                img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+                print(f"图像已调整大小: {width}x{height} -> {new_width}x{new_height}")
+                # 保存调整后的图像
+                cv2.imwrite(file_path, img)
+            
+            # 设置图片输出路径
             output_path = 'static/results.jpg'
             
-            # 确保图片文件可以被正常读取
-            try:
-                img = cv2.imread(file_path)
-                if img is None:
-                    raise Exception(f"无法读取图片文件: {file_path}")
-            except Exception as e:
-                raise Exception(f"图片读取失败: {str(e)}")
-                
+            # 进行预测
             results = model.predict(
                 source=file_path,
                 save=False,
@@ -165,6 +326,9 @@ def predict_image(model_path, file_path):
             
             print(f"图片文件已成功生成: {output_path}")
         
+        # 强制进行垃圾回收
+        gc.collect()
+        
         return results, is_video
         
     except Exception as e:
@@ -175,5 +339,6 @@ def predict_image(model_path, file_path):
 if __name__ == "__main__":
     weights_path = "weights/best.pt"  # 替换为实际的模型路径
     image_path = "tiaozhanbei/ceshitu/7.jpg"    # 替换为实际的图片路径
-    predict_image(weights_path, image_path)
+    model = YOLO(weights_path)
+    predict_image(model, image_path)
 
