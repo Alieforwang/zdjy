@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- 直接使用本地ECharts库 -->
+    <script src="{{ url_for('static', filename='js/libs/echarts.min.js') }}"></script>
     <style>
     .result-image {
         max-width: 90%;
@@ -61,7 +62,7 @@
         <div class="logo">数据分析中心</div>
         <div class="nav-right">
             <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
-            <button class="logout-btn" onclick="window.location.href='{{ url_for('logout') }}';">
+            <button class="logout-btn" id="logoutButton">
                 <span class="logout-icon">↩</span>
                 退出登录
             </button>
@@ -177,7 +178,15 @@
             <span class="btn-text">历史记录</span>
         </a>
     </div>
+    {% if is_admin %}
     <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    {% endif %}
+    <div class="bottom-nav7">
         <a href="{{ url_for('settings') }}" class="nav-btn">
             <span class="btn-icon">⚙️</span>
             <span class="btn-text">系统设置</span>
@@ -189,12 +198,19 @@
             <span class="btn-text">关于系统</span>
         </a>
     </div>
+    {% if is_admin %}
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         console.log('页面已加载，事件处理由analysis.js接管');
+        
+        // 添加登出按钮事件监听器
+        document.getElementById('logoutButton').addEventListener('click', function() {
+            window.location.href = '{{ url_for('logout') }}';
+        });
     });
     </script>
 </body>

@@ -1,9 +1,9 @@
-from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory
+from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash
 from flask_cors import CORS
 import util.DBUtil as DBM
 import os
 from werkzeug.utils import secure_filename
-from yolov8 import predict_image
+from yolov8 import predict_image, YOLOv8
 from datetime import timedelta, datetime
 import numpy as np
 import cv2
@@ -11,9 +11,39 @@ from ultralytics import YOLO
 import random
 import decimal
 import json
-from config import AMAP_CONFIG
+from config import AMAP_CONFIG, DB_CONFIG, APP_CONFIG, LOG_CONFIG
 import concurrent.futures
 import threading
+import sys
+import time
+import shutil
+import glob
+import uuid
+import logging
+import gc
+from functools import wraps
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+import traceback
+
+# 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
+os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# 确保临时目录存在
+for dir_path in ['/tmp/matplotlib_config', '/tmp/ultralytics_config']:
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path, exist_ok=True)
 
 # 线程池管理
 thread_pool_lock = threading.RLock()  # 使用可重入锁来保护线程池的创建和访问
@@ -54,43 +84,230 @@ def get_model():
         model_path = os.path.join('models3', 'best.pt')
         if os.path.exists(model_path):
             try:
-                # 加载模型时使用CPU以节省内存（如果没有GPU）
+                # 尝试检测是否有GPU可用
+                try:
+                    import torch
+                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                    logger.info(f"自动选择设备: {device}")
+                except ImportError:
+                    device = 'cpu'
+                    logger.info("无法导入torch，使用CPU设备")
+                
+                # 加载模型，允许自动回退到CPU
                 global_model = YOLO(model_path)
-                print("模型加载成功")
+                logger.info("模型加载成功")
             except Exception as e:
-                print(f"模型加载错误: {str(e)}")
+                logger.error(f"模型加载错误: {str(e)}")
     return global_model
 
 app = Flask(__name__)
-CORS(app)
-app.secret_key = '123456'  # 设置session密钥
+# 增强CORS配置，适应反向代理环境
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "*"}})
 
-# 设置自定义JSON编码器
-app.json_encoder = DecimalEncoder
+# 使用配置文件中的设置
+app.secret_key = APP_CONFIG['SECRET_KEY']
+
+# 添加响应处理钩子，处理反向代理场景下的OPTIONS请求
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # 设置session的配置
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # session有效期7天
+app.config['SESSION_TYPE'] = APP_CONFIG['SESSION_TYPE']
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(seconds=APP_CONFIG['PERMANENT_SESSION_LIFETIME'])  # 使用配置的过期时间
 app.config['SESSION_COOKIE_SECURE'] = False  # 如果不是HTTPS可以设为False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = None  # 修改为None以允许跨域请求传递Cookie
+app.config['SESSION_COOKIE_PATH'] = '/'  # 确保Cookie适用于整个站点
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # 每次请求都刷新会话
+app.config['SESSION_USE_SIGNER'] = True  # 使用签名保护会话
+
+# 添加自定义JSON编码器
+app.json_encoder = DecimalEncoder
 
 # 添加文件上传配置
-UPLOAD_FOLDER = 'static/uploads'
-RESULT_FOLDER = 'static'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi'}
+UPLOAD_FOLDER = APP_CONFIG['UPLOAD_FOLDER']
+ALLOWED_EXTENSIONS = APP_CONFIG['ALLOWED_EXTENSIONS']
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['RESULT_FOLDER'] = 'static'
+app.config['MAX_CONTENT_LENGTH'] = APP_CONFIG['MAX_CONTENT_LENGTH']  # 设置最大上传大小
+
+# 清理旧文件的函数
+def clean_old_files(directory, days_old=7):
+    """
+    清理指定目录中超过一定天数的文件
+    
+    Args:
+        directory: 要清理的目录路径
+        days_old: 超过该天数的文件将被删除，默认为7天
+    """
+    try:
+        logger.info(f"开始清理 {directory} 中超过 {days_old} 天的文件")
+        current_time = time.time()
+        # 确保目录存在
+        if not os.path.exists(directory):
+            logger.warning(f"目录 {directory} 不存在，无法清理")
+            return
+            
+        # 遍历目录中的所有文件
+        for file_name in os.listdir(directory):
+            file_path = os.path.join(directory, file_name)
+            
+            # 跳过目录
+            if os.path.isdir(file_path):
+                continue
+                
+            # 获取文件的最后修改时间
+            file_mod_time = os.path.getmtime(file_path)
+            # 计算文件存在的天数
+            days_existed = (current_time - file_mod_time) / (60 * 60 * 24)
+            
+            # 如果文件存在超过指定天数，则删除
+            if days_existed > days_old:
+                try:
+                    os.remove(file_path)
+                    logger.info(f"已删除旧文件: {file_path}")
+                except Exception as e:
+                    logger.error(f"删除文件 {file_path} 时出错: {str(e)}")
+    except Exception as e:
+        logger.error(f"清理目录 {directory} 时出错: {str(e)}")
+
+# 设置定期重置连接池的任务
+def setup_db_connection_maintenance():
+    """设置数据库连接池维护任务"""
+    from util.DBUtil import reset_connection_pool
+    import threading
+    
+    def reset_pool_periodically():
+        # 每小时重置一次连接池，避免连接池耗尽问题
+        while True:
+            try:
+                # 睡眠1小时
+                time.sleep(3600)
+                # 重置连接池
+                logger.info("执行定期数据库连接池维护...")
+                reset_connection_pool()
+                logger.info("数据库连接池重置完成")
+            except Exception as e:
+                logger.error(f"连接池维护任务出错: {str(e)}")
+    
+    # 在后台线程中运行
+    maintenance_thread = threading.Thread(
+        target=reset_pool_periodically,
+        daemon=True,  # 设为守护线程，主程序结束时自动退出
+        name="db-pool-maintenance"
+    )
+    maintenance_thread.start()
+    logger.info("数据库连接池维护任务已启动")
+
+# 注册清理函数
+def cleanup_resources():
+    """在程序退出时清理资源"""
+    logger.info("开始清理资源...")
+    try:
+        # 尝试重置连接池
+        from util.DBUtil import reset_connection_pool
+        reset_connection_pool()
+        logger.info("数据库连接池已重置")
+    except Exception as e:
+        logger.error(f"重置数据库连接池时出错: {str(e)}")
+    
+    try:
+        # 清理上传的临时文件
+        clean_old_files('static/uploads', days_old=1)
+    except Exception as e:
+        logger.error(f"清理上传文件时出错: {str(e)}")
+    
+    try:
+        # 清理分析结果图片
+        clean_old_files('static/results', days_old=7)
+    except Exception as e:
+        logger.error(f"清理结果文件时出错: {str(e)}")
+        
+    logger.info("资源清理完成")
+
+# 注册退出时的清理函数
+import atexit
+atexit.register(cleanup_resources)
+
+# 在全局范围中定义函数，但不调用
+def session_regenerate():
+    """重新生成会话ID同时保留会话内容"""
+    from flask.sessions import SecureCookieSession
+    if session and isinstance(session, SecureCookieSession):
+        # 备份旧的会话数据
+        old_data = dict(session)
+        # 轮换会话ID
+        session.clear()
+        # 恢复旧数据
+        for k, v in old_data.items():
+            session[k] = v
+        session.modified = True
+
+# 添加请求前处理器，确保会话在每次请求时都被刷新
+@app.before_request
+def make_session_permanent():
+    # 在请求上下文中添加regenerate方法
+    import types
+    if hasattr(session, '_get_current_object') and not hasattr(session, 'regenerate'):
+        try:
+            session.regenerate = types.MethodType(session_regenerate, session)
+        except Exception as e:
+            logger.error(f"添加session.regenerate方法出错: {str(e)}")
+    
+    # 使会话永久化，并在每次访问时重置过期时间
+    if 'user_id' in session:
+        session.permanent = True
+        session.modified = True  # 强制刷新会话
+        # 更新登录时间以保持会话新鲜
+        if 'login_time' in session:
+            # 如果已经过期近1天，则更新登录时间
+            login_time = datetime.strptime(session['login_time'], '%Y-%m-%d %H:%M:%S')
+            if (datetime.now() - login_time).days >= 1:
+                session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"更新会话登录时间: {session['login_time']}")
+        else:
+            # 如果没有登录时间，初始化它
+            session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"初始化会话登录时间: {session['login_time']}")
 
 # 确保必需的目录存在
 def ensure_directories():
+    """确保所有必需的目录都存在"""
     directories = [
         'static',
         'static/uploads',
-        'models'
+        'static/results',
+        'models',
+        'sessions',
+        'tmp'
     ]
     for directory in directories:
-        os.makedirs(directory, exist_ok=True)
+        try:
+            if not os.path.exists(directory):
+                os.makedirs(directory, exist_ok=True)
+                logger.info(f"创建目录: {directory}")
+            else:
+                logger.info(f"目录已存在: {directory}")
+        except Exception as e:
+            logger.error(f"创建目录 {directory} 时出错: {str(e)}")
+    
+    # 创建默认图片，用于加载失败时显示
+    default_image_path = 'static/default_result.jpg'
+    if not os.path.exists(default_image_path):
+        try:
+            # 创建一个简单的默认图像
+            img = np.ones((400, 600, 3), dtype=np.uint8) * 240  # 浅灰色背景
+            # 添加文本
+            cv2.putText(img, "无法加载图像", (150, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 100, 100), 2)
+            cv2.imwrite(default_image_path, img)
+            logger.info(f"创建默认图像: {default_image_path}")
+        except Exception as e:
+            logger.error(f"创建默认图像时出错: {str(e)}")
 
 # 在应用启动时创建目录
 ensure_directories()
@@ -104,6 +321,8 @@ def init_db_user():
     # 创建 user 表
     db.create_table("user")
 
+# 创建模型实例 - 使用CPU设备而非CUDA
+model = YOLOv8(weights='models/best.pt', device='cpu', load_params={'weights_only': True})
 
 @app.route('/')
 def index():
@@ -166,6 +385,11 @@ def get_user_status():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # 对于GET请求，重定向到登录页面
+    if request.method == 'GET':
+        return redirect(url_for('login_page'))
+    
+    # 处理POST请求的登录逻辑
     if request.method == 'POST':
         data = request.get_json()
         username = data.get('username')
@@ -192,12 +416,20 @@ def login():
                     if not is_admin and user_is_admin:
                         return jsonify({'success': False, 'message': '请使用管理员登录入口'})
                     
-                    # 设置session为永久的，并遵守配置的生存期
+                    # 清除任何可能存在的旧会话数据
+                    session.clear()
+                    
+                    # 设置会话为永久的，并遵守配置的生存期
                     session.permanent = True
                     session['user_id'] = user_id
                     session['username'] = username
                     session['is_admin'] = user_is_admin
                     session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    session['login_ip'] = request.remote_addr
+                    session.modified = True
+                    
+                    # 记录登录成功
+                    logger.info(f"用户 {username} 登录成功，IP: {request.remote_addr}")
                     
                     # 根据用户类型重定向到不同页面
                     if user_is_admin:
@@ -205,16 +437,19 @@ def login():
                     else:
                         return jsonify({'success': True, 'redirect': '/user'})
                     
+            # 登录失败记录
+            logger.warning(f"登录失败: 用户名 {username}，IP: {request.remote_addr}")
             return jsonify({'success': False, 'message': '用户名或密码错误'})
             
         except Exception as e:
-            print(f"登录错误: {str(e)}")
+            logger.error(f"登录错误: {str(e)}")
             return jsonify({'success': False, 'message': '登录过程出错'})
             
         finally:
             if 'db' in locals():
                 db.disconnect()
-                
+    
+    # 不应该到达这里，但作为保险
     return jsonify({'success': False, 'message': '不支持的请求方法'})
 
 @app.route('/logout')
@@ -224,8 +459,30 @@ def logout():
 
 @app.route('/analysis')
 def analysis():
+    # 直接检查会话状态
     if 'user_id' not in session:
+        # 记录未登录访问尝试
+        logger.warning(f"未登录用户尝试访问分析页面，IP: {request.remote_addr}")
+        # 在重定向前尝试强制刷新会话
+        try:
+            session.modified = True
+            # 尝试调用regenerate方法，但要处理它可能不存在的情况
+            if hasattr(session, 'regenerate'):
+                try:
+                    session.regenerate()
+                except Exception as e:
+                    logger.error(f"重新生成会话时出错: {str(e)}")
+        except Exception:
+            pass  # 忽略可能的错误
         return redirect(url_for('login_page'))
+    
+    # 显式刷新会话以确保不会过期
+    session.modified = True
+    
+    # 记录成功访问日志
+    logger.info(f"用户 {session.get('username')} 访问分析页面")
+    
+    # 直接渲染模板，不使用前端重定向
     return render_template('analysis.html', is_admin=session.get('is_admin', False))
 
 @app.route('/monitor')
@@ -255,262 +512,167 @@ def delete_job(job_id):
     print("DELETE FROM gw_list WHERE id = {}".format(job_id))
     return jsonify({"message": "Job deleted successfully!"})
 
-@app.route('/upload_analyze', methods=['POST'])
+@app.route('/api/analyze', methods=['POST'])
 def upload_analyze():
+    """
+    处理上传的图片并进行分析
+    """
+    thread_pool = get_thread_pool()
+    
     if 'file' not in request.files:
-        print("错误: 请求中没有文件")
-        return jsonify({'success': False, 'message': '没有文件'}), 400
+        return jsonify({"error": "No file part"}), 400
     
-    if 'user_id' not in session:
-        print("错误: 用户未登录")
-        return jsonify({'success': False, 'message': '请先登录'}), 401
+    file = request.files['file']
     
-    try:
-        file = request.files['file']
-        if file.filename == '':
-            print("错误: 未选择文件")
-            return jsonify({'success': False, 'message': '未选择文件'}), 400
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    if file:
+        # 创建一个唯一的文件名
+        filename = secure_filename(file.filename)
+        timestamp = int(time.time())
+        unique_filename = f"{os.path.splitext(filename)[0]}_{timestamp}_{random.randint(1000, 9999)}{os.path.splitext(filename)[1]}"
         
-        if file and allowed_file(file.filename):
-            # 确保目录存在
-            ensure_directories()
+        # 保存上传的文件
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(filepath)
+        
+        try:
+            # 在后台线程中处理图像和清理旧文件
+            thread_pool.submit(clean_old_files, app.config['UPLOAD_FOLDER'], 7)
+            thread_pool.submit(clean_old_files, app.config['RESULT_FOLDER'], 7)
             
-            # 获取线程池
-            thread_pool = get_thread_pool()
+            # 使用新的YOLOv8模型实例进行预测
+            logger.info(f"开始分析图像: {filepath}")
+            results = model.predict(filepath, conf_threshold=0.25)
             
-            # 清理之前的上传文件 - 保留最近10个文件以节省空间
-            def clean_old_files():
-                try:
-                    upload_dir = app.config['UPLOAD_FOLDER']
-                    files = sorted([os.path.join(upload_dir, f) for f in os.listdir(upload_dir) 
-                                if os.path.isfile(os.path.join(upload_dir, f))],
-                                key=os.path.getmtime)
-                    
-                    # 如果文件数超过10个，删除最旧的文件
-                    if len(files) > 10:
-                        for old_file in files[:-10]:
-                            try:
-                                os.remove(old_file)
-                                print(f"已删除旧文件: {old_file}")
-                            except Exception as e:
-                                print(f"警告: 无法删除旧文件 {old_file}: {str(e)}")
-                except Exception as e:
-                    print(f"清理旧文件时出错: {str(e)}")
+            if results is None or len(results) == 0:
+                return jsonify({"error": "No detection results"}), 400
             
-            # 使用线程池异步清理旧文件，不阻塞主流程
-            thread_pool.submit(clean_old_files)
+            result = results[0]  # 获取第一个结果
             
-            # 生成带随机数的文件名，避免缓存问题
-            import random
-            import time
-            random_suffix = f"{int(time.time())}_{random.randint(1000, 9999)}"
-            filename = secure_filename(file.filename)
-            base_name, ext = os.path.splitext(filename)
-            unique_filename = f"{base_name}_{random_suffix}{ext}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            # 提取边界框和类别
+            boxes = result.boxes.xyxy.cpu().numpy()
+            classes = result.boxes.cls.cpu().numpy()
+            confs = result.boxes.conf.cpu().numpy()
             
-            # 保存新文件
-            file.save(filepath)
-            print(f"上传文件已保存为: {filepath}")
+            # 将结果保存为图像
+            result_img = result.plot()
+            result_filename = f"result_{unique_filename}"
+            result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+            cv2.imwrite(result_path, result_img)
             
-            # 验证文件是否成功保存
-            if not os.path.exists(filepath):
-                print(f"错误: 文件保存失败 {filepath}")
-                return jsonify({'success': False, 'message': '文件保存失败'}), 500
-            
-            # 异步清理之前的结果文件
-            def clean_result_files():
-                for result_file in ['static/results.jpg', 'static/results.mp4', 'static/results.avi']:
-                    if os.path.exists(result_file):
-                        try:
-                            os.remove(result_file)
-                        except Exception as e:
-                            print(f"警告: 无法删除旧结果文件 {result_file}: {str(e)}")
-            
-            thread_pool.submit(clean_result_files)
-            
-            # 获取全局模型实例
-            model = get_model()
-            if model is None:
-                print("错误: 无法加载模型")
-                return jsonify({'success': False, 'message': '模型加载失败'}), 500
-            
-            # 定义预处理函数，处理大图像
-            def preprocess_image(file_path):
-                try:
-                    # 如果文件大于5MB，尝试调整图像大小以减少内存使用
-                    file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
-                    if file_size > 5 and file_path.lower().endswith(('.jpg', '.jpeg', '.png')):
-                        img = cv2.imread(file_path)
-                        if img is not None:
-                            height, width = img.shape[:2]
-                            # 如果图像尺寸太大，调整大小
-                            if height > 1000 or width > 1000:
-                                scale = min(1000 / height, 1000 / width)
-                                new_size = (int(width * scale), int(height * scale))
-                                img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
-                                cv2.imwrite(file_path, img)
-                                print(f"已调整图像大小: {file_path} -> {new_size}")
-                    return True
-                except Exception as e:
-                    print(f"图像预处理错误: {str(e)}")
-                    return False
-            
-            # 使用线程池异步处理图像预处理
-            preprocess_future = thread_pool.submit(preprocess_image, filepath)
-            try:
-                # 等待预处理完成，设置超时以防止无限等待
-                preprocess_success = preprocess_future.result(timeout=10)
-                if not preprocess_success:
-                    return jsonify({'success': False, 'message': '图像预处理失败'}), 500
+            # 准备响应数据
+            detections = []
+            for i in range(len(boxes)):
+                box = boxes[i]
+                cls_id = int(classes[i])
+                conf = float(confs[i])
                 
-                # 调用预测函数
-                results, is_video = predict_image(model, filepath)
-            except concurrent.futures.TimeoutError:
-                print(f"图像预处理超时")
-                return jsonify({'success': False, 'message': '图像预处理超时'}), 500
-            except Exception as e:
-                print(f"预测错误: {str(e)}")
-                return jsonify({'success': False, 'message': f'图像分析失败: {str(e)}'}), 500
-            
-            # 根据文件类型确定结果路径和MIME类型
-            if is_video:
-                result_path = 'static/results.mp4'
-                mime_type = 'video/mp4'
-            else:
-                result_path = 'static/results.jpg'
-                mime_type = 'image/jpeg'
-            
-            if not os.path.exists(result_path):
-                print(f"错误: 生成结果文件失败 {result_path}")
-                return jsonify({'success': False, 'message': '生成结果文件失败'}), 500
-            
-            # 定义异步保存分析记录到数据库的函数
-            def save_analysis_record():
-                try:
-                    db = DBM.DatabaseManager()
-                    db.connect()
-                    
-                    # 获取检测结果信息
-                    detect_type = "未知"
-                    confidence = 0.0
-                    location = "未指定"
-                    
-                    if hasattr(results, 'boxes') and len(results.boxes) > 0:
-                        # 获取置信度最高的检测结果
-                        best_box = results.boxes[0]
-                        confidence = float(best_box.conf[0])
-                        cls = int(best_box.cls[0])
-                        class_name = results.names[cls]
-                        
-                        # 根据模型输出的类别名称映射到系统使用的类型值
-                        type_mapping = {
-                            'ld': 'zdjy_ld',  # 流动摊位
-                            'gd': 'zdjy_gd'   # 固定摊位
-                        }
-                        detect_type = type_mapping.get(class_name, class_name)
-                    
-                    # 插入记录
-                    insert_query = """
-                    INSERT INTO analysis_records 
-                    (user_id, file_type, file_path, result_path, detect_type, location, confidence)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """
-                    params = (
-                        session['user_id'],
-                        'video' if is_video else 'image',
-                        filepath,
-                        result_path,
-                        detect_type,
-                        location,
-                        confidence
-                    )
-                    
-                    db.update_data(insert_query, params)
-                    
-                    # 更新统计数据
-                    today = datetime.now().date()
-                    
-                    # 获取当前统计数据
-                    get_current_stats = """
-                    SELECT daily_count, total_count 
-                    FROM detection_stats 
-                    WHERE user_id = %s AND detection_date = %s
-                    """
-                    current_stats = db.query_data(get_current_stats, (session['user_id'], today))
-                    
-                    if current_stats:
-                        # 更新现有记录
-                        update_stats = """
-                        UPDATE detection_stats 
-                        SET daily_count = daily_count + 1,
-                            total_count = total_count + 1
-                        WHERE user_id = %s AND detection_date = %s
-                        """
-                        db.update_data(update_stats, (session['user_id'], today))
-                    else:
-                        # 获取历史总数
-                        get_total = """
-                        SELECT COALESCE(MAX(total_count), 0) 
-                        FROM detection_stats 
-                        WHERE user_id = %s
-                        """
-                        total_result = db.query_data(get_total, (session['user_id'],))
-                        previous_total = total_result[0][0] if total_result else 0
-                        
-                        # 插入新记录
-                        insert_stats = """
-                        INSERT INTO detection_stats 
-                        (user_id, detection_date, daily_count, total_count)
-                        VALUES (%s, %s, 1, %s)
-                        """
-                        db.update_data(insert_stats, (session['user_id'], today, previous_total + 1))
-                    
-                    db.disconnect()
-                    print(f"分析记录已保存到数据库")
-                    
-                    return {
-                        'daily_count': current_stats[0][0] + 1 if current_stats else 1,
-                        'total_count': current_stats[0][1] + 1 if current_stats else previous_total + 1
-                    }
-                except Exception as e:
-                    print(f"保存分析记录错误: {str(e)}")
-                    return {'daily_count': 0, 'total_count': 0}
-            
-            # 异步保存分析记录
+                detections.append({
+                    "box": [float(x) for x in box],
+                    "class": cls_id,
+                    "confidence": conf,
+                    "name": "占道经营" if cls_id == 0 else f"未知类别-{cls_id}"
+                })
+                
+            # 创建数据库连接并保存分析结果
             try:
-                # 再次获取线程池，以防在处理过程中线程池被关闭
-                thread_pool = get_thread_pool()
-                db_future = thread_pool.submit(save_analysis_record)
+                db = DBM.DatabaseManager()
+                db.connect()
+                
+                # 获取当前用户ID
+                user_id = session.get('user_id')
+                if not user_id:
+                    user_id = 1  # 默认用户ID，如果没有登录
+                
+                # 保存分析记录
+                insert_query = """
+                INSERT INTO analysis_records 
+                (user_id, file_type, file_path, result_path, detect_type, confidence, created_at) 
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                """
+                
+                # 设置默认值
+                file_type = 'image'
+                detect_type = 'zdjy_ld'  # 默认为流动摊位
+                avg_confidence = 0.0
+                
+                # 计算平均置信度
+                if detections:
+                    avg_confidence = sum(d["confidence"] for d in detections) / len(detections)
+                
+                # 执行插入
+                db.update_data(
+                    insert_query, 
+                    (user_id, file_type, filepath, result_path, detect_type, avg_confidence)
+                )
+                
+                db.disconnect()
+                
             except Exception as e:
-                print(f"提交数据库任务时出错: {str(e)}")
-                # 如果提交任务失败，同步执行数据库保存
-                save_analysis_record()
+                logger.error(f"保存分析结果到数据库时出错: {str(e)}")
+                # 继续处理，不因数据库错误而中断整个分析过程
             
-            # 首先返回结果给用户，不等待数据库操作完成
             return jsonify({
-                'success': True,
-                'message': '分析完成',
-                'original_image': f'/static/uploads/{unique_filename}',
-                'result_image': f'/{result_path}',
-                'is_video': is_video,
-                'async_processing': True
+                "success": True,
+                "message": "图像分析完成",
+                "result_image": url_for('get_result', filename=result_filename),
+                "uploaded_image": url_for('get_upload', filename=unique_filename),
+                "detections": detections,
+                "detection_count": len(detections)
             })
-        else:
-            print(f"错误: 不支持的文件类型 {file.filename}")
-            allowed_extensions_str = ', '.join(ALLOWED_EXTENSIONS)
-            return jsonify({'success': False, 'message': f'不支持的文件类型，请上传 {allowed_extensions_str} 格式'}), 400
             
-    except Exception as e:
-        print(f"分析错误: {str(e)}")
-        return jsonify({'success': False, 'message': f'分析过程出错: {str(e)}'}), 500
+        except Exception as e:
+            logger.error(f"图像分析错误: {str(e)}")
+            traceback.print_exc()
+            return jsonify({"error": str(e)}), 500
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    response = send_from_directory('static', filename)
-    if filename.endswith('.mp4'):
-        response.headers['Content-Type'] = 'video/mp4'
-    return response
+    """提供静态文件访问，包括默认图片"""
+    try:
+        # 如果是默认图片，直接返回
+        if filename == 'default_result.jpg':
+            return send_from_directory('static', filename)
+            
+        # 检查文件是否存在
+        file_path = os.path.join('static', filename)
+        if not os.path.exists(file_path):
+            logger.warning(f"请求的文件不存在: {filename}")
+            # 如果文件不存在，返回默认图片
+            return send_from_directory('static', 'default_result.jpg')
+            
+        # 根据文件类型设置正确的Content-Type
+        content_type = None
+        if filename.endswith('.mp4'):
+            content_type = 'video/mp4'
+        elif filename.endswith(('.jpg', '.jpeg')):
+            content_type = 'image/jpeg'
+        elif filename.endswith('.png'):
+            content_type = 'image/png'
+        elif filename.endswith('.gif'):
+            content_type = 'image/gif'
+            
+        response = send_from_directory('static', filename)
+        if content_type:
+            response.headers['Content-Type'] = content_type
+        return response
+        
+    except Exception as e:
+        logger.error(f"提供静态文件时出错: {str(e)}")
+        # 发生错误时返回默认图片
+        return send_from_directory('static', 'default_result.jpg')
+
+@app.route('/get_result/<path:filename>')
+def get_result(filename):
+    """提供结果图像的静态文件访问"""
+    return send_from_directory(app.config['RESULT_FOLDER'], filename)
+
+@app.route('/get_upload/<path:filename>')
+def get_upload(filename):
+    """提供上传图像的静态文件访问"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # 添加获取历史记录的接口
 @app.route('/api/history', methods=['GET'])
@@ -606,35 +768,62 @@ def get_history():
 
 @app.route('/check_login')
 def check_login():
-    if 'user_id' in session:
-        # 检查登录时间，计算剩余有效期
-        login_time = session.get('login_time')
-        current_time = datetime.now()
-        
-        if login_time:
-            login_datetime = datetime.strptime(login_time, '%Y-%m-%d %H:%M:%S')
-            time_elapsed = current_time - login_datetime
-            time_remaining = app.config['PERMANENT_SESSION_LIFETIME'] - time_elapsed
-            days_remaining = time_remaining.days
+    # 增强版会话检查
+    try:
+        if 'user_id' in session:
+            # 确保会话被标记为已修改，以更新过期时间
+            session.modified = True
             
+            # 检查登录时间，计算剩余有效期
+            login_time = session.get('login_time')
+            current_time = datetime.now()
+            
+            if login_time:
+                login_datetime = datetime.strptime(login_time, '%Y-%m-%d %H:%M:%S')
+                time_elapsed = current_time - login_datetime
+                time_remaining = app.config['PERMANENT_SESSION_LIFETIME'] - time_elapsed
+                days_remaining = time_remaining.days
+                
+                # 如果会话即将过期，刷新会话的创建时间
+                if days_remaining < 1:
+                    session['login_time'] = current_time.strftime('%Y-%m-%d %H:%M:%S')
+                    print(f"会话即将过期，已刷新: {session['login_time']}")
+                    days_remaining = app.config['PERMANENT_SESSION_LIFETIME'].days
+                
+                # 记录日志以便调试
+                logger.info(f"用户 {session.get('username')} 的会话有效，剩余 {days_remaining} 天")
+                
+                return jsonify({
+                    'logged_in': True,
+                    'username': session.get('username', ''),
+                    'user_id': session.get('user_id'),
+                    'is_admin': session.get('is_admin', False),
+                    'session_expires_in_days': days_remaining
+                })
+            
+            # 如果没有登录时间但有用户ID，仍然认为会话有效
+            logger.info(f"用户 {session.get('username')} 的会话有效，但没有登录时间记录")
             return jsonify({
                 'logged_in': True,
                 'username': session.get('username', ''),
                 'user_id': session.get('user_id'),
-                'is_admin': session.get('is_admin', False),
-                'session_expires_in_days': days_remaining
+                'is_admin': session.get('is_admin', False)
             })
         
+        # 如果会话中没有用户ID，返回未登录状态
+        logger.info("用户未登录或会话已过期")
         return jsonify({
-            'logged_in': True,
-            'username': session.get('username', ''),
-            'user_id': session.get('user_id'),
-            'is_admin': session.get('is_admin', False)
+            'logged_in': False,
+            'message': '用户未登录或 session 已过期'
         })
-    return jsonify({
-        'logged_in': False,
-        'message': '用户未登录或 session 已过期'
-    })
+    except Exception as e:
+        # 捕获并记录可能的异常
+        logger.error(f"检查登录状态时出错: {str(e)}")
+        # 异常情况下仍然返回未登录状态，确保前端能继续工作
+        return jsonify({
+            'logged_in': False,
+            'message': f'检查登录状态时出错: {str(e)}'
+        })
 
 @app.route('/download_result/<path:filename>')
 def download_result(filename):
@@ -655,46 +844,137 @@ def download_result(filename):
 
 @app.route('/api/latest_result', methods=['GET'])
 def get_latest_result():
+    """获取用户最新的分析记录，使用简化逻辑降低出错风险"""
+    # 检查登录状态
     if 'user_id' not in session:
+        logger.warning(f"未登录用户尝试访问最新结果API: {request.remote_addr}")
         return jsonify({'success': False, 'message': '请先登录'}), 401
-        
+    
     try:
+        # 创建一个默认的返回结果
+        default_result = {
+            'success': False,
+            'message': '没有分析记录',
+            'data': {
+                'file_type': 'image',
+                'file_path': '/static/default_result.jpg',
+                'result_image': '/static/default_result.jpg',
+                'is_video': False,
+                'detect_type': 'unknown',
+                'confidence': None
+            }
+        }
+        
+        # 尝试从数据库获取数据
+        logger.info(f"用户 {session.get('username')} 请求最新结果数据")
+        
+        # 创建数据库连接
         db = DBM.DatabaseManager()
         db.connect()
         
-        # 获取当前用户最新的分析记录
-        query = """
-        SELECT * FROM analysis_records 
-        WHERE user_id = %s 
-        ORDER BY created_at DESC 
-        LIMIT 1
-        """
-        result = db.query_data(query, (session['user_id'],))
+        # 获取用户ID
+        user_id = session.get('user_id')
+        if not user_id:
+            logger.error("会话中有用户ID但获取失败")
+            return jsonify(default_result), 500
         
-        if result and len(result) > 0:
-            record = result[0]
-            # 确保confidence是float类型
-            confidence = float(record[7]) if record[7] is not None else None
+        try:
+            # 简化查询
+            query = "SELECT * FROM analysis_records WHERE user_id = %s ORDER BY created_at DESC LIMIT 1"
+            result = db.query_data(query, (user_id,))
             
-            return jsonify({
-                'success': True,
-                'data': {
-                    'file_type': record[2],
-                    'file_path': f'/static/uploads/{os.path.basename(record[3])}',
-                    'result_image': f'/{record[4]}',
-                    'is_video': record[2] == 'video',
-                    'detect_type': record[5],
-                    'confidence': confidence
+            # 检查结果
+            if not result or len(result) == 0:
+                logger.info(f"用户 {session.get('username')} 没有分析记录")
+                db.disconnect()
+                return jsonify(default_result)
+
+            # 解析记录
+            record = result[0]
+            logger.info(f"找到记录: ID={record[0] if len(record) > 0 else 'unknown'}")
+            
+            # 安全地提取数据
+            try:
+                # 准备返回数据
+                response_data = {
+                    'success': True,
+                    'data': {
+                        'file_type': 'image',  # 默认为图像
+                        'file_path': '/static/default_result.jpg',  # 默认图片
+                        'result_image': '/static/default_result.jpg',  # 默认图片
+                        'is_video': False,
+                        'detect_type': 'unknown',
+                        'confidence': None
+                    }
                 }
-            })
-        else:
-            return jsonify({'success': False, 'message': '没有分析记录'})
+                
+                # 逐个安全地获取字段
+                if len(record) > 2 and record[2]:
+                    response_data['data']['file_type'] = str(record[2])
+                    response_data['data']['is_video'] = (str(record[2]) == 'video')
+                
+                if len(record) > 3 and record[3]:
+                    file_path = str(record[3])
+                    # 确保路径格式正确
+                    if file_path:
+                        if not file_path.startswith('/static/'):
+                            file_path = f'/static/uploads/{os.path.basename(file_path)}'
+                        response_data['data']['file_path'] = file_path
+                
+                if len(record) > 4 and record[4]:
+                    result_path = str(record[4])
+                    # 确保路径格式正确
+                    if result_path:
+                        if result_path.startswith('static/'):
+                            result_path = f'/{result_path}'
+                        elif not result_path.startswith('/'):
+                            result_path = f'/{result_path}'
+                        response_data['data']['result_image'] = result_path
+                
+                if len(record) > 5 and record[5]:
+                    response_data['data']['detect_type'] = str(record[5])
+                
+                if len(record) > 7 and record[7] is not None:
+                    try:
+                        response_data['data']['confidence'] = float(record[7])
+                    except (ValueError, TypeError):
+                        logger.warning(f"无法转换置信度为浮点数: {record[7]}")
+                
+                # 安全关闭数据库连接
+                db.disconnect()
+                
+                # 返回数据
+                return jsonify(response_data)
+                
+            except Exception as e:
+                logger.error(f"处理记录数据时出错: {str(e)}")
+                db.disconnect()
+                return jsonify(default_result)
+                
+        except Exception as e:
+            logger.error(f"查询数据库时出错: {str(e)}")
+            db.disconnect()
+            return jsonify(default_result)
             
     except Exception as e:
-        print(f"获取最新结果错误: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-    finally:
-        db.disconnect()
+        # 记录详细的异常信息
+        error_msg = f"获取最新结果时出现未处理异常: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        
+        # 返回简化的错误响应，避免泄露敏感信息
+        return jsonify({
+            'success': False,
+            'message': '服务器处理请求时出错',
+            'data': {
+                'file_type': 'image',
+                'file_path': '/static/default_result.jpg',
+                'result_image': '/static/default_result.jpg',
+                'is_video': False,
+                'detect_type': 'unknown',
+                'confidence': None
+            }
+        }), 500
 
 @app.route('/api/stats')
 def get_stats():
@@ -906,10 +1186,27 @@ def analyze_frame():
         print(f"分析帧错误: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/api/analysis/chart-data')
+@app.route('/api/analysis/chart-data', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'])
 def get_chart_data():
+    # 处理OPTIONS请求，用于CORS预检
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    # 增强版会话验证 - 检查用户是否已登录
     if 'user_id' not in session:
-        return jsonify({'trend': {'dates': [], 'counts': []}, 'distribution': []}), 401
+        logger.warning(f"未授权访问图表数据API: {request.remote_addr}")
+        # 明确返回401状态码，使前端知道需要重新登录
+        return jsonify({
+            'success': False,
+            'message': '会话已过期，请重新登录',
+            'trend': {'dates': [], 'counts': []}, 
+            'distribution': []
+        }), 401
+    
+    # 记录合法API访问
+    logger.info(f"用户 {session.get('username')} 访问图表数据API")
+    # 显式刷新会话，确保会话持续有效
+    session.modified = True
         
     try:
         db = DBM.DatabaseManager()
@@ -983,7 +1280,7 @@ def get_chart_data():
         })
         
     except Exception as e:
-        print(f"获取图表数据错误: {str(e)}")
+        logger.error(f"获取图表数据错误: {str(e)}")
         # 返回空数据而不是错误状态，让前端能够正常显示
         return jsonify({
             'trend': {'dates': [], 'counts': []},
@@ -1004,14 +1301,22 @@ def user_home():
 
 @app.route('/user_management')
 def user_management():
-    if 'user_id' not in session or not session.get('is_admin'):
+    # 检查用户是否已登录
+    if 'user_id' not in session:
         return redirect(url_for('login_page'))
-    return render_template('user_management.html')
+    
+    # 检查用户是否有管理员权限
+    is_admin = session.get('is_admin', False)
+    if not is_admin:
+        flash('您没有权限访问此页面')
+        return redirect(url_for('index'))
+    
+    return render_template('user_management.html', is_admin=is_admin)
 
 @app.route('/api/users', methods=['GET'])
 def get_users():
     if 'user_id' not in session or not session.get('is_admin'):
-        return jsonify({'success': False, 'message': '未登录或无权限'})
+        return jsonify({'success': False, 'message': '未登录或无权限'}), 401
     
     try:
         db = DBM.DatabaseManager()
@@ -1034,7 +1339,7 @@ def get_users():
 @app.route('/api/users', methods=['POST'])
 def add_user():
     if 'user_id' not in session or not session.get('is_admin'):
-        return jsonify({'success': False, 'message': '未登录或无权限'})
+        return jsonify({'success': False, 'message': '未登录或无权限'}), 401
     
     try:
         data = request.get_json()
@@ -1043,7 +1348,7 @@ def add_user():
         is_admin = data.get('is_admin', False)
         
         if not username or not password:
-            return jsonify({'success': False, 'message': '用户名和密码不能为空'})
+            return jsonify({'success': False, 'message': '用户名和密码不能为空'}), 400
         
         db = DBM.DatabaseManager()
         db.connect()
@@ -1052,7 +1357,7 @@ def add_user():
         existing_user = db.query_data('SELECT id FROM user WHERE username = %s', (username,))
         if existing_user:
             db.disconnect()
-            return jsonify({'success': False, 'message': '用户名已存在'})
+            return jsonify({'success': False, 'message': '用户名已存在'}), 400
         
         # 添加新用户
         db.update_data(
@@ -1068,7 +1373,7 @@ def add_user():
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     if 'user_id' not in session or not session.get('is_admin'):
-        return jsonify({'success': False, 'message': '未登录或无权限'})
+        return jsonify({'success': False, 'message': '未登录或无权限'}), 401
     
     try:
         data = request.get_json()
@@ -1077,7 +1382,7 @@ def update_user(user_id):
         is_admin = data.get('is_admin', False)
         
         if not username:
-            return jsonify({'success': False, 'message': '用户名不能为空'})
+            return jsonify({'success': False, 'message': '用户名不能为空'}), 400
         
         db = DBM.DatabaseManager()
         db.connect()
@@ -1089,7 +1394,7 @@ def update_user(user_id):
         )
         if existing_user:
             db.disconnect()
-            return jsonify({'success': False, 'message': '用户名已存在'})
+            return jsonify({'success': False, 'message': '用户名已存在'}), 400
         
         # 更新用户信息
         if password:
@@ -1111,12 +1416,12 @@ def update_user(user_id):
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     if 'user_id' not in session or not session.get('is_admin'):
-        return jsonify({'success': False, 'message': '未登录或无权限'})
+        return jsonify({'success': False, 'message': '未登录或无权限'}), 401
     
     try:
         # 不允许删除自己
         if user_id == session['user_id']:
-            return jsonify({'success': False, 'message': '不能删除当前登录用户'})
+            return jsonify({'success': False, 'message': '不能删除当前登录用户'}), 400
         
         db = DBM.DatabaseManager()
         db.connect()
@@ -1125,7 +1430,7 @@ def delete_user(user_id):
         user = db.query_data('SELECT id FROM user WHERE id = %s', (user_id,))
         if not user:
             db.disconnect()
-            return jsonify({'success': False, 'message': '用户不存在'})
+            return jsonify({'success': False, 'message': '用户不存在'}), 404
         
         # 删除用户
         db.delete_data('DELETE FROM user WHERE id = %s', (user_id,))
@@ -1219,68 +1524,259 @@ def shutdown_thread_pool(exception=None):
     # 系统关闭时会由cleanup_resources函数处理
     pass
 
-# 设置进程终止时的清理函数
-def cleanup_resources():
-    print("正在清理资源...")
-    # 关闭线程池
-    global thread_pool_executor
-    if thread_pool_executor and not thread_pool_executor._shutdown:
-        try:
-            thread_pool_executor.shutdown(wait=True)  # 等待所有任务完成后关闭
-            print("线程池已关闭")
-        except Exception as e:
-            print(f"关闭线程池时出错: {str(e)}")
-    
-    # 清理其他资源
-    global global_model
-    if global_model:
-        global_model = None
-        print("模型资源已清理")
-    
-    # 尝试关闭所有数据库连接
+# 初始化应用
+def init_app():
+    """初始化应用配置和资源"""
     try:
-        from util.DBUtil import connection_pool
-        if connection_pool:
-            # 关闭连接池中的所有连接
-            for cnx in connection_pool._cnx_queue.queue:
-                if hasattr(cnx, 'is_connected') and cnx.is_connected():
-                    try:
-                        cnx.close()
-                    except:
-                        pass
-            print("数据库连接池已清理")
-    except:
-        pass
-    
-    print("资源清理完成")
+        # 设置数据库连接池维护
+        setup_db_connection_maintenance()
+        logger.info("数据库连接池维护任务已设置")
+        
+        # 确保必要的目录存在
+        for directory in ['static/uploads', 'static/results', 'sessions']:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+                logger.info(f"创建目录: {directory}")
+    except Exception as e:
+        logger.error(f"初始化应用时出错: {str(e)}")
 
-# 注册清理函数
-import atexit
-atexit.register(cleanup_resources)
+# 应用启动时调用初始化
+init_app()
+
+# 个人中心路由
+@app.route('/profile')
+def profile():
+    # 检查用户是否已登录
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    
+    # 获取is_admin属性
+    is_admin = session.get('is_admin', False)
+    
+    return render_template('profile.html', is_admin=is_admin)
+
+# 个人中心API - 获取用户信息
+@app.route('/api/profile')
+def get_profile():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': '用户未登录'}), 401
+    
+    try:
+        db = DBM.DatabaseManager()
+        db.connect()
+        
+        # 获取用户信息
+        query = "SELECT id, username, is_admin, created_at FROM user WHERE id = %s"
+        result = db.query_data(query, (session['user_id'],))
+        
+        if not result:
+            return jsonify({'success': False, 'message': '用户不存在'}), 404
+        
+        # 获取最后登录时间（模拟数据，实际应从登录记录表获取）
+        last_login = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        user_data = {
+            'success': True,
+            'user_id': result[0][0],
+            'username': result[0][1],
+            'is_admin': bool(result[0][2]),
+            'created_at': result[0][3].isoformat() if result[0][3] else None,
+            'last_login': last_login
+        }
+        
+        db.disconnect()
+        return jsonify(user_data)
+    
+    except Exception as e:
+        logger.error(f"获取用户信息失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取用户信息失败: {str(e)}'}), 500
+
+# 个人中心API - 修改密码
+@app.route('/api/profile/change_password', methods=['POST'])
+def change_password():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': '用户未登录'}), 401
+    
+    try:
+        data = request.get_json()
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            return jsonify({'success': False, 'message': '密码不能为空'}), 400
+        
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'message': '新密码长度必须至少为6位'}), 400
+        
+        db = DBM.DatabaseManager()
+        db.connect()
+        
+        # 验证当前密码
+        query = "SELECT password FROM user WHERE id = %s"
+        result = db.query_data(query, (session['user_id'],))
+        
+        if not result:
+            return jsonify({'success': False, 'message': '用户不存在'}), 404
+        
+        stored_password = result[0][0]
+        
+        # 验证当前密码是否正确
+        if not compare_passwords(current_password, stored_password):
+            return jsonify({'success': False, 'message': '当前密码不正确'}), 400
+        
+        # 更新密码
+        hashed_password = hash_password(new_password)
+        update_query = "UPDATE user SET password = %s WHERE id = %s"
+        db.update_data(update_query, (hashed_password, session['user_id']))
+        
+        db.disconnect()
+        
+        # 记录密码变更操作
+        logger.info(f"用户 {session.get('username')} 修改了密码，IP: {request.remote_addr}")
+        
+        return jsonify({'success': True, 'message': '密码修改成功'})
+    
+    except Exception as e:
+        logger.error(f"修改密码失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'修改密码失败: {str(e)}'}), 500
+
+# 个人中心API - 获取操作日志
+@app.route('/api/profile/logs')
+def get_operation_logs():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': '用户未登录'}), 401
+    
+    try:
+        # 获取查询参数
+        page = int(request.args.get('page', 1))
+        days = int(request.args.get('days', 7))
+        log_type = request.args.get('type', 'all')
+        
+        # 每页显示数量
+        per_page = 10
+        
+        # 计算偏移量
+        offset = (page - 1) * per_page
+        
+        # 构建示例日志数据（实际应从日志表获取）
+        # 这里使用模拟数据，实际项目中应从数据库获取真实日志
+        logs = []
+        log_types = ['登录', '检测', '分析', '查询']
+        descriptions = [
+            '用户登录系统',
+            '执行占道经营检测任务',
+            '分析历史数据',
+            '查询统计报表',
+            '修改用户密码',
+            '导出数据报表'
+        ]
+        
+        # 生成随机日志数据
+        import random
+        from datetime import datetime, timedelta
+        
+        # 计算日期范围
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # 总日志数量（实际应从数据库查询）
+        total_logs = 35
+        
+        # 根据日志类型筛选
+        filtered_logs = []
+        for i in range(total_logs):
+            # 随机生成日志时间
+            log_date = start_date + timedelta(
+                seconds=random.randint(0, int((end_date - start_date).total_seconds()))
+            )
+            
+            # 随机生成日志类型
+            action_type = random.choice(log_types)
+            
+            # 如果指定了日志类型且不匹配，则跳过
+            if log_type != 'all' and log_type != action_type.lower():
+                continue
+                
+            # 随机生成描述
+            description = random.choice(descriptions)
+            
+            # 随机生成IP地址
+            ip = f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}"
+            
+            filtered_logs.append({
+                'timestamp': log_date.strftime('%Y-%m-%d %H:%M:%S'),
+                'action_type': action_type,
+                'description': description,
+                'ip_address': ip
+            })
+        
+        # 按时间排序（降序）
+        filtered_logs.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        # 计算总页数
+        total_pages = max(1, (len(filtered_logs) + per_page - 1) // per_page)
+        
+        # 确保页码在有效范围内
+        if page < 1:
+            page = 1
+        elif page > total_pages:
+            page = total_pages
+        
+        # 获取当前页的日志
+        page_logs = filtered_logs[offset:offset + per_page]
+        
+        return jsonify({
+            'success': True,
+            'logs': page_logs,
+            'current_page': page,
+            'total_pages': total_pages,
+            'total_logs': len(filtered_logs)
+        })
+    
+    except Exception as e:
+        logger.error(f"获取操作日志失败: {str(e)}")
+        return jsonify({'success': False, 'message': f'获取操作日志失败: {str(e)}'}), 500
 
 if __name__ == '__main__':
     try:
         # 创建数据库表
         db = DBM.DatabaseManager()
-        db.connect()
-        print("数据库连接成功")
-        
-        # 创建必要的表
-        db.create_tables()
-        print("数据库表创建成功")
-        
-        # 检查是否存在默认管理员用户
-        result = db.query_data("SELECT COUNT(*) FROM user WHERE username = 'admin'")
-        if result and result[0][0] == 0:
-            # 创建默认管理员用户
-            db.update_data(
-                "INSERT INTO user (username, password, is_admin) VALUES (%s, %s, %s)",
-                ("admin", "admin", True)
-            )
-            print("创建默认管理员用户成功")
-        
-        db.disconnect()
-        print("数据库初始化完成")
+        try:
+            db.connect()
+            logger.info("数据库连接成功")
+            
+            # 创建必要的表
+            try:
+                db.create_tables()
+                logger.info("数据库表创建成功")
+            except Exception as table_error:
+                logger.error(f"创建数据库表时出错: {str(table_error)}")
+                logger.error(f"错误详情: {traceback.format_exc()}")
+                # 继续程序执行，因为表可能已经存在
+            
+            # 检查是否存在默认管理员用户
+            try:
+                result = db.query_data("SELECT COUNT(*) FROM user WHERE username = 'admin'")
+                if result and result[0][0] == 0:
+                    # 创建默认管理员用户
+                    db.update_data(
+                        "INSERT INTO user (username, password, is_admin) VALUES (%s, %s, %s)",
+                        ("admin", "admin", True)
+                    )
+                    logger.info("创建默认管理员用户成功")
+            except Exception as user_error:
+                logger.error(f"检查或创建管理员用户时出错: {str(user_error)}")
+                # 继续执行，可能是表结构问题
+        except Exception as db_error:
+            logger.error(f"数据库连接或初始化错误: {str(db_error)}")
+        finally:
+            try:
+                if 'db' in locals() and db.connection:
+                    db.disconnect()
+            except:
+                pass
+            
+        logger.info("数据库初始化完成")
         
         # 服务器配置优化，适合低内存环境
         from werkzeug.serving import run_simple
@@ -1288,10 +1784,14 @@ if __name__ == '__main__':
         # 不再使用app.run，因为它不适合生产环境
         # app.run(debug=True, port=8888)
     except Exception as e:
-        print(f"启动错误: {str(e)}")
+        logger.error(f"启动错误: {str(e)}")
+        logger.error(f"错误详情: {traceback.format_exc()}")
     finally:
         # 确保清理资源
-        cleanup_resources()
+        try:
+            cleanup_resources()
+        except Exception as cleanup_error:
+            logger.error(f"清理资源时出错: {str(cleanup_error)}")
 
 # Gunicorn配置 - 部署时使用
 # 在终端运行: gunicorn -c gunicorn_config.py app:app

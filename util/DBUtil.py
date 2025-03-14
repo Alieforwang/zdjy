@@ -2,12 +2,13 @@ import mysql.connector
 from mysql.connector import Error, pooling
 import time
 import threading
+from config import DB_CONFIG
 
 # 全局连接池实例
 connection_pool = None
 pool_lock = threading.Lock()
 
-def get_connection_pool(pool_size=5, pool_name="mysql_pool"):
+def get_connection_pool(pool_size=10, pool_name="mysql_pool"):
     """获取全局连接池实例，如果不存在则创建"""
     global connection_pool
     
@@ -15,20 +16,12 @@ def get_connection_pool(pool_size=5, pool_name="mysql_pool"):
         with pool_lock:
             if connection_pool is None:  # 双重检查锁定模式
                 try:
-                    # 配置连接池
-                    pool_config = {
-                        "host": "127.0.0.1",
-                        "user": "root",
-                        "password": "123456",
-                        "database": "tiaozhanbei",
+                    # 使用配置文件中的连接池配置
+                    pool_config = DB_CONFIG.copy()
+                    pool_config.update({
                         "pool_size": pool_size,
-                        "pool_name": pool_name,
-                        "pool_reset_session": True,
-                        "autocommit": True,
-                        "use_pure": True,  # 使用纯Python实现减少内存消耗
-                        "connection_timeout": 30,
-                        "buffered": True  # 优化查询性能
-                    }
+                        "pool_name": pool_name
+                    })
                     
                     connection_pool = pooling.MySQLConnectionPool(**pool_config)
                     print(f"MySQL连接池已创建，大小: {pool_size}")
@@ -39,14 +32,15 @@ def get_connection_pool(pool_size=5, pool_name="mysql_pool"):
     return connection_pool
 
 class DatabaseManager():
-    def __init__(self, host='localhost', user='root', password='252525zyh', database='tiaozhanbei'):
-        self.host = "127.0.0.1"
-        self.user = "root"
-        self.password = "123456"
-        self.database = "tiaozhanbei"
+    def __init__(self, host='127.0.0.1', user='root', password='123456', database='tiaozhanbei'):
+        # 使用配置文件中的默认值
+        self.host = DB_CONFIG['host']
+        self.user = DB_CONFIG['user']
+        self.password = DB_CONFIG['password']
+        self.database = DB_CONFIG['database']
         self.connection = None
         self._use_pool = True  # 默认使用连接池
-        self._pool_size = 3    # 默认池大小，适合低内存环境
+        self._pool_size = DB_CONFIG['pool_size']   # 使用配置文件中的池大小
         
         # 初始化时就确保连接池存在
         if self._use_pool:
@@ -56,12 +50,34 @@ class DatabaseManager():
         """从连接池获取连接或直接创建新连接"""
         try:
             if self.connection and hasattr(self.connection, 'is_connected') and self.connection.is_connected():
-                return
-                
+                # 已有活跃连接，先检查连接是否有效
+                try:
+                    # 执行一个轻量级查询验证连接
+                    cursor = self.connection.cursor()
+                    cursor.execute("SELECT 1")
+                    cursor.fetchone()
+                    cursor.close()
+                    return
+                except Error:
+                    # 连接无效，需要关闭并重新获取
+                    self.disconnect()
+                    
             if self._use_pool:
                 # 从连接池获取连接
                 pool = get_connection_pool(self._pool_size)
-                self.connection = pool.get_connection()
+                # 添加重试逻辑获取连接
+                retries = 3
+                for attempt in range(retries):
+                    try:
+                        self.connection = pool.get_connection()
+                        break
+                    except Error as e:
+                        if attempt < retries - 1:
+                            print(f"获取连接失败，正在重试 ({attempt+1}/{retries}): {e}")
+                            time.sleep(1)  # 等待1秒再重试
+                        else:
+                            raise  # 重试耗尽，抛出异常
+                
                 if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
                     return
             else:
@@ -106,14 +122,25 @@ class DatabaseManager():
         """关闭连接，如果使用连接池则将连接归还池中"""
         try:
             if self.connection:
-                if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
-                    if self._use_pool:
-                        self.connection.close()  # 将连接归还池中
-                    else:
-                        self.connection.close()  # 直接关闭连接
+                if hasattr(self.connection, 'is_connected'):
+                    try:
+                        # 检查连接是否仍然有效
+                        if self.connection.is_connected():
+                            if self._use_pool:
+                                self.connection.close()  # 将连接归还池中
+                            else:
+                                self.connection.close()  # 直接关闭连接
+                    except Error as e:
+                        print(f"检查连接状态时出错: {e}")
+                        # 尝试无条件关闭连接
+                        try:
+                            self.connection.close()  
+                        except:
+                            pass
                 self.connection = None
         except Error as e:
             print(f"关闭数据库连接错误: {e}")
+            self.connection = None  # 确保引用被清除
 
     def query_data(self, query, params=None):
         """执行SELECT查询"""
@@ -156,10 +183,20 @@ class DatabaseManager():
         cursor = None
         try:
             cursor = self.connection.cursor()
+            # 关闭警告，避免类型错误
+            cursor.execute("SET sql_notes = 0")
+            
+            # 确保query是字符串类型
+            if not isinstance(query, str):
+                query = str(query)
+                
             cursor.execute(query, params)
             if not self._use_pool:  # 如果使用连接池，autocommit已启用
                 self.connection.commit()
             affected_rows = cursor.rowcount
+            
+            # 恢复警告设置
+            cursor.execute("SET sql_notes = 1")
             return affected_rows
         except Error as e:
             print(f"更新执行错误: {e}")
@@ -175,7 +212,16 @@ class DatabaseManager():
                 if cursor:
                     cursor.close()
                 cursor = self.connection.cursor()
+                # 关闭警告
+                cursor.execute("SET sql_notes = 0")
+                
+                if not isinstance(query, str):
+                    query = str(query)
+                    
                 cursor.execute(query, params)
+                # 恢复警告设置
+                cursor.execute("SET sql_notes = 1")
+                
                 if not self._use_pool:
                     self.connection.commit()
                 affected_rows = cursor.rowcount
@@ -226,13 +272,26 @@ class DatabaseManager():
 
     def execute_query(self, query, params=None):
         """执行任意SQL查询，可用于创建表等DDL操作"""
-        return self.update_data(query, params)
+        if isinstance(query, str):
+            return self.update_data(query, params)
+        else:
+            print(f"警告: 查询不是字符串类型: {type(query)}")
+            # 尝试转换为字符串
+            try:
+                query_str = str(query)
+                return self.update_data(query_str, params)
+            except Exception as e:
+                print(f"转换查询为字符串失败: {str(e)}")
+                raise
 
     def create_tables(self):
         """创建所有必需的表"""
         try:
+            # 关闭外键检查，避免创建表时的外键约束问题
+            self.update_data("SET FOREIGN_KEY_CHECKS = 0")
+            
             # 创建用户表
-            self.execute_query("""
+            user_table_sql = """
                 CREATE TABLE IF NOT EXISTS user (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     username VARCHAR(255) NOT NULL UNIQUE,
@@ -240,10 +299,15 @@ class DatabaseManager():
                     is_admin BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """)
+            """
+            try:
+                self.execute_query(user_table_sql)
+                print("用户表创建或已存在")
+            except Exception as e:
+                print(f"创建用户表错误: {str(e)}")
             
             # 创建分析记录表
-            self.execute_query("""
+            analysis_table_sql = """
                 CREATE TABLE IF NOT EXISTS analysis_records (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     user_id INT NOT NULL,
@@ -251,15 +315,19 @@ class DatabaseManager():
                     file_path VARCHAR(255),
                     result_path VARCHAR(255),
                     detect_type VARCHAR(50),
-                    location VARCHAR(255),
                     confidence DECIMAL(5,4),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES user(id)
                 )
-            """)
+            """
+            try:
+                self.execute_query(analysis_table_sql)
+                print("分析记录表创建或已存在")
+            except Exception as e:
+                print(f"创建分析记录表错误: {str(e)}")
             
             # 创建检测统计表
-            self.execute_query("""
+            stats_table_sql = """
                 CREATE TABLE IF NOT EXISTS detection_stats (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     user_id INT NOT NULL,
@@ -269,26 +337,271 @@ class DatabaseManager():
                     FOREIGN KEY (user_id) REFERENCES user(id),
                     UNIQUE KEY unique_user_date (user_id, detection_date)
                 )
-            """)
+            """
+            try:
+                self.execute_query(stats_table_sql)
+                print("检测统计表创建或已存在")
+            except Exception as e:
+                print(f"创建检测统计表错误: {str(e)}")
+                
+            # 恢复外键检查    
+            self.update_data("SET FOREIGN_KEY_CHECKS = 1")
             
             print("数据库表创建成功")
             
         except Exception as e:
             print(f"创建表错误: {str(e)}")
-            raise e
+            # 不再抛出异常，让应用继续运行
+            # raise e
 
     def close_all_connections(self):
-        """关闭所有数据库连接(开发/测试环境使用)"""
-        global connection_pool
+        """尝试关闭所有连接并清理资源"""
+        try:
+            # 关闭当前连接
+            self.disconnect()
+            
+            # 尝试关闭连接池中的所有连接
+            global connection_pool
+            if connection_pool:
+                # 尝试获取池中所有连接并关闭
+                print("正在关闭连接池中的所有连接...")
+                try:
+                    # 直接访问连接池的内部队列（不推荐但在清理时有效）
+                    if hasattr(connection_pool, '_cnx_queue'):
+                        for cnx in list(connection_pool._cnx_queue.queue):
+                            try:
+                                if hasattr(cnx, 'is_connected') and cnx.is_connected():
+                                    cnx.close()
+                            except Exception as e:
+                                print(f"关闭池中连接时出错: {str(e)}")
+                except Exception as e:
+                    print(f"清理连接池时出错: {str(e)}")
+        except Exception as e:
+            print(f"关闭所有连接时出错: {str(e)}")
+
+# 添加一个定期清理连接池的函数
+def reset_connection_pool():
+    """重置全局连接池，关闭所有连接并创建新的连接池"""
+    global connection_pool, pool_lock
+    
+    with pool_lock:
         if connection_pool:
             try:
-                # 尝试关闭所有连接池中的连接
-                for cnx in connection_pool._cnx_queue.queue:
-                    if hasattr(cnx, 'is_connected') and cnx.is_connected():
-                        cnx.close()
-                print("已关闭所有连接池中的连接")
+                print("正在重置数据库连接池...")
+                # 尝试关闭池中所有连接
+                if hasattr(connection_pool, '_cnx_queue'):
+                    for cnx in list(connection_pool._cnx_queue.queue):
+                        try:
+                            if hasattr(cnx, 'is_connected') and cnx.is_connected():
+                                cnx.close()
+                        except:
+                            pass
+                
+                # 清空连接池引用，让垃圾回收器处理它
+                connection_pool = None
+                
+                # 强制垃圾回收
+                import gc
+                gc.collect()
+                
+                # 重新创建连接池
+                get_connection_pool(pool_size=10)
+                print("数据库连接池已重置")
+                return True
             except Exception as e:
-                print(f"关闭连接池中的连接时出错: {e}")
+                print(f"重置连接池时出错: {str(e)}")
+                return False
+    return False
+
+# 用户管理相关方法
+def get_all_users(self):
+    """
+    获取所有用户的列表
+    
+    返回值:
+        用户列表，每个用户包含id、username、is_admin和created_at字段
+    """
+    try:
+        query = """
+            SELECT id, username, is_admin, created_at 
+            FROM user 
+            ORDER BY id ASC
+        """
+        results = self.execute_query(query)
         
-        # 重置连接池
-        connection_pool = None
+        users = []
+        for row in results:
+            users.append({
+                'id': row[0],
+                'username': row[1],
+                'is_admin': bool(row[2]),
+                'created_at': row[3]
+            })
+        
+        return users
+    except Exception as e:
+        self.logger.error(f"获取用户列表错误: {str(e)}")
+        raise Exception(f"获取用户列表错误: {str(e)}")
+
+def get_user_by_id(self, user_id):
+    """
+    根据ID获取用户信息
+    
+    参数:
+        user_id: 用户ID
+    
+    返回值:
+        包含用户信息的字典，如果用户不存在则返回None
+    """
+    try:
+        query = """
+            SELECT id, username, is_admin, created_at 
+            FROM user 
+            WHERE id = %s
+        """
+        results = self.execute_query(query, (user_id,))
+        
+        if results:
+            row = results[0]
+            return {
+                'id': row[0],
+                'username': row[1],
+                'is_admin': bool(row[2]),
+                'created_at': row[3]
+            }
+        
+        return None
+    except Exception as e:
+        self.logger.error(f"根据ID获取用户错误: {str(e)}")
+        raise Exception(f"根据ID获取用户错误: {str(e)}")
+
+def get_user_by_username(self, username):
+    """
+    根据用户名获取用户信息
+    
+    参数:
+        username: 用户名
+    
+    返回值:
+        包含用户信息的字典，如果用户不存在则返回None
+    """
+    try:
+        query = """
+            SELECT id, username, is_admin, created_at 
+            FROM user 
+            WHERE username = %s
+        """
+        results = self.execute_query(query, (username,))
+        
+        if results:
+            row = results[0]
+            return {
+                'id': row[0],
+                'username': row[1],
+                'is_admin': bool(row[2]),
+                'created_at': row[3]
+            }
+        
+        return None
+    except Exception as e:
+        self.logger.error(f"根据用户名获取用户错误: {str(e)}")
+        raise Exception(f"根据用户名获取用户错误: {str(e)}")
+
+def create_user(self, username, password, is_admin=False):
+    """
+    创建新用户
+    
+    参数:
+        username: 用户名
+        password: 密码（明文，将会被加密）
+        is_admin: 是否为管理员用户，默认为False
+    
+    返回值:
+        新创建用户的ID
+    """
+    try:
+        # 密码加密
+        hashed_password = self.hash_password(password)
+        
+        query = """
+            INSERT INTO user (username, password, is_admin, created_at) 
+            VALUES (%s, %s, %s, NOW())
+        """
+        
+        # 执行插入操作
+        cursor = self.execute_update(query, (username, hashed_password, is_admin))
+        user_id = cursor.lastrowid
+        
+        return user_id
+    except Exception as e:
+        self.logger.error(f"创建用户错误: {str(e)}")
+        raise Exception(f"创建用户错误: {str(e)}")
+
+def update_user(self, user_id, username, password=None, is_admin=False):
+    """
+    更新用户信息
+    
+    参数:
+        user_id: 用户ID
+        username: 新的用户名
+        password: 新的密码（如果不提供则不更新密码）
+        is_admin: 是否为管理员用户
+    
+    返回值:
+        是否更新成功
+    """
+    try:
+        # 如果提供了新密码，则更新用户名、密码和管理员状态
+        if password:
+            hashed_password = self.hash_password(password)
+            query = """
+                UPDATE user 
+                SET username = %s, password = %s, is_admin = %s 
+                WHERE id = %s
+            """
+            self.execute_update(query, (username, hashed_password, is_admin, user_id))
+        # 否则只更新用户名和管理员状态
+        else:
+            query = """
+                UPDATE user 
+                SET username = %s, is_admin = %s 
+                WHERE id = %s
+            """
+            self.execute_update(query, (username, is_admin, user_id))
+        
+        return True
+    except Exception as e:
+        self.logger.error(f"更新用户错误: {str(e)}")
+        raise Exception(f"更新用户错误: {str(e)}")
+
+def delete_user(self, user_id):
+    """
+    删除用户
+    
+    参数:
+        user_id: 要删除的用户ID
+    
+    返回值:
+        是否删除成功
+    """
+    try:
+        query = "DELETE FROM user WHERE id = %s"
+        self.execute_update(query, (user_id,))
+        return True
+    except Exception as e:
+        self.logger.error(f"删除用户错误: {str(e)}")
+        raise Exception(f"删除用户错误: {str(e)}")
+
+def hash_password(self, password):
+    """
+    对密码进行哈希加密
+    
+    参数:
+        password: 明文密码
+    
+    返回值:
+        加密后的密码
+    """
+    import hashlib
+    # 简单的MD5加密，实际应用中应使用更安全的算法如bcrypt
+    return hashlib.md5(password.encode()).hexdigest()

@@ -20,8 +20,9 @@
 .bottom-nav3 { top: 45%; }
 .bottom-nav4 { top: 55%; }
 .bottom-nav5 { top: 65%; }
-.bottom-nav6 { top: 75%; }
+.bottom-nav8 { top: 75%; }
 .bottom-nav7 { top: 85%; }
+.bottom-nav6 { top: 95%; }
 
 /* 悬停时展开效果 */
 .bottom-nav1:hover, .bottom-nav2:hover, .bottom-nav3:hover,

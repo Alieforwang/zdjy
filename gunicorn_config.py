@@ -1,21 +1,26 @@
 # Gunicorn 配置文件 - 优化用于2核2G内存环境
 import multiprocessing
+import os
+
+# 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
+os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
 
 # 绑定地址和端口
 bind = "0.0.0.0:8888"
 
 # 工作进程数量 - 对于2核心服务器，2个进程已经足够
 # 因为我们在应用内使用了多线程，所以减少工作进程数以避免资源争用
-workers = 2
+workers = multiprocessing.cpu_count() * 2 + 1
 # 使用gevent处理并发
-worker_class = "gevent"
+worker_class = "gthread"
 worker_connections = 200
 
 # 工作进程启动时预加载应用，避免每个进程单独加载模型
 preload_app = True
 
 # 超时设置 - 增加处理大视频文件的超时时间
-timeout = 300
+timeout = 600
 keepalive = 2
 
 # 内存优化设置
@@ -28,7 +33,7 @@ worker_max_requests = 200
 # 日志设置
 accesslog = "access.log"
 errorlog = "error.log"
-loglevel = "warning"  # 生产环境使用warning级别减少日志量
+loglevel = "info"  # 生产环境使用warning级别减少日志量
 
 # 守护进程和PID文件
 daemon = True
@@ -44,6 +49,12 @@ worker_tmp_dir = "/dev/shm"
 limit_request_line = 4096
 limit_request_fields = 100
 limit_request_field_size = 8190
+
+# 每个工作进程的线程数
+threads = 4
+
+# 最大等待请求数
+backlog = 2048
 
 # 进程启动前回调函数
 def on_starting(server):
@@ -109,7 +120,7 @@ def worker_exit(server, worker):
                 pass
 
 # 优雅的处理SIGTERM信号 - 无缝重启
-graceful_timeout = 30
+graceful_timeout = 120
 
 # 子进程重启时处理（用于处理内存泄漏）
 def child_exit(server, worker):

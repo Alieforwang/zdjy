@@ -39,8 +39,8 @@ function throttle(func, limit = 300) {
 }
 
 // 全局错误处理器
-window.addEventListener('error', function(e) {
-    console.error('全局错误:', e.message, e.filename, e.lineno);
+window.addEventListener('error', function(event) {
+    console.error('全局错误:', event.message, event.filename, event.lineno);
     // 如果处于上传状态并发生错误，重置上传状态
     if (window.isUploading) {
         window.isUploading = false;
@@ -57,26 +57,92 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded');
     
     // 先检查登录状态
-    fetch('/check_login')
+    fetch('/check_login', {
+        method: 'GET',
+        credentials: 'include'
+    })
         .then(response => response.json())
         .then(data => {
             if (!data.logged_in) {
-                window.location.href = '/login';
+                console.error('会话已过期，重定向到登录页面');
+                // 使用replace而不是assign，确保用户不能使用后退返回到未登录状态的页面
+                window.location.replace('/login_page');
             } else {
+                console.log('用户已登录:', data.username);
+                
+                // 在localStorage中保存登录状态作为备份
+                localStorage.setItem('user_logged_in', 'true');
+                localStorage.setItem('username', data.username);
+                localStorage.setItem('login_timestamp', new Date().getTime());
+                
                 // 初始化所有功能
-    initCharts();
-                loadStats(); // 加载统计数据
-    initUpload();
-                loadLatestResult(); // 加载最新的分析结果
-                fetchChartData();
-                startStatsUpdate();
+                try {
+                    initCharts();
+                    loadStats(); // 加载统计数据
+                    initUpload();
+                    loadLatestResult(); // 加载最新的分析结果
+                    fetchChartData();
+                    startStatsUpdate();
+                } catch (error) {
+                    console.error('初始化功能时出错:', error);
+                    // 显示友好的错误消息
+                    showErrorMessage('初始化页面时出错，请刷新页面重试');
+                }
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            window.location.href = '/login';
+            console.error('检查登录状态出错:', error);
+            
+            // 检查localStorage中的备份登录状态
+            const isLoggedIn = localStorage.getItem('user_logged_in') === 'true';
+            const loginTime = parseInt(localStorage.getItem('login_timestamp') || '0');
+            const now = new Date().getTime();
+            const hoursSinceLogin = (now - loginTime) / (1000 * 60 * 60);
+            
+            // 如果本地存储显示用户在24小时内登录过，允许继续使用
+            if (isLoggedIn && hoursSinceLogin < 24) {
+                console.log('会话检查失败，但本地存储显示用户已登录');
+                try {
+                    initCharts();
+                    loadStats();
+                    initUpload();
+                    loadLatestResult();
+                    fetchChartData();
+                    startStatsUpdate();
+                } catch (e) {
+                    console.error('使用本地登录状态初始化时出错:', e);
+                }
+            } else {
+                // 如果没有本地登录状态或已过期，重定向到登录页面
+                window.location.replace('/login_page');
+            }
         });
 });
+
+// 显示错误消息函数
+function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.style.position = 'fixed';
+    errorDiv.style.top = '20px';
+    errorDiv.style.left = '50%';
+    errorDiv.style.transform = 'translateX(-50%)';
+    errorDiv.style.padding = '10px 20px';
+    errorDiv.style.background = 'rgba(255, 0, 0, 0.8)';
+    errorDiv.style.color = 'white';
+    errorDiv.style.borderRadius = '5px';
+    errorDiv.style.zIndex = '9999';
+    errorDiv.textContent = message;
+    
+    document.body.appendChild(errorDiv);
+    
+    // 5秒后自动移除
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+        }
+    }, 5000);
+}
 
 // 初始化图表
 function initCharts() {
@@ -277,10 +343,37 @@ async function fetchChartData() {
         zlevel: 0
     });
 
-    fetch('/api/analysis/chart-data')
+    fetch('/api/analysis/chart-data', {
+        method: 'GET',  // 明确指定使用GET方法
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'  // 明确表明这是AJAX请求
+        },
+        credentials: 'include'  // 改为include确保在跨域情况下也发送cookies
+    })
         .then(response => {
             if (!response.ok) {
-                throw new Error('网络响应不正常');
+                // 特别处理401未授权状态（会话过期）
+                if (response.status === 401) {
+                    console.error('会话已过期，需要重新登录');
+                    
+                    // 确保用户知道会话过期
+                    showErrorMessage('您的会话已过期，即将跳转到登录页面');
+                    
+                    // 延迟3秒后跳转，让用户有时间看到消息
+                    setTimeout(() => {
+                        // 清除localStorage中的登录状态
+                        localStorage.removeItem('user_logged_in');
+                        localStorage.removeItem('username');
+                        localStorage.removeItem('login_timestamp');
+                        
+                        // 重定向到登录页面
+                        window.location.replace('/login_page');
+                    }, 3000);
+                    
+                    throw new Error('会话已过期');
+                }
+                throw new Error('网络响应不正常: ' + response.status);
             }
             return response.json();
         })
@@ -290,6 +383,16 @@ async function fetchChartData() {
             typeDistributionChart.hideLoading();
             
             console.log('获取到图表数据:', data);
+            
+            // 检查是否有会话过期消息
+            if (data.success === false && data.message && data.message.includes('会话已过期')) {
+                console.error('会话已过期，需要重新登录');
+                showErrorMessage('您的会话已过期，即将跳转到登录页面');
+                setTimeout(() => {
+                    window.location.replace('/login_page');
+                }, 3000);
+                return;
+            }
             
             if (data && data.trend && data.distribution) {
                 // 更新趋势图
@@ -309,8 +412,14 @@ async function fetchChartData() {
             typeDistributionChart.hideLoading();
             
             console.error('获取图表数据失败:', error);
-            // 显示错误状态
-            showErrorState(error.message);
+            
+            // 如果不是会话过期错误，显示一般错误状态
+            if (!error.message.includes('会话已过期')) {
+                // 显示错误状态
+                showErrorState(error.message);
+                // 展示用户友好的错误消息
+                showErrorMessage('加载图表数据失败，请刷新页面重试');
+            }
         });
 }
 
@@ -602,7 +711,14 @@ function updateDistributionChart(distributionData) {
 // 加载统计数据
 async function loadStats() {
     try {
-        const response = await fetch('/api/stats');
+        const response = await fetch('/api/stats', {
+            method: 'GET',
+            credentials: 'include',  // 确保发送cookies以维持会话
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
         const data = await response.json();
         
         if (data) {
@@ -703,9 +819,10 @@ function handleFiles(files) {
     }
     
     console.log('发送上传请求...');
-    fetch('/upload_analyze', {
+    fetch('/api/analyze', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'  // 确保发送cookies以维持会话
     })
     .then(response => {
         console.log('服务器响应状态:', response.status);
@@ -851,38 +968,138 @@ function initUpload() {
 
 // 加载最新的分析结果
 function loadLatestResult() {
-    fetch('/api/latest_result')
-        .then(response => response.json())
+    console.log('加载最新分析结果...');
+    fetch('/api/latest_result', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+        .then(response => {
+            if (!response.ok) {
+                console.error(`API响应错误: ${response.status} - ${response.statusText}`);
+                if (response.status === 401) {
+                    throw new Error('用户未登录，请刷新页面并重新登录');
+                } else if (response.status === 500) {
+                    throw new Error('服务器内部错误，请稍后再试');
+                } else {
+                    throw new Error(`请求失败(${response.status})`);
+                }
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 const resultArea = document.getElementById('resultArea');
+                if (!resultArea) {
+                    console.error('未找到resultArea元素');
+                    return;
+                }
+                
+                if (!data.data || !data.data.result_image) {
+                    console.error('返回的数据不完整:', data);
+                    resultArea.innerHTML = '<div class="error-message">数据不完整，无法显示结果</div>';
+                    return;
+                }
+                
+                // 处理图片路径 - 检查是否有效路径
+                let resultImage = data.data.result_image;
+                
+                // 确保路径以/开头
+                if (!resultImage.startsWith('/')) {
+                    resultImage = '/' + resultImage;
+                }
+                
+                // 检查是否是static目录下的图片，如果是，可能是一个错误的路径
+                if (resultImage.startsWith('/static/results.jpg')) {
+                    console.warn('检测到可能错误的图片路径，改用默认图片');
+                    resultImage = '/static/default_result.jpg';
+                }
+                
+                // 添加时间戳防止缓存
+                const timestamp = new Date().getTime();
+                resultImage = `${resultImage}?t=${timestamp}`;
+                
+                console.log('处理后的图片路径:', resultImage);
+                
                 resultArea.innerHTML = `
                     <div class="result-images">
                         <div class="image-container">
                             ${data.data.is_video ? 
-                                `<video src="${data.data.result_image}" 
+                                `<video src="${resultImage}" 
                                         class="result-image" 
                                         controls>
                                     您的浏览器不支持视频播放。
                                 </video>` :
-                                `<img src="${data.data.result_image}" 
+                                `<img src="${resultImage}" 
                                       class="result-image" 
-                                      alt="分析结果">`
+                                      alt="分析结果"
+                                      onerror="handleImageError(this, 1)">`
                             }
                         </div>
                         <div class="download-section">
-                            <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
+                            <button class="download-btn" onclick="downloadResult('${resultImage.split('/').pop().split('?')[0]}')">
                                 <span class="download-icon">⬇️</span>
                                 下载分析结果
                             </button>
                         </div>
-                </div>
-            `;
+                    </div>
+                    <div class="confidence-info">
+                        <div class="confidence-label">检测类型：${data.data.detect_type || '未知'}</div>
+                        <div class="confidence-label">置信度：${data.data.confidence ? (data.data.confidence * 100).toFixed(2) + '%' : '未知'}</div>
+                    </div>
+                `;
+                
+                console.log('最新分析结果加载成功，图片路径:', resultImage);
+            } else {
+                console.log('无最新分析结果:', data.message);
+                const resultArea = document.getElementById('resultArea');
+                if (resultArea) {
+                    resultArea.innerHTML = '<div class="empty-state">暂无分析记录，请上传图片进行分析</div>';
+                }
             }
         })
         .catch(error => {
-            console.error('Error loading latest result:', error);
+            console.error('加载最新结果失败:', error);
+            const resultArea = document.getElementById('resultArea');
+            if (resultArea) {
+                resultArea.innerHTML = `<div class="error-message">
+                    <div class="error-icon">❌</div>
+                    <div class="error-text">加载分析结果失败: ${error.message || '未知错误'}</div>
+                    <div class="error-hint">请刷新页面或稍后再试</div>
+                </div>`;
+            }
         });
+}
+
+// 修改图片错误处理函数
+function handleImageError(img, maxRetries) {
+    console.log('图片加载错误处理开始，当前图片路径:', img.src);
+    if (img.retryCount === undefined) {
+        img.retryCount = 0;
+    }
+    
+    if (img.retryCount < maxRetries) {
+        img.retryCount++;
+        console.log('图片加载失败，尝试加载默认图片');
+        // 使用绝对路径和时间戳防止缓存
+        const timestamp = new Date().getTime();
+        // 检查当前路径是否已经是默认图片
+        if (img.src.includes('default_result.jpg')) {
+            console.error('默认图片也无法加载，显示错误信息');
+            img.style.display = 'none';
+            img.parentElement.innerHTML = '<div class="error-message">图片加载失败</div>';
+        } else {
+            img.src = `/static/default_result.jpg?t=${timestamp}`;
+            console.log('已将图片路径更改为默认图片:', img.src);
+        }
+    } else {
+        console.error('图片加载失败，已达到最大重试次数');
+        img.style.display = 'none';
+        img.parentElement.innerHTML = '<div class="error-message">图片加载失败</div>';
+    }
 }
 
 // 下载结果文件

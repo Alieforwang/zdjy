@@ -7,6 +7,73 @@ let detectionCount = 0;
 let lastMinuteDetections = [];
 let frameCount = 0;
 
+// 添加浏览器兼容性检查和polyfill
+(function() {
+    // 确保老旧浏览器也能支持navigator.mediaDevices
+    if (navigator.mediaDevices === undefined) {
+        navigator.mediaDevices = {};
+        console.log('初始化mediaDevices对象');
+    }
+
+    // 一些浏览器实现了部分mediaDevices，我们不能只分配getUserMedia
+    // 因为这会覆盖已有的属性
+    if (navigator.mediaDevices.getUserMedia === undefined) {
+        navigator.mediaDevices.getUserMedia = function(constraints) {
+            // 首先获取老版本的getUserMedia
+            var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia ||
+                              navigator.msGetUserMedia;
+
+            if (!getUserMedia) {
+                console.error('浏览器不支持getUserMedia');
+                return Promise.reject(new Error('浏览器不支持getUserMedia'));
+            }
+
+            // 包装老版本API为Promise
+            return new Promise(function(resolve, reject) {
+                getUserMedia.call(navigator, constraints, resolve, reject);
+            });
+        }
+        console.log('添加getUserMedia polyfill');
+    }
+})();
+
+// 检查摄像头权限状态
+async function checkCameraPermission() {
+    try {
+        console.log('检查摄像头权限状态');
+
+        // 检查浏览器是否支持mediaDevices
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error('浏览器不支持mediaDevices API');
+            alert('您的浏览器不支持摄像头功能，请使用Chrome、Firefox或Edge浏览器');
+            return false;
+        }
+
+        // 尝试获取权限
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
+        // 获取成功，停止所有轨道
+        stream.getTracks().forEach(track => track.stop());
+        console.log('摄像头权限已授权');
+        return true;
+    } catch (error) {
+        console.error('摄像头权限检查失败:', error);
+        
+        // 给用户详细的指导
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            alert('摄像头访问被拒绝。请在浏览器设置中允许访问摄像头。\n\n' +
+                  'Chrome: 地址栏左侧 → 点击锁图标 → 网站设置 → 摄像头 → 允许\n' +
+                  'Firefox: 地址栏左侧 → 点击锁图标 → 清除设置 → 重新授权\n' +
+                  'Edge: 地址栏右侧 → 点击锁图标 → 网站权限 → 允许摄像头');
+        } else if (error.name === 'NotFoundError') {
+            alert('未检测到摄像头设备，请确认摄像头已连接并正常工作');
+        } else {
+            alert(`访问摄像头时出错: ${error.message}`);
+        }
+        return false;
+    }
+}
+
 // 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
     // 检查登录状态
@@ -39,29 +106,76 @@ function checkLoginStatus() {
 
 // 启动摄像头
 async function startCamera(id) {
+    console.log(`开始启动摄像头 ID: ${id}`);
+    
+    // 先检查浏览器是否支持navigator.mediaDevices
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('浏览器不支持mediaDevices API');
+        alert('您的浏览器不支持摄像头功能，请使用Chrome、Firefox或Edge浏览器');
+        return;
+    }
+    
+    // 检查摄像头权限
+    const permissionState = await checkCameraPermission().catch(err => {
+        console.error('权限检查出错:', err);
+        return false;
+    });
+    
+    if (!permissionState) {
+        console.log('未获得摄像头权限，无法启动');
+        alert('需要摄像头权限才能继续。请在浏览器设置中允许访问摄像头。');
+        return;
+    }
+    
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        });
+        // 获取适合当前设备的视频约束条件
+        const constraints = getOptimalConstraints();
+        console.log('使用的视频约束:', constraints);
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
         
         const video = document.getElementById(`video${id}`);
+        if (!video) {
+            console.error(`未找到video元素: video${id}`);
+            throw new Error(`未找到video元素: video${id}`);
+        }
+        
         const canvas = document.getElementById(`canvas${id}`);
+        if (!canvas) {
+            console.error(`未找到canvas元素: canvas${id}`);
+            throw new Error(`未找到canvas元素: canvas${id}`);
+        }
         
         video.srcObject = stream;
         streams[id] = stream;
         
+        // 添加视频加载事件处理
+        video.onloadedmetadata = function() {
+            console.log(`视频元数据已加载，分辨率: ${video.videoWidth}x${video.videoHeight}`);
+            video.play().catch(e => console.error('视频播放失败:', e));
+        };
+        
+        video.onerror = function(e) {
+            console.error('视频元素错误:', e);
+        };
+        
         // 更新按钮状态
-        document.getElementById(`startBtn${id}`).disabled = true;
-        document.getElementById(`stopBtn${id}`).disabled = false;
-        document.getElementById(`captureBtn${id}`).disabled = false;
-        document.getElementById(`recordBtn${id}`).disabled = false;
+        const startBtn = document.getElementById(`startBtn${id}`);
+        const stopBtn = document.getElementById(`stopBtn${id}`);
+        const captureBtn = document.getElementById(`captureBtn${id}`);
+        const recordBtn = document.getElementById(`recordBtn${id}`);
+        
+        if (startBtn) startBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = false;
+        if (captureBtn) captureBtn.disabled = false;
+        if (recordBtn) recordBtn.disabled = false;
         
         // 更新状态显示
-        document.getElementById(`status${id}`).textContent = '在线';
-        document.getElementById(`status${id}`).className = 'status online';
+        const statusEl = document.getElementById(`status${id}`);
+        if (statusEl) {
+            statusEl.textContent = '在线';
+            statusEl.className = 'status online';
+        }
         
         // 更新在线摄像头数量
         onlineCameras++;
@@ -71,8 +185,41 @@ async function startCamera(id) {
         startAnalyzing(id);
         
     } catch (error) {
-        console.error('Error accessing camera:', error);
-        alert('无法访问摄像头，请检查权限设置');
+        console.error('访问摄像头时出错:', error);
+        
+        // 根据错误类型提供更详细的错误信息
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            alert('摄像头访问被拒绝。请在浏览器设置中允许访问摄像头。');
+        } else if (error.name === 'NotFoundError') {
+            alert('未检测到摄像头设备，请确认摄像头已连接并正常工作');
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+            alert('摄像头可能被其他应用程序占用，请关闭其他使用摄像头的应用后重试');
+        } else if (error.name === 'OverconstrainedError') {
+            alert('摄像头不支持请求的分辨率，请尝试使用较低的分辨率');
+        } else {
+            alert(`访问摄像头时出错: ${error.message}`);
+        }
+    }
+}
+
+// 获取最佳视频约束条件
+function getOptimalConstraints() {
+    // 检测是否为移动设备
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // 移动设备使用较低分辨率以节省资源
+        return { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: { ideal: 'environment' } // 优先使用后置摄像头
+        };
+    } else {
+        // 桌面设备使用较高分辨率
+        return { 
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        };
     }
 }
 

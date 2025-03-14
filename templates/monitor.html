@@ -30,6 +30,11 @@
         </div>
     </nav>
 
+    <!-- 添加顶部权限请求按钮 -->
+    <div style="text-align: center; margin: 10px auto; max-width: 600px; background-color: #40a9ff; color: white; padding: 10px; border-radius: 5px; cursor: pointer;" onclick="requestCameraPermission();">
+        <b>点击此处请求摄像头权限</b> &nbsp; 📷 &nbsp; <small>(如果摄像头不工作，请先点击此按钮)</small>
+    </div>
+
     <!-- 添加状态栏 -->
     <div class="status-bar">
         <div class="status-item">
@@ -42,11 +47,29 @@
         </div>
     </div>
 
+    <!-- 添加摄像头权限提示 -->
+    <div class="camera-permission-tip" style="background-color: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="cameraPermissionTip">
+        <h3 style="margin-top: 0; color: #ffcc00;">⚠️ 摄像头权限提示</h3>
+        <p>要使用实时监控功能，请在浏览器弹出的权限请求中<span style="color: #4CAF50; font-weight: bold;">允许</span>访问摄像头。</p>
+        <p>如果没有看到权限请求对话框，请点击下方按钮手动申请权限：</p>
+        <button style="background: #40a9ff; border: none; color: white; padding: 8px 15px; border-radius: 3px; cursor: pointer; margin: 10px 0;" onclick="requestCameraPermission();">
+            <b>申请摄像头权限</b>
+        </button>
+        <p>如果您已拒绝权限，请按照以下步骤重新授权：</p>
+        <ol style="padding-left: 20px;">
+            <li>点击地址栏左侧的锁定/信息图标</li>
+            <li>找到"摄像头"权限设置</li>
+            <li>将其更改为"允许"</li>
+            <li>刷新页面</li>
+        </ol>
+        <button style="background: #4CAF50; border: none; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer;" onclick="document.getElementById('cameraPermissionTip').style.display='none';">知道了</button>
+    </div>
+
     <div class="main-container">
         <div class="monitor-grid" id="monitorGrid">
             <div class="monitor-item">
                 <div class="video-container">
-                    <video id="video1" autoplay muted></video>
+                    <video id="video1" autoplay muted playsinline></video>
                     <canvas id="canvas1" class="overlay-canvas"></canvas>
                 </div>
                 <div class="monitor-info">
@@ -60,14 +83,14 @@
                     <button class="control-btn" onclick="stopCamera(1)" id="stopBtn1" disabled>
                         <span class="btn-icon">⏹️</span>
                     </button>
-                    <button class="control-btn" onclick="captureImage(1)" id="captureBtn1">
-                        <span class="btn-icon">📸</span>
+                    <button class="control-btn" onclick="captureImage(1)" id="captureBtn1" disabled>
+                        <span class="btn-icon">📷</span>
                     </button>
-                    <button class="control-btn" onclick="toggleRecording(1)" id="recordBtn1">
-                        <span class="btn-icon">⏺️</span>
+                    <button class="control-btn" onclick="toggleRecording(1)" id="recordBtn1" disabled>
+                        <span class="btn-icon">🔴</span>
                     </button>
-                    <button class="control-btn" onclick="toggleFullscreen('video1')" id="fullscreenBtn1">
-                        <span class="btn-icon">🔲</span>
+                    <button class="control-btn" onclick="toggleFullscreen('video1')">
+                        <span class="btn-icon">🔍</span>
                     </button>
                 </div>
             </div>
@@ -101,6 +124,16 @@
         </div>
     </div>
 
+    <!-- 添加控制按钮 -->
+    <div class="control-panel" style="text-align: center; margin: 5px auto;">
+        <button id="fullscreenBtn" class="control-btn-big">
+            <span class="btn-icon">🔍</span> 全屏
+        </button>
+        <button id="layoutBtn" class="control-btn-big">
+            <span class="btn-icon">🔀</span> 切换布局
+        </button>
+    </div>
+
     <!-- 底部导航栏 -->
     <div class="bottom-nav1">
         {% if is_admin %}
@@ -130,7 +163,15 @@
             <span class="btn-text">历史记录</span>
         </a>
     </div>
+    {% if is_admin %}
     <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    {% endif %}
+    <div class="bottom-nav7">
         <a href="{{ url_for('settings') }}" class="nav-btn">
             <span class="btn-icon">⚙️</span>
             <span class="btn-text">系统设置</span>
@@ -142,10 +183,14 @@
             <span class="btn-text">关于系统</span>
         </a>
     </div>
+    {% if is_admin %}
+    {% endif %}
 
+    <!-- 先加载主要的 JS 文件 -->
     <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script>
+    // 内联JS代码应该放在主要JS文件加载后
     function toggleFullscreen(videoId) {
         const video = document.getElementById(videoId);
         const container = document.querySelector('.main-container');
@@ -192,6 +237,14 @@
             alertPanel.querySelector('.minimize-btn').textContent = '−';
         }
     });
+
+    // 布局切换功能
+    function toggleLayout() {
+        const grid = document.getElementById('monitorGrid');
+        if (grid) {
+            grid.classList.toggle('single-view');
+        }
+    }
     </script>
 </body>
 </html> 

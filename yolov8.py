@@ -7,6 +7,17 @@ import time
 import concurrent.futures
 import threading
 import queue
+import logging
+import traceback
+import torch
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 def Predict():
     # 直接使用预训练模型创建模型.
@@ -341,4 +352,89 @@ if __name__ == "__main__":
     image_path = "tiaozhanbei/ceshitu/7.jpg"    # 替换为实际的图片路径
     model = YOLO(weights_path)
     predict_image(model, image_path)
+
+class YOLOv8:
+    def __init__(self, weights, device='cpu', load_params=None):
+        """
+        初始化YOLOv8检测器
+        :param weights: 模型权重文件路径
+        :param device: 使用的设备(cuda 或 cpu)
+        :param load_params: 模型加载的额外参数，例如 {'weights_only': True}
+        """
+        try:
+            # 设置默认加载参数
+            if load_params is None:
+                load_params = {'weights_only': True}
+            
+            # 记录模型加载开始
+            logger.info(f"开始加载YOLOv8模型，权重文件: {weights}, 设备: {device}")
+            
+            # 确保模型文件存在
+            if not os.path.exists(weights):
+                logger.error(f"模型文件不存在: {weights}")
+                raise FileNotFoundError(f"模型文件不存在: {weights}")
+            
+            # 检查CUDA是否可用，如果请求CUDA但不可用，则回退到CPU
+            if device == 'cuda' and not torch.cuda.is_available():
+                logger.warning("CUDA请求但不可用，回退到CPU设备")
+                device = 'cpu'
+            
+            # 加载模型
+            self.model = YOLO(weights)
+            
+            # 将模型移动到指定设备
+            if device != 'cpu':
+                try:
+                    self.model.to(device)
+                    logger.info(f"模型已成功加载到 {device} 设备")
+                except Exception as e:
+                    logger.warning(f"无法将模型加载到 {device}，回退到CPU: {str(e)}")
+                    device = 'cpu'
+                    # 如果移动到GPU失败，确保模型在CPU上
+                    self.model.to('cpu')
+            else:
+                logger.info("模型已加载到CPU设备")
+            
+            # 记录模型加载完成
+            logger.info(f"YOLOv8模型加载完成")
+            
+        except Exception as e:
+            logger.error(f"YOLOv8模型加载失败: {str(e)}")
+            raise
+
+    def predict(self, img, conf_threshold=0.25):
+        """
+        使用YOLOv8进行目标检测
+        :param img: 输入图像(OpenCV格式)或图像文件路径
+        :param conf_threshold: 置信度阈值
+        :return: 检测结果
+        """
+        try:
+            start_time = cv2.getTickCount()
+            
+            # 如果输入是字符串路径，则加载图像
+            if isinstance(img, str):
+                if not os.path.exists(img):
+                    logger.error(f"图像文件不存在: {img}")
+                    return None
+                logger.info(f"加载图像文件: {img}")
+                img = cv2.imread(img)
+                if img is None:
+                    logger.error(f"无法读取图像文件: {img}")
+                    return None
+            
+            # 进行预测
+            results = self.model(img, conf=conf_threshold, verbose=False)
+            
+            # 计算处理时间
+            process_time = (cv2.getTickCount() - start_time) / cv2.getTickFrequency()
+            logger.info(f"YOLOv8处理时间: {process_time:.4f}秒")
+            
+            # 返回结果
+            return results
+            
+        except Exception as e:
+            logger.error(f"YOLOv8预测失败: {str(e)}")
+            traceback.print_exc()
+            return None
 

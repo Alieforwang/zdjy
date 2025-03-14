@@ -136,7 +136,15 @@
             <span class="btn-text">历史记录</span>
         </a>
     </div>
+    {% if is_admin %}
     <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    {% endif %}
+    <div class="bottom-nav7">
         <a href="{{ url_for('settings') }}" class="nav-btn active">
             <span class="btn-icon">⚙️</span>
             <span class="btn-text">系统设置</span>
@@ -148,6 +156,8 @@
             <span class="btn-text">关于系统</span>
         </a>
     </div>
+    {% if is_admin %}
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 </body>
