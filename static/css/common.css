@@ -294,4 +294,282 @@ tr:hover {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* 页面预加载动画 */
+.page-preloader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #0a1929;
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+}
+
+.page-preloader.active {
+  display: block;
+}
+
+.page-preloader.fade-out {
+  animation: fadeOut 0.5s forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.page-preloader::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background: radial-gradient(circle, rgba(0, 188, 212, 0.1) 0%, #0a1929 70%);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.preloader-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 200px;
+  text-align: center;
+}
+
+/* 进度条样式 */
+.progress-container {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 20px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-color), rgba(124, 255, 178, 0.7));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 188, 212, 0.5);
+}
+
+/* 奔跑的小人动画 */
+.running-man {
+  width: 100px;
+  height: 100px;
+  background-image: url('../img/image1.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin: 0 auto 20px;
+  position: relative;
+  animation: bobbing 1s infinite alternate ease-in-out;
+}
+
+@keyframes bobbing {
+  from { transform: translateY(0); }
+  to { transform: translateY(-10px); }
+}
+
+/* 如果图片加载失败，使用CSS动画代替 */
+.running-man-fallback {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 20px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.running-man-fallback::before {
+  content: '🏃';
+  font-size: 40px;
+  animation: running 0.5s infinite alternate;
+}
+
+@keyframes running {
+  0% { transform: translateY(0) rotate(0deg) scaleX(1); }
+  25% { transform: translateY(-5px) rotate(5deg) scaleX(1); }
+  50% { transform: translateY(0) rotate(0deg) scaleX(-1); }
+  75% { transform: translateY(-5px) rotate(-5deg) scaleX(-1); }
+  100% { transform: translateY(0) rotate(0deg) scaleX(1); }
+}
+
+/* 足迹动画 */
+.running-track {
+  width: 150px;
+  height: 10px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.running-track::before {
+  content: '👣 👣 👣 👣 👣 👣';
+  position: absolute;
+  white-space: nowrap;
+  font-size: 10px;
+  animation: trackMove 2s linear infinite;
+}
+
+@keyframes trackMove {
+  0% { transform: translateX(150px); }
+  100% { transform: translateX(-150px); }
+}
+
+.loading-text {
+  font-family: 'ZIT', sans-serif;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 2px;
+  margin-top: 30px;
+  text-shadow: 0 0 10px rgba(124, 255, 178, 0.5);
+  white-space: nowrap;
+  animation: breathe 1.5s infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.loading-text::after {
+  content: '';
+  animation: loadingDots 1.5s infinite;
+}
+
+@keyframes loadingDots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+/* 发光线路动画 */
+.circuit-lines {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.circuit-line {
+  position: absolute;
+  height: 2px;
+  background: rgba(124, 255, 178, 0.7);
+  animation: circuitMove 5s linear infinite;
+  box-shadow: 0 0 8px rgba(124, 255, 178, 0.8);
+}
+
+.circuit-line:nth-child(1) {
+  width: 30%;
+  top: 20%;
+  left: -30%;
+  animation-delay: 0s;
+}
+
+.circuit-line:nth-child(2) {
+  width: 25%;
+  top: 45%;
+  left: -25%;
+  animation-delay: 1s;
+}
+
+.circuit-line:nth-child(3) {
+  width: 35%;
+  top: 70%;
+  left: -35%;
+  animation-delay: 2s;
+}
+
+.circuit-line:nth-child(4) {
+  width: 40%;
+  top: 35%;
+  right: -40%;
+  animation-delay: 0.5s;
+  animation-name: circuitMoveReverse;
+}
+
+.circuit-line:nth-child(5) {
+  width: 35%;
+  top: 60%;
+  right: -35%;
+  animation-delay: 1.5s;
+  animation-name: circuitMoveReverse;
+}
+
+@keyframes circuitMove {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 100%)); }
+}
+
+@keyframes circuitMoveReverse {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-100vw - 100%)); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+/* 保留其他必要的动画和样式 */
+.data-loading {
+  position: relative;
+  height: 30px;
+  width: 100%;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.data-loading span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: rgba(24, 144, 255, 0.7);
+  border-radius: 50%;
+  margin: 0 2px;
+  animation: dataWave 1.5s infinite ease-in-out;
+}
+
+.data-loading span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.data-loading span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.data-loading span:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+.data-loading span:nth-child(5) {
+  animation-delay: 0.8s;
+}
+
+@keyframes dataWave {
+  0%, 100% {
+    transform: scaleY(1);
+    background-color: rgba(24, 144, 255, 0.7);
+  }
+  50% {
+    transform: scaleY(2);
+    background-color: rgba(124, 255, 178, 0.7);
+  }
 } 

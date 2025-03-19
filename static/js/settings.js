@@ -181,9 +181,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
     // 返回主页按钮事件处理
-    document.getElementById('backHomeBtn').addEventListener('click', function() {
-        window.location.href = '/';
-    });
+    const backHomeBtn = document.getElementById('backHomeBtn');
+    if (backHomeBtn) {
+        backHomeBtn.addEventListener('click', function() {
+            window.location.href = '/';
+        });
+    }
 
     // 初始加载设置
     loadSettings();

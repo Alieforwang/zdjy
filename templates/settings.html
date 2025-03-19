@@ -98,12 +98,13 @@
                     <span class="storage-info">已使用: 45% (4.5GB/10GB)</span>
                 </div>
             </div>
-
-            <!-- 保存按钮 -->
-            <div class="settings-actions">
-                <button id="saveSettings" class="save-btn">保存设置</button>
-                <button id="resetSettings" class="reset-btn">恢复默认</button>
-            </div>
+        </div>
+        
+        <!-- 底部按钮区域 -->
+        <div class="settings-actions">
+            <button id="backHomeBtn" class="home-btn">返回首页</button>
+            <button id="saveSettings" class="save-btn">保存设置</button>
+            <button id="resetSettings" class="reset-btn">恢复默认</button>
         </div>
     </div>
 
@@ -160,5 +161,8 @@
     {% endif %}
 
     <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
 </body>
 </html> 

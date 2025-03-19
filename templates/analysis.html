@@ -503,14 +503,15 @@
     <script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        console.log("页面已加载，事件处理由analysis.js接管");
-        
-        // 添加登出按钮事件监听器
-        document.getElementById("logoutButton").addEventListener("click", function() {
-            window.location.href = "{{ url_for('logout') }}";
+        document.addEventListener("DOMContentLoaded", function() {
+            // 初始化上传区域事件
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            // 现有脚本内容
         });
-    });
     </script>
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
 </body>
 </html> 

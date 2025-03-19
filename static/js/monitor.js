@@ -706,12 +706,12 @@ function toggleLayout() {
     grid.classList.toggle('single-view');
 }
 
-// 在初始化页面时安全获取元素
+// 安全获取DOM元素的函数，避免空引用错误
 function safeGetElement(id) {
     const element = document.getElementById(id);
-    if (!element) {
-        console.log(` 找不到元素: ${id}`);
-        return null;
+    // 只在开发环境下输出警告，不影响生产环境
+    if (!element && window.location.hostname === 'localhost') {
+        console.warn(` 找不到元素: ${id}`);
     }
     return element;
 }
@@ -802,6 +802,58 @@ function checkPageStatus() {
     }
 }
 
+// 添加更新视频列表的函数
+function loadVideoList() {
+    try {
+        console.log('开始加载视频列表...');
+        
+        fetch('/api/videos')
+            .then(response => response.json())
+            .then(data => {
+                console.log('获取视频列表:', data);
+                
+                const videoListEl = document.getElementById('videoList');
+                if (!videoListEl) {
+                    // 视频列表元素不存在时静默忽略，不输出错误
+                    return;
+                }
+                
+                if (data.status === 'success' && data.data.length > 0) {
+                    videoListEl.innerHTML = '';
+                    
+                    data.data.forEach(video => {
+                        const item = document.createElement('div');
+                        item.className = 'video-item';
+                        item.innerHTML = `
+                            <div class="video-thumb">
+                                <img src="${video.thumb || '/static/img/video-placeholder.jpg'}" alt="${video.name}">
+                                <span class="video-duration">${video.duration || '00:00'}</span>
+                            </div>
+                            <div class="video-info">
+                                <div class="video-name">${video.name}</div>
+                                <div class="video-date">${video.date}</div>
+                            </div>
+                        `;
+                        
+                        item.addEventListener('click', () => {
+                            // 处理视频点击事件
+                            // ...
+                        });
+                        
+                        videoListEl.appendChild(item);
+                    });
+                } else {
+                    videoListEl.innerHTML = '<div class="no-videos">暂无录制视频</div>';
+                }
+            })
+            .catch(err => {
+                console.error('加载视频列表出错:', err);
+            });
+    } catch (err) {
+        console.error('加载视频列表函数出错:', err);
+    }
+}
+
 // 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
     try {
@@ -809,6 +861,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 检查登录状态
         checkLoginStatus();
+        
+        // 尝试加载视频列表
+        loadVideoList();
+        
+        // 刷新按钮
+        const refreshBtn = safeGetElement('refreshBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', loadVideoList);
+        }
         
         // 安全获取并设置元素事件
         const fullscreenBtn = safeGetElement('fullscreenBtn');

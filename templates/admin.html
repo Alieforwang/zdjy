@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 智能检测系统</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    
+    <!-- 加载ECharts相关脚本（本地文件） -->
+    <script src="{{ url_for('static', filename='js/libs/echarts.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/echarts-gl.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/libs/echarts-liquidfill.min.js') }}"></script>
+</head>
+<body>
+    <!-- 图表容器 -->
+    <div class="charts-container">
+        <div class="chart-row">
+            <div class="chart-box">
+                <div id="detectionTrendChart" class="chart"></div>
+            </div>
+            <div class="chart-box">
+                <div id="typeDistributionChart" class="chart"></div>
+            </div>
+        </div>
+        <div class="chart-row">
+            <div class="chart-box">
+                <div id="detection3DChart" class="chart"></div>
+            </div>
+            <div class="chart-box">
+                <div id="completionLiquidChart" class="chart"></div>
+            </div>
+        </div>
+        <div class="chart-row">
+            <div class="chart-box">
+                <div id="typeRadarChart" class="chart"></div>
+            </div>
+            <div class="chart-box">
+                <div id="accuracyTrendChart" class="chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 其他内容 -->
+    <div id="resultArea"></div>
+
+    <!-- 加载分析脚本 -->
+    <script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
+
+    <!-- 直接初始化图表，不使用事件监听 -->
+    <script>
+        // 直接定义并初始化所有图表（避免依赖外部函数）
+        (function() {
+            console.log('正在初始化图表...');
+            
+            try {
+                // 确保所有图表容器都存在
+                const containers = [
+                    'detectionTrendChart',
+                    'typeDistributionChart',
+                    'detection3DChart',
+                    'completionLiquidChart',
+                    'typeRadarChart',
+                    'accuracyTrendChart'
+                ];
+                
+                const missingContainers = containers.filter(id => !document.getElementById(id));
+                if (missingContainers.length > 0) {
+                    console.error('缺少图表容器:', missingContainers.join(', '));
+                    return;
+                }
+                
+                // 调用分析脚本中的图表初始化函数
+                if (typeof window.initCharts === 'function') {
+                    window.initCharts();
+                    console.log('图表初始化成功');
+                } else {
+                    // 如果外部函数不可用，我们可以在这里定义一个简单的图表初始化
+                    console.log('使用内置初始化函数');
+                    
+                    // 初始化趋势图
+                    const detectionTrendChart = echarts.init(document.getElementById('detectionTrendChart'));
+                    detectionTrendChart.setOption({
+                        title: { text: '检测趋势', left: 'center', textStyle: { color: '#fff' } },
+                        tooltip: { trigger: 'axis' },
+                        xAxis: { type: 'category', data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'] },
+                        yAxis: { type: 'value' },
+                        series: [{ 
+                            name: '数量', 
+                            type: 'line', 
+                            data: [120, 132, 101, 134, 90, 230, 210],
+                            smooth: true,
+                            itemStyle: { color: '#40a9ff' },
+                            areaStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                    { offset: 0, color: 'rgba(64, 169, 255, 0.6)' },
+                                    { offset: 1, color: 'rgba(64, 169, 255, 0.0)' }
+                                ])
+                            }
+                        }]
+                    });
+                    
+                    // 初始化分布图
+                    const typeDistributionChart = echarts.init(document.getElementById('typeDistributionChart'));
+                    typeDistributionChart.setOption({
+                        title: { text: '类型分布', left: 'center', textStyle: { color: '#fff' } },
+                        tooltip: { trigger: 'item' },
+                        series: [{
+                            name: '类型',
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: {
+                                borderRadius: 10,
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: { show: false, position: 'center' },
+                            emphasis: {
+                                label: {
+                                    show: true,
+                                    fontSize: '16',
+                                    fontWeight: 'bold'
+                                }
+                            },
+                            data: [
+                                { value: 735, name: '流动摊位' },
+                                { value: 580, name: '固定摊位' }
+                            ]
+                        }]
+                    });
+                    
+                    // 初始化3D图
+                    const detection3DChart = echarts.init(document.getElementById('detection3DChart'));
+                    detection3DChart.setOption({
+                        title: { text: '分布热力图', textStyle: { color: '#fff' } },
+                        xAxis3D: { type: 'value' },
+                        yAxis3D: { type: 'value' },
+                        zAxis3D: { type: 'value' },
+                        grid3D: {},
+                        series: [{
+                            type: 'scatter3D',
+                            data: [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
+                        }]
+                    });
+                    
+                    // 初始化水球图
+                    const completionLiquidChart = echarts.init(document.getElementById('completionLiquidChart'));
+                    completionLiquidChart.setOption({
+                        series: [{
+                            type: 'liquidFill',
+                            data: [0.75, 0.68],
+                            color: ['#1890ff', '#71c5ff'],
+                            label: { fontSize: 40 }
+                        }]
+                    });
+                    
+                    // 初始化雷达图
+                    const typeRadarChart = echarts.init(document.getElementById('typeRadarChart'));
+                    typeRadarChart.setOption({
+                        title: { text: '类型雷达图', textStyle: { color: '#fff' } },
+                        radar: {
+                            indicator: [
+                                { name: '类型1', max: 100 },
+                                { name: '类型2', max: 100 },
+                                { name: '类型3', max: 100 },
+                                { name: '类型4', max: 100 },
+                                { name: '类型5', max: 100 }
+                            ]
+                        },
+                        series: [{
+                            name: '类型分析',
+                            type: 'radar',
+                            data: [{ 
+                                value: [80, 70, 90, 60, 75],
+                                name: '占比' 
+                            }]
+                        }]
+                    });
+                    
+                    // 初始化精度图
+                    const accuracyTrendChart = echarts.init(document.getElementById('accuracyTrendChart'));
+                    accuracyTrendChart.setOption({
+                        title: { text: '准确率趋势', textStyle: { color: '#fff' } },
+                        xAxis: { type: 'category', data: ['1月', '2月', '3月', '4月', '5月', '6月'] },
+                        yAxis: { type: 'value', min: 70, max: 100 },
+                        series: [{
+                            data: [82, 85, 88, 91, 93, 95],
+                            type: 'line',
+                            smooth: true
+                        }]
+                    });
+                    
+                    // 添加响应式调整
+                    window.addEventListener('resize', function() {
+                        detectionTrendChart.resize();
+                        typeDistributionChart.resize();
+                        detection3DChart.resize();
+                        completionLiquidChart.resize();
+                        typeRadarChart.resize();
+                        accuracyTrendChart.resize();
+                    });
+                }
+            } catch (error) {
+                console.error('图表初始化失败:', error);
+            }
+        })();
+    </script>
+
+    <style>
+        .charts-container {
+            padding: 20px;
+        }
+        .chart-row {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 20px;
+        }
+        .chart-box {
+            flex: 1;
+            background: rgba(0, 21, 41, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .chart {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</body>
+</html> 

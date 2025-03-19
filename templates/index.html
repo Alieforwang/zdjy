@@ -6,18 +6,18 @@
     <meta name="color-scheme" content="light dark">
     <meta name="forced-colors" content="active">
     <title>灵瞳-城市治理智能感知终端</title>
-    <link rel="stylesheet" href="../static/css/style.css">
-    <link rel="stylesheet" href="../static/css/logout.css">
-    <link rel="stylesheet" href="../static/css/styles.css">
-    <script src="../static/js/libs/echarts.min.js"></script>
-    <script src="../static/js/libs/echarts-gl.min.js"></script>
-    <script src="../static/js/libs/echarts-liquidfill.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <!-- 页面预加载脚本，需要最先加载 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
     <script>
         // 高德地图配置
         window.AMAP_CONFIG = {
-            webKey: '{{ amap_web_key }}',
-            jsKey: '{{ amap_js_key }}',
-            securityJsCode: '{{ amap_security_code }}'
+            webKey: '9decdfc73fd9e9f474719d5344635a96',
+            jsKey: 'bfa29703d862a8c0dd480a3956015990',
+            securityJsCode: '0eabe65c8f32a08b8701a989c93cf45e'
         };
     </script>
     <script type="text/javascript">
@@ -33,10 +33,16 @@
             document.head.appendChild(script);
         })();
     </script>
+    <!-- 添加ECharts库 -->
+    <script src="{{ url_for('static', filename='js/libs/echarts.min.js') }}"></script>
+    <!-- 添加ECharts的GL扩展，用于3D图表 -->
+    <script src="{{ url_for('static', filename='js/libs/echarts-gl.min.js') }}"></script>
+    <!-- 添加水球图扩展 -->
+    <script src="{{ url_for('static', filename='js/libs/echarts-liquidfill.min.js') }}"></script>
     <style>
         @font-face {
             font-family: 'ZIT';
-            src: url('../static/zit/biaot.ttf') format('truetype');
+            src: url("{{ url_for('static', filename='zit/biaot.ttf') }}") format('truetype');
         }
         body {
             background-color: #002a54;
@@ -77,19 +83,25 @@
             margin-bottom: 10px;
         }
         .stat-item {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 10px;
+            background: rgba(0, 21, 41, 0.4);
+            padding: 12px;
             border-radius: 8px;
             text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
         .stat-value {
-            font-size: 20px;
+            font-size: 28px;
             font-weight: bold;
-            margin: 5px 0;
+            margin: 8px 0;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
         .stat-label {
-            font-size: 12px;
-            opacity: 0.8;
+            font-size: 14px;
+            opacity: 1;
+            color: #7cffb2;
+            font-weight: 500;
         }
         .heatmap-container {
             grid-column: span 2;
@@ -372,6 +384,10 @@
             <span class="btn-text">关于系统</span>
         </a>
     </div>
+
+    <!-- 页面脚本 -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
 
     <script>
         // Logout button handler
@@ -794,7 +810,6 @@
             const multiDimensionalAnalysis = echarts.init(document.getElementById('multiDimensionalAnalysis'));
             multiDimensionalAnalysis.setOption({
                 title: {
-                    // text: '违法类型分布',
                     textStyle: { color: '#fff' }
                 },
                 radar: {
@@ -935,7 +950,6 @@
             const chart = echarts.init(document.getElementById('weatherAnalysis'));
             chart.setOption({
                 title: {
-                    // text: '天气关联分析',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: { trigger: 'axis' },
@@ -943,7 +957,7 @@
                     data: ['违法事件数', '温度', '湿度'],
                     textStyle: { 
                         color: '#fff',
-                        fontSize: 10 // 减小字体大小
+                        fontSize: 10
                     },
                     bottom: 0
                 },
@@ -953,7 +967,7 @@
                     data: ['晴天', '多云', '小雨', '大雨'],
                     axisLabel: { 
                         color: '#fff',
-                        fontSize: 10 // 减小标签字体大小
+                        fontSize: 10
                     }
                 },
                 yAxis: [{
@@ -965,7 +979,7 @@
                     },
                     nameTextStyle: {
                         fontSize: 10,
-                        padding: [0, 0, 0, -20] // 调整名称位置
+                        padding: [0, 0, 0, -20]
                     }
                 }, {
                     type: 'value',
@@ -976,7 +990,7 @@
                     },
                     nameTextStyle: {
                         fontSize: 10,
-                        padding: [0, -20, 0, 0] // 调整名称位置
+                        padding: [0, -20, 0, 0]
                     }
                 }],
                 series: [{
@@ -998,18 +1012,17 @@
                     yAxisIndex: 1,
                     data: [25, 22, 20, 18],
                     lineStyle: { color: '#ff7070' },
-                    symbolSize: 6 // 减小标记大小
+                    symbolSize: 6
                 }, {
                     name: '湿度',
                     type: 'line',
                     yAxisIndex: 1,
                     data: [40, 50, 70, 85],
                     lineStyle: { color: '#91cc75' },
-                    symbolSize: 6 // 减小标记大小
+                    symbolSize: 6
                 }]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
 
@@ -1018,7 +1031,6 @@
             const chart = echarts.init(document.getElementById('enforcementGauge'));
             chart.setOption({
                 title: {
-                    // text: '执法效率分析',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: {
@@ -1027,13 +1039,13 @@
                 series: [{
                     name: '执法效率',
                     type: 'gauge',
-                    center: ['50%', '60%'], // 稍微下移仪表盘
-                    radius: '80%', // 稍微放大仪表盘
+                    center: ['50%', '60%'],
+                    radius: '80%',
                     detail: {
                         formatter: '{value}%',
                         color: '#fff',
                         fontSize: 18,
-                        offsetCenter: [0, '60%'] // 调整值的位置
+                        offsetCenter: [0, '60%']
                     },
                     data: [{
                         value: 85,
@@ -1045,7 +1057,7 @@
                     title: {
                         color: '#fff',
                         fontSize: 12,
-                        offsetCenter: [0, '80%'] // 调整标题位置
+                        offsetCenter: [0, '80%']
                     },
                     axisLabel: {
                         color: '#fff',
@@ -1077,7 +1089,6 @@
                 }]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
 
@@ -1112,7 +1123,6 @@
                 }]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
 
@@ -1163,7 +1173,6 @@
 
             const option = {
                 title: {
-                    // text: '摊位密度时空分布',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: {},
@@ -1176,9 +1185,9 @@
                     },
                     textStyle: {
                         color: '#fff',
-                        fontSize: 10 // 减小标签字体大小
+                        fontSize: 10
                     },
-                    right: 5, // 调整视觉映射控件位置
+                    right: 5,
                     bottom: 5
                 },
                 xAxis3D: {
@@ -1187,7 +1196,7 @@
                     name: '星期',
                     nameTextStyle: { 
                         color: '#fff',
-                        fontSize: 10 // 减小轴名称字体大小
+                        fontSize: 10
                     }
                 },
                 yAxis3D: {
@@ -1196,7 +1205,7 @@
                     name: '时间',
                     nameTextStyle: { 
                         color: '#fff',
-                        fontSize: 10 // 减小轴名称字体大小
+                        fontSize: 10
                     }
                 },
                 zAxis3D: {
@@ -1204,7 +1213,7 @@
                     name: '密度',
                     nameTextStyle: { 
                         color: '#fff',
-                        fontSize: 10 // 减小轴名称字体大小
+                        fontSize: 10
                     }
                 },
                 grid3D: {
@@ -1245,7 +1254,6 @@
 
             chart.setOption(option);
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
 
             // 保存全局变量以便控制旋转
@@ -1284,7 +1292,6 @@
             const chart = echarts.init(document.getElementById('hourlyDistribution'));
             chart.setOption({
                 title: {
-                    // text: '时段分布分析',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: {
@@ -1307,7 +1314,7 @@
                         color: '#fff',
                         interval: 0,
                         rotate: 30,
-                        fontSize: 9 // 减小x轴标签字体大小
+                        fontSize: 9
                     }
                 },
                 yAxis: {
@@ -1315,12 +1322,12 @@
                     name: '违法事件数',
                     nameTextStyle: {
                         color: '#fff',
-                        fontSize: 10, // 减小y轴名称字体大小
-                        padding: [0, 0, 0, -30] // 调整位置
+                        fontSize: 10,
+                        padding: [0, 0, 0, -30]
                     },
                     axisLabel: {
                         color: '#fff',
-                        fontSize: 10 // 减小y轴标签字体大小
+                        fontSize: 10
                     }
                 },
                 series: [{
@@ -1343,11 +1350,10 @@
                             ])
                         }
                     },
-                    barWidth: '60%' // 控制柱状图宽度
+                    barWidth: '60%'
                 }]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
 
@@ -1356,7 +1362,6 @@
             const chart = echarts.init(document.getElementById('aiAnalysis'));
             chart.setOption({
                 title: {
-                    // text: 'AI识别准确率分析',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: {
@@ -1377,7 +1382,7 @@
                     boundaryGap: [0, 0.01],
                     axisLabel: { 
                         color: '#fff',
-                        fontSize: 10 // 减小标签字体大小
+                        fontSize: 10
                     }
                 },
                 yAxis: {
@@ -1385,7 +1390,7 @@
                     data: ['流动摊贩', '店外经营', '违规停车', '广告牌匾', '建筑材料'],
                     axisLabel: { 
                         color: '#fff',
-                        fontSize: 10 // 减小标签字体大小
+                        fontSize: 10
                     }
                 },
                 series: [
@@ -1403,7 +1408,6 @@
                 ]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
         
@@ -1412,7 +1416,6 @@
             const chart = echarts.init(document.getElementById('seasonalTrend'));
             chart.setOption({
                 title: {
-                    // text: '季节性趋势分析',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: {
@@ -1422,11 +1425,11 @@
                     data: ['春季', '夏季', '秋季', '冬季'],
                     textStyle: { 
                         color: '#fff',
-                        fontSize: 10 // 减小字体
+                        fontSize: 10
                     },
-                    bottom: 0, // 将图例放到底部
-                    itemWidth: 12, // 减小图例宽度
-                    itemHeight: 8 // 减小图例高度
+                    bottom: 0,
+                    itemWidth: 12,
+                    itemHeight: 8
                 },
                 radar: {
                     indicator: [
@@ -1435,12 +1438,12 @@
                         { name: '晚市', max: 100 },
                         { name: '夜市', max: 100 }
                     ],
-                    center: ['50%', '50%'], // 确保雷达图居中
-                    radius: '60%', // 稍微缩小雷达图半径
+                    center: ['50%', '50%'],
+                    radius: '60%',
                     name: {
                         textStyle: {
                             color: '#fff',
-                            fontSize: 10 // 减小指示器名称字体大小
+                            fontSize: 10
                         }
                     },
                     splitArea: {
@@ -1494,7 +1497,6 @@
                 }]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
 
@@ -1509,7 +1511,7 @@
             categories.forEach((cat, idx) => {
                 nodes.push({
                     name: cat,
-                    symbolSize: 40, // 减小节点大小
+                    symbolSize: 40,
                     category: idx
                 });
                 
@@ -1526,7 +1528,6 @@
             // 设置图表选项
             chart.setOption({
                 title: {
-                    // text: '周边设施关联分析',
                     textStyle: { color: '#fff' }
                 },
                 tooltip: {},
@@ -1535,9 +1536,9 @@
                         return a;
                     }),
                     textStyle: { color: '#fff' },
-                    bottom: 0, // 将图例移到底部
-                    itemWidth: 10, // 减小图例项宽度
-                    itemHeight: 10 // 减小图例项高度
+                    bottom: 0,
+                    itemWidth: 10,
+                    itemHeight: 10
                 }],
                 animationDurationUpdate: 1500,
                 animationEasingUpdate: 'quinticInOut',
@@ -1556,14 +1557,13 @@
                         show: true,
                         position: 'right',
                         color: '#fff',
-                        fontSize: 10 // 减小标签字体大小
+                        fontSize: 10
                     },
                     lineStyle: {
                         color: 'source',
                         curveness: 0.3,
-                        width: 1 // 减小线宽
+                        width: 1
                     },
-                    // 优化布局参数
                     force: {
                         repulsion: 80,
                         gravity: 0.1,
@@ -1572,7 +1572,6 @@
                 }]
             });
             
-            // 触发一次resize确保图表正确显示
             setTimeout(() => chart.resize(), 100);
         }
 
@@ -1689,7 +1688,5 @@
             }
         }
     </script>
-    <script src="../static/js/main.js"></script>
-    <script src="../static/js/logout.js"></script>
 </body>
 </html> 

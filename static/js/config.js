@@ -7,5 +7,5 @@ const AMAP_CONFIG = {
     securityJsCode: '0eabe65c8f32a08b8701a989c93cf45e'
 };
 
-// 导出配置
-export { AMAP_CONFIG }; 
+// 设置为全局变量
+window.AMAP_CONFIG = AMAP_CONFIG; 
