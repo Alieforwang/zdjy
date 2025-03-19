@@ -30,6 +30,7 @@ APP_CONFIG = {
     'SESSION_TYPE': 'filesystem',  # session存储类型
     'PERMANENT_SESSION_LIFETIME': 3600,  # session过期时间(秒)
     'UPLOAD_FOLDER': 'static/uploads',  # 上传文件存储目录
+    'RESULT_FOLDER': 'static/@results',  # 结果文件存储目录
     'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,  # 最大上传文件大小(16MB)
     'ALLOWED_EXTENSIONS': {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi'},  # 允许上传的文件类型
 }

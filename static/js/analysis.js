@@ -1,19 +1,21 @@
 // 初始化图表
 let detectionTrendChart;
 let typeDistributionChart;
+let detection3DChart;  // 新增：3D检测热力图
+let completionLiquidChart;  // 新增：检测完成率水球图
+let typeRadarChart;  // 新增：占道经营类型雷达图
+let accuracyTrendChart;  // 新增：检测精度变化曲线图
 
 // 颜色配置 - 更新为更适合深蓝色主题的颜色
 const violationTypeToColor = {
-    'zdjy_ld': '#1890ff',  // 流动摊位 - 更亮的蓝色
-    'zdjy_gd': '#52c41a',  // 固定摊位 - 绿色
-    'other': '#faad14'     // 其他 - 黄色
+    'zdjy_ld': '#1890ff',  // 流动摊位 - 蓝色
+    'zdjy_gd': '#52c41a'   // 固定摊位 - 绿色
 };
 
 // 类型映射
 const typeMapping = {
     'zdjy_ld': '流动摊位',
-    'zdjy_gd': '固定摊位',
-    'other': '其他'
+    'zdjy_gd': '固定摊位'
 };
 
 // 实用函数 - 防抖与节流
@@ -146,10 +148,18 @@ function showErrorMessage(message) {
 
 // 初始化图表
 function initCharts() {
-    // 检测趋势图
-    detectionTrendChart = echarts.init(document.getElementById('detectionTrendChart'));
+    console.log('初始化图表');
     
-    // 配置趋势图初始选项
+    // 初始化图表实例
+    detectionTrendChart = echarts.init(document.getElementById('detectionTrendChart'));
+    typeDistributionChart = echarts.init(document.getElementById('typeDistributionChart'));
+    detection3DChart = echarts.init(document.getElementById('detection3DChart'));
+    completionLiquidChart = echarts.init(document.getElementById('completionLiquidChart'));
+    typeRadarChart = echarts.init(document.getElementById('typeRadarChart'));
+    accuracyTrendChart = echarts.init(document.getElementById('accuracyTrendChart'));
+    
+    // 设置基本的图表选项
+    // 趋势图默认选项
     const trendOption = {
         title: {
             text: '近7天检测趋势',
@@ -231,10 +241,7 @@ function initCharts() {
     // 设置趋势图选项
     detectionTrendChart.setOption(trendOption);
     
-    // 类型分布图
-    typeDistributionChart = echarts.init(document.getElementById('typeDistributionChart'));
-    
-    // 配置分布图初始选项
+    // 分布图默认选项
     const distributionOption = {
         title: {
             text: '类型分布',
@@ -303,208 +310,217 @@ function initCharts() {
     // 设置分布图选项
     typeDistributionChart.setOption(distributionOption);
     
-    // 添加窗口大小调整监听
-    window.addEventListener('resize', function() {
-        if (detectionTrendChart) {
-            detectionTrendChart.resize();
-        }
-        if (typeDistributionChart) {
-            typeDistributionChart.resize();
-        }
-    });
-    
-    // 延时触发一次调整，确保完全加载
-    setTimeout(() => {
-        if (detectionTrendChart) {
-            detectionTrendChart.resize();
-        }
-        if (typeDistributionChart) {
-            typeDistributionChart.resize();
-        }
-    }, 200);
-}
-
-// 获取图表数据
-async function fetchChartData() {
-    // 添加加载状态
-    detectionTrendChart.showLoading({
-        text: '加载中...',
-        color: '#40a9ff',
-        textColor: '#fff',
-        maskColor: 'rgba(0, 0, 0, 0.2)',
-        zlevel: 0
-    });
-    
-    typeDistributionChart.showLoading({
-        text: '加载中...',
-        color: '#40a9ff',
-        textColor: '#fff',
-        maskColor: 'rgba(0, 0, 0, 0.2)',
-        zlevel: 0
-    });
-
-    fetch('/api/analysis/chart-data', {
-        method: 'GET',  // 明确指定使用GET方法
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'  // 明确表明这是AJAX请求
+    // 3D热力图默认选项
+    const option3D = {
+        title: {
+            text: '检测点分布',
+            textStyle: {
+                color: '#fff',
+                fontSize: 14
+            },
+            left: 'center'
         },
-        credentials: 'include'  // 改为include确保在跨域情况下也发送cookies
-    })
-        .then(response => {
-            if (!response.ok) {
-                // 特别处理401未授权状态（会话过期）
-                if (response.status === 401) {
-                    console.error('会话已过期，需要重新登录');
-                    
-                    // 确保用户知道会话过期
-                    showErrorMessage('您的会话已过期，即将跳转到登录页面');
-                    
-                    // 延迟3秒后跳转，让用户有时间看到消息
-                    setTimeout(() => {
-                        // 清除localStorage中的登录状态
-                        localStorage.removeItem('user_logged_in');
-                        localStorage.removeItem('username');
-                        localStorage.removeItem('login_timestamp');
-                        
-                        // 重定向到登录页面
-                        window.location.replace('/login_page');
-                    }, 3000);
-                    
-                    throw new Error('会话已过期');
+        tooltip: {},
+        visualMap: {
+            show: true,
+            dimension: 2,
+            min: 0,
+            max: 30,
+            inRange: {
+                color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
+            }
+        },
+        xAxis3D: {
+            type: 'value',
+            name: '经度',
+            nameTextStyle: {
+                color: '#fff'
+            },
+            axisLabel: {
+                color: '#fff'
+            }
+        },
+        yAxis3D: {
+            type: 'value',
+            name: '纬度',
+            nameTextStyle: {
+                color: '#fff'
+            },
+            axisLabel: {
+                color: '#fff'
+            }
+        },
+        zAxis3D: {
+            type: 'value',
+            name: '检测数',
+            nameTextStyle: {
+                color: '#fff'
+            },
+            axisLabel: {
+                color: '#fff'
+            }
+        },
+        grid3D: {
+            viewControl: {
+                autoRotate: true,
+                autoRotateSpeed: 10,
+                distance: 150
+            },
+            light: {
+                main: {
+                    intensity: 1.2
+                },
+                ambient: {
+                    intensity: 0.3
                 }
-                throw new Error('网络响应不正常: ' + response.status);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // 隐藏加载状态
-            detectionTrendChart.hideLoading();
-            typeDistributionChart.hideLoading();
-            
-            console.log('获取到图表数据:', data);
-            
-            // 检查是否有会话过期消息
-            if (data.success === false && data.message && data.message.includes('会话已过期')) {
-                console.error('会话已过期，需要重新登录');
-                showErrorMessage('您的会话已过期，即将跳转到登录页面');
-                setTimeout(() => {
-                    window.location.replace('/login_page');
-                }, 3000);
-                return;
-            }
-            
-            if (data && data.trend && data.distribution) {
-                // 更新趋势图
-                updateTrendChart(data.trend);
-                
-                // 更新分布图
-                updateDistributionChart(data.distribution);
-            } else {
-                console.warn('获取到的图表数据格式不正确:', data);
-                // 显示空数据状态
-                showEmptyDataState();
-            }
-        })
-        .catch(error => {
-            // 隐藏加载状态
-            detectionTrendChart.hideLoading();
-            typeDistributionChart.hideLoading();
-            
-            console.error('获取图表数据失败:', error);
-            
-            // 如果不是会话过期错误，显示一般错误状态
-            if (!error.message.includes('会话已过期')) {
-                // 显示错误状态
-                showErrorState(error.message);
-                // 展示用户友好的错误消息
-                showErrorMessage('加载图表数据失败，请刷新页面重试');
-            }
-        });
-}
-
-// 显示空数据状态
-function showEmptyDataState() {
-    detectionTrendChart.setOption({
-        title: {
-            text: '暂无数据',
-            left: 'center',
-            top: 'center',
-            textStyle: {
-                fontSize: 16,
-                color: '#909399'
             }
         },
         series: [{
-            type: 'line',
-            data: []
+            type: 'bar3D',
+            data: generateMockLocationData(),
+            shading: 'lambert',
+            itemStyle: {
+                opacity: 0.8
+            },
+            emphasis: {
+                itemStyle: {
+                    color: '#fff200'
+                }
+            }
         }]
-    });
+    };
     
-    typeDistributionChart.setOption({
+    // 设置3D热力图选项
+    detection3DChart.setOption(option3D);
+    
+    // 水球图默认选项
+    const liquidOption = {
         title: {
-            text: '暂无数据',
-            left: 'center',
-            top: 'center',
+            text: '本月完成率',
             textStyle: {
-                fontSize: 16,
-                color: '#909399'
+                color: '#fff',
+                fontSize: 14
+            },
+            left: 'center'
+        },
+        series: [{
+            type: 'liquidFill',
+            data: [0.75, 0.68, 0.61],
+            color: ['#1890ff', '#71c5ff', '#a8dfff'],
+            backgroundStyle: {
+                color: 'rgba(0, 20, 50, 0.8)'
+            },
+            radius: '75%',
+            center: ['50%', '50%'],
+            label: {
+                normal: {
+            textStyle: {
+                        color: '#fff',
+                        fontSize: 40,
+                        fontWeight: 'bold'
+                    }
+                }
+            },
+            outline: {
+                borderDistance: 5,
+                itemStyle: {
+                    borderWidth: 5,
+                    borderColor: 'rgba(20, 70, 140, 0.8)',
+                    shadowColor: 'rgba(0, 0, 0, 0.8)',
+                    shadowBlur: 20
+                }
+            }
+        }]
+    };
+    
+    // 设置水球图选项
+    completionLiquidChart.setOption(liquidOption);
+    
+    // 雷达图默认选项
+    const radarOption = {
+        title: {
+            text: '占道经营类型对比',
+            textStyle: {
+                color: '#fff',
+                fontSize: 14
+            },
+            left: 'center'
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            },
+            formatter: function(params) {
+                const value = params[0].value;
+                const name = params[0].name;
+                return `${name}<br/>数量: ${value}`;
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '8%',
+            top: '15%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: ['流动摊位', '固定摊位'],
+            axisLabel: {
+                color: '#e6e6e6'
+            },
+            axisLine: {
+                lineStyle: {
+                    color: '#3a5178'
+                }
+            }
+        },
+        yAxis: {
+            type: 'value',
+            name: '数量',
+            minInterval: 1,
+            axisLabel: {
+                color: '#e6e6e6'
+            },
+            axisLine: {
+                lineStyle: {
+                    color: '#3a5178'
+                }
+            },
+            splitLine: {
+                lineStyle: {
+                    color: 'rgba(58, 81, 120, 0.3)'
+                }
             }
         },
         series: [{
-            type: 'pie',
-            data: []
-        }]
-    });
-}
-
-// 显示错误状态
-function showErrorState(message) {
-    const errorText = message || '加载数据失败';
-    
-    detectionTrendChart.setOption({
-        title: {
-            text: errorText,
-            left: 'center',
-            top: 'center',
-            textStyle: {
-                fontSize: 16,
-                color: '#f56c6c'
+            name: '数量',
+            type: 'bar',
+            data: [0, 0],
+            barWidth: '40%',
+            itemStyle: {
+                color: function(params) {
+                    return params.dataIndex === 0 ? '#1890ff' : '#52c41a';
+                },
+                borderRadius: [5, 5, 0, 0]
+            },
+            label: {
+                show: true,
+                position: 'top',
+                formatter: '{c}',
+                color: '#e6e6e6'
             }
-        },
-        series: [{
-            type: 'line',
-            data: []
         }]
-    });
+    };
     
-    typeDistributionChart.setOption({
-        title: {
-            text: errorText,
-            left: 'center',
-            top: 'center',
-            textStyle: {
-                fontSize: 16,
-                color: '#f56c6c'
-            }
-        },
-        series: [{
-            type: 'pie',
-            data: []
-        }]
-    });
-}
-
-// 更新趋势图
-function updateTrendChart(trendData) {
-    if (!trendData || !trendData.dates || !trendData.counts || trendData.dates.length === 0) {
-        showEmptyDataState();
-        return;
-    }
+    // 设置雷达图选项
+    typeRadarChart.setOption(radarOption);
     
-    const option = {
+    // 精度变化曲线图默认选项
+    const accuracyOption = {
         title: {
-            text: '近7天检测趋势',
+            text: '近7天检测精度变化',
             textStyle: {
                 fontSize: 16,
                 fontWeight: 'normal',
@@ -520,20 +536,27 @@ function updateTrendChart(trendData) {
             textStyle: {
                 color: '#fff'
             },
-            formatter: function(params) {
-                const param = params[0];
-                return `${param.axisValue}<br />检测数量: <b>${param.value}</b>`;
+            formatter: '{b}<br/>{a0}: {c0}%<br/>{a1}: {c1}%'
+        },
+        legend: {
+            data: ['流动摊位', '固定摊位'],
+            bottom: 0,
+            textStyle: {
+                color: '#e6e6e6'
             }
+        },
+        grid: {
+            top: 60,
+            left: '5%',
+            right: '5%',
+            bottom: '15%',
+            containLabel: true
         },
         xAxis: {
             type: 'category',
-            data: trendData.dates,
+            data: generateLast7Days(),
             axisLabel: {
-                color: '#b7c4d5',
-                formatter: function(value) {
-                    // 只显示月份和日期
-                    return value.substring(5);
-                }
+                color: '#b7c4d5'
             },
             axisLine: {
                 lineStyle: {
@@ -546,8 +569,15 @@ function updateTrendChart(trendData) {
         },
         yAxis: {
             type: 'value',
-            axisLabel: {
+            name: '精度(%)',
+            nameTextStyle: {
                 color: '#b7c4d5'
+            },
+            min: 70,
+            max: 100,
+            axisLabel: {
+                color: '#b7c4d5',
+                formatter: '{value}%'
             },
             splitLine: {
                 lineStyle: {
@@ -555,78 +585,331 @@ function updateTrendChart(trendData) {
                 }
             }
         },
-        grid: {
-            top: '60',
-            left: '5%',
-            right: '5%',
-            bottom: '10%',
-            containLabel: true
+        series: [
+            {
+                name: '流动摊位',
+            type: 'line',
+                data: generateRandomAccuracy(),
+            smooth: true,
+                symbolSize: 6,
+                itemStyle: {
+                    color: '#1890ff'
+                },
+            lineStyle: {
+                width: 3,
+                    color: '#1890ff'
+                }
+            },
+            {
+                name: '固定摊位',
+                type: 'line',
+                data: generateRandomAccuracy(),
+                smooth: true,
+                symbolSize: 6,
+            itemStyle: {
+                    color: '#52c41a'
+                },
+                lineStyle: {
+                    width: 3,
+                    color: '#52c41a'
+                }
+            }
+        ]
+    };
+    
+    // 设置精度变化曲线图选项
+    accuracyTrendChart.setOption(accuracyOption);
+    
+    // 添加窗口大小调整监听
+    window.addEventListener('resize', function() {
+        if (detectionTrendChart) {
+            detectionTrendChart.resize();
+        }
+        if (typeDistributionChart) {
+            typeDistributionChart.resize();
+        }
+        if (detection3DChart) {
+            detection3DChart.resize();
+        }
+        if (completionLiquidChart) {
+            completionLiquidChart.resize();
+        }
+        if (typeRadarChart) {
+            typeRadarChart.resize();
+        }
+        if (accuracyTrendChart) {
+            accuracyTrendChart.resize();
+        }
+    });
+    
+    // 延时触发一次调整，确保完全加载
+    setTimeout(() => {
+        if (detectionTrendChart) {
+            detectionTrendChart.resize();
+        }
+        if (typeDistributionChart) {
+            typeDistributionChart.resize();
+        }
+        if (detection3DChart) {
+            detection3DChart.resize();
+        }
+        if (completionLiquidChart) {
+            completionLiquidChart.resize();
+        }
+        if (typeRadarChart) {
+            typeRadarChart.resize();
+        }
+        if (accuracyTrendChart) {
+            accuracyTrendChart.resize();
+        }
+    }, 200);
+}
+
+// 生成模拟位置数据
+function generateMockLocationData() {
+    const data = [];
+    // 生成10x10网格的模拟数据
+    for (let i = 0; i < 10; i++) {
+        for (let j = 0; j < 10; j++) {
+            // 随机生成高度(检测数量)
+            const height = Math.round(Math.random() * 25) + 5;
+            data.push([i, j, height]);
+        }
+    }
+    return data;
+}
+
+// 生成过去7天的日期
+function generateLast7Days() {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        days.push(date.getMonth() + 1 + '/' + date.getDate());
+    }
+    return days;
+}
+
+// 生成随机精度数据（75%-95%之间）
+function generateRandomAccuracy() {
+    const accuracy = [];
+    for (let i = 0; i < 7; i++) {
+        accuracy.push((75 + Math.random() * 20).toFixed(1));
+    }
+    return accuracy;
+}
+
+// 显示图表加载状态
+function showLoadingState() {
+    // 添加加载状态到所有图表
+    detectionTrendChart.showLoading({
+        text: '加载中...',
+                    color: '#40a9ff',
+        textColor: '#fff',
+        maskColor: 'rgba(0, 0, 0, 0.2)',
+        zlevel: 0
+    });
+    
+    typeDistributionChart.showLoading({
+        text: '加载中...',
+        color: '#40a9ff',
+        textColor: '#fff',
+        maskColor: 'rgba(0, 0, 0, 0.2)',
+        zlevel: 0
+    });
+    
+    detection3DChart.showLoading({
+        text: '加载中...',
+        color: '#40a9ff',
+        textColor: '#fff',
+        maskColor: 'rgba(0, 0, 0, 0.2)',
+        zlevel: 0
+    });
+    
+    completionLiquidChart.showLoading({
+        text: '加载中...',
+        color: '#40a9ff',
+        textColor: '#fff',
+        maskColor: 'rgba(0, 0, 0, 0.2)',
+        zlevel: 0
+    });
+    
+    typeRadarChart.showLoading({
+        text: '加载中...',
+        color: '#40a9ff',
+        textColor: '#fff',
+        maskColor: 'rgba(0, 0, 0, 0.2)',
+        zlevel: 0
+    });
+    
+    accuracyTrendChart.showLoading({
+        text: '加载中...',
+        color: '#40a9ff',
+        textColor: '#fff',
+        maskColor: 'rgba(0, 0, 0, 0.2)',
+        zlevel: 0
+    });
+}
+
+// 隐藏图表加载状态
+function hideLoadingState() {
+    detectionTrendChart.hideLoading();
+    typeDistributionChart.hideLoading();
+    detection3DChart.hideLoading();
+    completionLiquidChart.hideLoading();
+    typeRadarChart.hideLoading();
+    accuracyTrendChart.hideLoading();
+}
+
+// 获取图表数据
+function fetchChartData() {
+    showLoadingState();
+    console.log('获取图表数据...');
+    
+    // 从API获取数据
+    fetch('/api/analysis/chart-data', {
+        method: 'GET',
+        credentials: 'include'
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                console.error('获取图表数据失败：未授权');
+                window.location.replace('/login_page');
+            } else {
+                console.error('获取图表数据失败：', response.status);
+                throw new Error('获取图表数据失败');
+            }
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('获取到的图表数据:', data);
+        
+        // 更新趋势图数据
+        updateTrendChart(data.trend);
+        
+        // 更新分布图数据
+        updateDistributionChart(data.distribution);
+        
+        // 更新3D热力图数据
+        updateLocationChart(data.location);
+        
+        // 更新水球图数据
+        updateCompletionChart(data.completion);
+        
+        // 更新类型对比图数据
+        updateTypeComparisonChart(data.comparison);
+        
+        // 更新精度变化曲线图
+        updateAccuracyChart(data.accuracy);
+        
+        // 隐藏加载状态
+        hideLoadingState();
+    })
+    .catch(error => {
+        console.error('获取图表数据错误:', error);
+        
+        // 显示错误信息
+        showErrorMessage('获取图表数据失败，将使用默认数据');
+        
+        // 创建默认空数据
+        const emptyData = {
+            trend: {
+                dates: generateLast7Days(),
+                counts: Array(7).fill(0),
+                ld_counts: Array(7).fill(0),
+                gd_counts: Array(7).fill(0)
+            },
+            distribution: [
+                {type: '流动摊位', count: 0, original_type: 'zdjy_ld'},
+                {type: '固定摊位', count: 0, original_type: 'zdjy_gd'}
+            ],
+            location: {
+                data: []
+            },
+            completion: {
+                rate: 0.5
+            },
+            comparison: {
+                categories: ['流动摊位', '固定摊位'],
+                values: [50, 50],
+                percentages: [50, 50]
+            },
+            accuracy: {
+                dates: generateLast7Days(),
+                ld_accuracy: Array(7).fill(80),
+                gd_accuracy: Array(7).fill(80)
+            }
+        };
+        
+        // 使用默认数据更新图表
+        updateTrendChart(emptyData.trend);
+        updateDistributionChart(emptyData.distribution);
+        updateLocationChart(emptyData.location);
+        updateCompletionChart(emptyData.completion);
+        updateTypeComparisonChart(emptyData.comparison);
+        updateAccuracyChart(emptyData.accuracy);
+        
+        // 隐藏加载状态
+        hideLoadingState();
+    });
+}
+
+// 更新趋势图
+function updateTrendChart(trendData) {
+    if (!trendData || !trendData.dates || !trendData.counts) {
+        console.error('趋势数据无效');
+        return;
+    }
+    
+    // 分别获取总体趋势和流动/固定摊位的数据
+    const dates = trendData.dates;
+    const counts = trendData.counts;
+    
+    // 构建图表选项
+    const option = {
+        xAxis: {
+            data: dates
         },
         series: [{
             name: '检测数量',
-            data: trendData.counts,
-            type: 'line',
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 8,
-            showSymbol: true,
-            lineStyle: {
-                width: 3,
-                color: '#40a9ff'
-            },
-            itemStyle: {
-                color: '#40a9ff',
-                borderColor: '#fff',
-                borderWidth: 2
-            },
-            emphasis: {
-                itemStyle: {
-                    color: '#40a9ff',
-                    borderColor: '#fff',
-                    borderWidth: 3,
-                    shadowColor: 'rgba(64, 169, 255, 0.5)',
-                    shadowBlur: 10
-                }
-            },
-            areaStyle: {
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(64, 169, 255, 0.6)' },
-                    { offset: 1, color: 'rgba(64, 169, 255, 0.0)' }
-                ])
-            },
-            animation: true,
-            animationDuration: 2000,
-            animationEasing: 'cubicOut'
+            data: counts
         }]
     };
     
+    // 更新图表
+    if (detectionTrendChart) {
     detectionTrendChart.setOption(option);
+    }
 }
 
 // 更新分布图
 function updateDistributionChart(distributionData) {
     if (!distributionData || distributionData.length === 0) {
-        showEmptyDataState();
-        return;
+        console.warn('分布数据无效或为空，使用默认数据');
+        // 使用默认数据,只包含两种类型
+        distributionData = [
+            {type: '流动摊位', count: 0, original_type: 'zdjy_ld'},
+            {type: '固定摊位', count: 0, original_type: 'zdjy_gd'}
+        ];
     }
     
-    const data = distributionData.map(item => {
-        const type = item.type;
-        const originalType = item.original_type || 'other';
-        const colorKey = violationTypeToColor[originalType] ? originalType : 'other';
-        
+    // 准备饼图数据
+    const pieData = distributionData.map(item => {
         return {
-            name: type,
-            value: item.count,
+            name: item.type,
+            value: item.count || 0, // 确保count不为null或undefined
             itemStyle: {
-                color: violationTypeToColor[colorKey]
+                color: violationTypeToColor[item.original_type] || violationTypeToColor.zdjy_ld
             }
         };
     });
     
+    // 构建图表选项
     const option = {
         title: {
-            text: '类型分布',
+            text: '占道经营类型分布',
             textStyle: {
                 fontSize: 16,
                 fontWeight: 'normal',
@@ -637,75 +920,166 @@ function updateDistributionChart(distributionData) {
         },
         tooltip: {
             trigger: 'item',
-            backgroundColor: 'rgba(1, 22, 53, 0.9)',
-            borderColor: '#40a9ff',
-            textStyle: {
-                color: '#fff'
-            },
-            formatter: function(params) {
-                return `${params.name}<br />数量: <b>${params.value}</b> (${params.percent}%)`;
-            }
+            formatter: '{b}: {c} ({d}%)'
         },
         legend: {
-            type: 'scroll',
             orient: 'horizontal',
             bottom: 0,
             left: 'center',
-            itemWidth: 15,
-            itemHeight: 10,
-            icon: 'roundRect',
+            data: distributionData.map(item => item.type),
             textStyle: {
-                color: '#b7c4d5',
-                fontSize: 12
-            },
-            pageTextStyle: {
-                color: '#b7c4d5'
-            },
-            pageIconColor: '#40a9ff',
-            pageIconInactiveColor: '#233656'
+                color: '#e6e6e6'
+            }
         },
         series: [{
-            name: '类型分布',
+            name: '占道经营类型',
             type: 'pie',
             radius: ['35%', '70%'],
             center: ['50%', '50%'],
-            avoidLabelOverlap: true,
-            itemStyle: {
-                borderRadius: 5,
-                borderColor: '#011635',
-                borderWidth: 2
-            },
-            label: {
-                show: false
-            },
+            data: pieData,
             emphasis: {
                 itemStyle: {
                     shadowBlur: 10,
                     shadowOffsetX: 0,
                     shadowColor: 'rgba(0, 0, 0, 0.5)'
-                },
-                label: {
-                    show: true,
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    color: '#fff'
                 }
-            },
-            labelLine: {
-                show: false
-            },
-            data: data,
-            animationType: 'scale',
-            animationEasing: 'elasticOut',
-            animationDelay: function (idx) {
-                return Math.random() * 200;
-            },
-            animation: true,
-            animationDuration: 2000
+            }
         }]
     };
     
-    typeDistributionChart.setOption(option);
+    // 更新图表
+    if (typeDistributionChart) {
+        typeDistributionChart.setOption(option);
+    }
+}
+
+// 更新3D热力图
+function updateLocationChart(locationData) {
+    if (!locationData || !locationData.data) {
+        console.error('位置数据无效');
+        return;
+    }
+    
+    const data3D = locationData.data;
+    
+    // 找出最大值以设置合适的可视化映射
+    let maxValue = 10;
+    if (data3D.length > 0) {
+        maxValue = Math.max(...data3D.map(item => item[2]));
+        maxValue = Math.max(maxValue, 10); // 确保值不会太小
+    }
+    
+    // 构建图表选项
+    const option = {
+        visualMap: {
+            max: maxValue
+        },
+        series: [{
+            data: data3D
+        }]
+    };
+    
+    // 更新图表
+    if (detection3DChart) {
+        detection3DChart.setOption(option);
+    }
+}
+
+// 更新水球图
+function updateCompletionChart(completionData) {
+    if (!completionData || completionData.rate === undefined) {
+        console.error('完成率数据无效');
+        return;
+    }
+    
+    // 获取完成率，确保在0-1之间
+    let rate = Math.min(1, Math.max(0, completionData.rate));
+    
+    // 设置三层水波，每层略有不同
+    const value1 = rate;
+    const value2 = Math.max(0, rate - 0.05);
+    const value3 = Math.max(0, rate - 0.1);
+    
+    // 构建图表选项
+    const option = {
+        series: [{
+            type: 'liquidFill',
+            data: [value1, value2, value3],
+            label: {
+                normal: {
+                    formatter: (rate * 100).toFixed(0) + '%'
+                }
+            }
+        }]
+    };
+    
+    // 更新图表
+    if (completionLiquidChart) {
+        completionLiquidChart.setOption(option);
+    }
+}
+
+// 更新类型对比图数据
+function updateTypeComparisonChart(comparisonData) {
+    if (!comparisonData || !comparisonData.values || !comparisonData.categories) {
+        console.error('类型对比数据无效');
+        return;
+    }
+    
+    // 获取基础数据
+    const categories = comparisonData.categories;
+    const values = comparisonData.values;
+    const percentages = comparisonData.percentages || values.map(value => 0);
+    
+    // 更新柱状图
+    const option = {
+        xAxis: {
+            data: categories
+        },
+        series: [{
+            data: values.map((value, index) => ({
+                value: value,
+                itemStyle: {
+                    color: index === 0 ? '#1890ff' : '#52c41a'
+                }
+            }))
+        }]
+    };
+    
+    // 更新图表
+    if (typeRadarChart) {
+        typeRadarChart.setOption(option);
+    }
+}
+
+// 更新精度变化曲线图数据
+function updateAccuracyChart(accuracyData) {
+    if (!accuracyData || !accuracyData.dates || !accuracyData.ld_accuracy || !accuracyData.gd_accuracy) {
+        console.error('精度数据无效');
+        return;
+    }
+    
+    // 构建图表选项
+    const option = {
+        xAxis: {
+            data: accuracyData.dates
+        },
+        series: [
+            {
+                name: '流动摊位',
+                data: accuracyData.ld_accuracy
+            },
+            {
+                name: '固定摊位',
+                data: accuracyData.gd_accuracy
+            }
+        ]
+    };
+    
+    // 更新图表
+    if (accuracyTrendChart) {
+        accuracyTrendChart.setOption(option);
+    }
 }
 
 // 加载统计数据
@@ -830,31 +1204,114 @@ function handleFiles(files) {
     })
     .then(data => {
         console.log('上传响应:', data);
-        window.isUploading = false; // 重置上传标志
+        window.isUploading = false;
         
-        // 恢复上传提示文字
         if (uploadText) {
             uploadText.textContent = "拖拽文件到此处或点击上传";
         }
         
         if (data.success) {
+            // 更新检测类型显示
+            const currentDetectionType = document.getElementById('currentDetectionType');
+            if (currentDetectionType) {
+                const typeText = data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位';
+                currentDetectionType.textContent = typeText;
+                currentDetectionType.className = data.detect_type;
+            }
+            
+            // 创建图片容器
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'image-container';
+            imageContainer.style.position = 'relative';
+            
+            // 创建原始图片元素
+            const img = document.createElement('img');
+            img.className = 'result-image';
+            img.src = data.result_image + '?t=' + new Date().getTime();
+            img.alt = '分析结果';
+            img.onerror = function() {
+                this.onerror = null;
+                this.src = '/static/@results/default_result.jpg';
+                this.alt = '加载失败';
+            };
+            
+            // 创建Canvas元素
+            const canvas = document.createElement('canvas');
+            canvas.className = 'detection-canvas';
+            canvas.style.position = 'absolute';
+            canvas.style.top = '0';
+            canvas.style.left = '0';
+            canvas.style.pointerEvents = 'none';
+            
+            // 等待图片加载完成后设置Canvas尺寸并绘制检测框
+            img.onload = function() {
+                canvas.width = this.width;
+                canvas.height = this.height;
+                
+                // 绘制检测框
+                const ctx = canvas.getContext('2d');
+                ctx.lineWidth = 2;
+                ctx.font = '14px Arial';
+                
+                data.detections.forEach(detection => {
+                    // 将归一化坐标转换为实际像素坐标
+                    const x = detection.x * this.width;
+                    const y = detection.y * this.height;
+                    const width = detection.width * this.width;
+                    const height = detection.height * this.height;
+                    
+                    // 根据类别设置不同的颜色
+                    let color;
+                    if (detection.class === 'zdjy_ld') {
+                        color = '#ff4d4f'; // 流动摊位用红色
+                    } else if (detection.class === 'zdjy_gd') {
+                        color = '#52c41a'; // 固定摊位用绿色
+                    } else {
+                        color = '#1890ff'; // 其他类别用蓝色
+                    }
+                    
+                    // 绘制边界框
+                    ctx.strokeStyle = color;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // 绘制标签背景
+                    const label = `${detection.class === 'zdjy_ld' ? '流动摊位' : '固定摊位'} ${(detection.confidence * 100).toFixed(1)}%`;
+                    const labelWidth = ctx.measureText(label).width + 8;
+                    const labelHeight = 20;
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x, y - labelHeight, labelWidth, labelHeight);
+                    
+                    // 绘制标签文本
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(label, x + 4, y - 5);
+                });
+            };
+            
+            // 组装DOM
+            imageContainer.appendChild(img);
+            imageContainer.appendChild(canvas);
+            
             // 显示分析结果
             resultArea.innerHTML = `
-                <div class="result-images">
+                <div class="result-content">
+                    <div class="detection-info">
+                        <div class="detection-type-result">
+                            检测结果: <span class="${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                            <span class="detection-count">(发现 ${data.detection_count} 个目标)</span>
+                        </div>
+                        <div class="detection-details">
+                            ${data.detections.map(d => `
+                                <div class="detection-item ${d.class_type}">
+                                    <span class="detection-name">${d.class_name}</span>
+                                    <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
                     <div class="image-container">
-                        ${data.is_video ? 
-                            `<video src="${data.result_image}?t=${new Date().getTime()}" 
-                                    class="result-image" 
-                                    controls
-                                    preload="auto"
-                                    playsinline>
-                                您的浏览器不支持视频播放。
-                            </video>` :
-                            `<img src="${data.result_image}?t=${new Date().getTime()}" 
-                                  class="result-image" 
-                                  alt="分析结果"
-                                  onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
-                        }
+                        <img src="${data.result_image}" class="result-image" alt="分析结果" onerror="handleImageError(this)">
+                        ${canvas.outerHTML}
                     </div>
                     <div class="download-section">
                         <button class="download-btn" onclick="downloadResult('${data.result_image.split('/').pop()}')">
@@ -1025,18 +1482,27 @@ function loadLatestResult() {
                 console.log('处理后的图片路径:', resultImage);
                 
                 resultArea.innerHTML = `
-                    <div class="result-images">
+                    <div class="result-content">
+                        <div class="detection-info">
+                            <div class="detection-type-result">
+                                检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                                <span class="detection-count">(发现 ${data.data.detection_count} 个目标)</span>
+                            </div>
+                            <div class="detection-details">
+                                ${data.data.detections.map(d => `
+                                    <div class="detection-item ${d.class_type}">
+                                        <span class="detection-name">${d.class_name}</span>
+                                        <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
                         <div class="image-container">
                             ${data.data.is_video ? 
-                                `<video src="${resultImage}" 
-                                        class="result-image" 
-                                        controls>
+                                `<video src="${resultImage}" class="result-image" controls>
                                     您的浏览器不支持视频播放。
-                                </video>` :
-                                `<img src="${resultImage}" 
-                                      class="result-image" 
-                                      alt="分析结果"
-                                      onerror="handleImageError(this, 1)">`
+                                </video>` : 
+                                `<img src="${resultImage}" class="result-image" alt="分析结果" onerror="handleImageError(this, 1)">`
                             }
                         </div>
                         <div class="download-section">
@@ -1045,10 +1511,6 @@ function loadLatestResult() {
                                 下载分析结果
                             </button>
                         </div>
-                    </div>
-                    <div class="confidence-info">
-                        <div class="confidence-label">检测类型：${data.data.detect_type || '未知'}</div>
-                        <div class="confidence-label">置信度：${data.data.confidence ? (data.data.confidence * 100).toFixed(2) + '%' : '未知'}</div>
                     </div>
                 `;
                 
@@ -1135,27 +1597,29 @@ function restoreLatestResult() {
                 // 恢复分析结果
                 const resultArea = document.getElementById('resultArea');
                 resultArea.innerHTML = `
-                    <div class="result-images">
-                        <div class="image-container">
-                            ${data.data.is_video ? 
-                                `<video src="${data.data.result_image}" 
-                                        class="result-image" 
-                                        controls
-                                        preload="auto"
-                                        playsinline>
-                                    您的浏览器不支持视频播放。
-                                </video>` :
-                                `<img src="${data.data.result_image}" 
-                                      class="result-image" 
-                                      alt="分析结果"
-                                      onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
-                            }
-                        </div>
-                        <div class="download-section">
-                            <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
-                                <span class="download-icon">⬇️</span>
-                                下载分析结果
-                            </button>
+                    <div class="result-container">
+                        <div class="result-images">
+                            <div class="image-container">
+                                ${data.data.is_video ? 
+                                    `<video src="${data.data.result_image}" 
+                                            class="result-image" 
+                                            controls
+                                            preload="auto"
+                                            playsinline>
+                                        您的浏览器不支持视频播放。
+                                    </video>` :
+                                    `<img src="${data.data.result_image}" 
+                                          class="result-image" 
+                                          alt="分析结果"
+                                          onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
+                                }
+                            </div>
+                            <div class="download-section">
+                                <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
+                                    <span class="download-icon">⬇️</span>
+                                    下载分析结果
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;

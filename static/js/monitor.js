@@ -6,6 +6,8 @@ let onlineCameras = 0;
 let detectionCount = 0;
 let lastMinuteDetections = [];
 let frameCount = 0;
+let isCameraMode = true;  // 默认处于摄像头模式
+let cameraInterval = null; // 用于摄像头模式的定时器
 
 // 添加浏览器兼容性检查和polyfill
 (function() {
@@ -74,34 +76,226 @@ async function checkCameraPermission() {
     }
 }
 
-// 初始化页面
-document.addEventListener('DOMContentLoaded', function() {
-    // 检查登录状态
-    checkLoginStatus();
+// 处理当前摄像头帧
+function processCameraFrame() {
+    if (!streams[1]) {
+        console.error('摄像头未启动');
+        return;
+    }
     
-    // 初始化全屏按钮
-    document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+    const video = document.getElementById('video1');
     
-    // 初始化布局切换按钮
-    document.getElementById('layoutBtn').addEventListener('click', toggleLayout);
+    // 创建一个临时canvas用于捕获视频帧
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = video.videoWidth;
+    tempCanvas.height = video.videoHeight;
     
-    // 更新检测率
-    setInterval(updateDetectionRate, 1000);
-});
-
-// 检查登录状态
-function checkLoginStatus() {
-    fetch('/check_login')
-        .then(response => response.json())
-        .then(data => {
-            if (!data.logged_in) {
-                window.location.href = '/login';
-            }
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // 将canvas内容转为base64
+    const imageData = tempCanvas.toDataURL('image/jpeg');
+    
+    // 显示加载状态
+    const aiStatus = document.getElementById('aiStatus');
+    if (aiStatus) {
+        aiStatus.textContent = "正在分析...";
+        aiStatus.style.color = "#1890ff";
+    }
+    
+    const status2El = document.getElementById('status2');
+    if (status2El) {
+        status2El.textContent = "分析中";
+        status2El.className = "status online";
+    }
+    
+    // 发送到服务器进行分析
+    fetch('/process_camera_frame', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            image: imageData
         })
-        .catch(error => {
-            console.error('Error:', error);
-            window.location.href = '/login';
-        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // 更新分析结果
+            let detectionCountValue = data.detection_count || 0;
+            
+            if (aiStatus) {
+                aiStatus.textContent = `检测到${detectionCountValue}个目标`;
+            }
+            
+            if (status2El) {
+                status2El.textContent = `已完成分析`;
+            }
+            
+            // 显示结果图像
+            const resultImage = new Image();
+            resultImage.onload = function() {
+                const canvas = document.getElementById('canvas1');
+                if (!canvas) return;
+                
+                canvas.width = resultImage.width;
+                canvas.height = resultImage.height;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(resultImage, 0, 0, canvas.width, canvas.height);
+                
+                // 设置检测框和标签
+                drawDetectionBoxes(canvas, data.detections);
+            };
+            
+            // 使用服务器返回的结果图像URL
+            if (data.result_image) {
+                resultImage.src = data.result_image;
+            }
+            
+            // 更新检测计数
+            detectionCount += data.detection_count;
+            const now = new Date();
+            lastMinuteDetections.push({
+                time: now,
+                count: data.detection_count
+            });
+            
+            // 只有检测到占道经营时才添加警报并保存到数据库
+            if (data.detection_count > 0) {
+                const type = data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位';
+                addAlert(1, type, data.detections[0]?.confidence || 0.8);
+                
+                // 保存检测结果到数据库
+                saveDetectionResult(data);
+            }
+            
+            // 更新检测类型显示
+            updateDetectionTypeDisplay(data.detect_type);
+        } else {
+            if (aiStatus) {
+                aiStatus.textContent = `分析失败: ${data.message}`;
+                aiStatus.style.color = "#ff4d4f";
+            }
+            
+            if (status2El) {
+                status2El.textContent = "分析失败";
+                status2El.className = "status";
+            }
+        }
+    })
+    .catch(error => {
+        console.error('分析错误:', error);
+        
+        if (aiStatus) {
+            aiStatus.textContent = "分析出错";
+            aiStatus.style.color = "#ff4d4f";
+        }
+        
+        if (status2El) {
+            status2El.textContent = "错误";
+            status2El.className = "status";
+        }
+    });
+}
+
+// 保存检测结果到数据库
+function saveDetectionResult(data) {
+    // 确保只有当检测到占道经营时才保存
+    if (!data || !data.detection_count || data.detection_count <= 0) {
+        console.log('未检测到占道经营，不保存数据');
+        return;
+    }
+    
+    console.log('检测到占道经营，准备保存结果');
+    
+    // 发送保存请求
+    fetch('/save_detection_result', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            detection_data: data,
+            timestamp: new Date().toISOString(),
+            camera_id: 1, // 假设当前摄像头ID为1
+            detection_type: data.detect_type,
+            confidence: data.detections[0]?.confidence || 0
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.status === 'success') {
+            console.log('检测结果保存成功:', result.message);
+        } else {
+            console.error('检测结果保存失败:', result.message);
+        }
+    })
+    .catch(error => {
+        console.error('保存检测结果时出错:', error);
+    });
+}
+
+// 绘制检测框和标签
+function drawDetectionBoxes(canvas, detections) {
+    if (!detections || detections.length === 0) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    detections.forEach(detection => {
+        const [x1, y1, x2, y2] = detection.box;
+        const confidence = detection.confidence;
+        const className = detection.class_name;
+        const classType = detection.class_type;
+        
+        // 根据类型设置不同的颜色
+        let boxColor = '#ff4d4f'; // 默认红色
+        if (classType === 'zdjy_gd') {
+            boxColor = '#52c41a'; // 固定摊位使用绿色
+        } else if (classType === 'zdjy_ld') {
+            boxColor = '#ff4d4f'; // 流动摊位使用红色
+        } else {
+            boxColor = '#1890ff'; // 其他类型使用蓝色
+        }
+        
+        // 绘制边界框
+        ctx.strokeStyle = boxColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        
+        // 绘制半透明填充
+        ctx.fillStyle = boxColor.replace(')', ', 0.2)').replace('rgb', 'rgba');
+        ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        
+        // 绘制标签背景
+        ctx.fillStyle = boxColor.replace(')', ', 0.8)').replace('rgb', 'rgba');
+        const label = `${className} ${(confidence * 100).toFixed(1)}%`;
+        ctx.font = '12px Arial';
+        const labelWidth = ctx.measureText(label).width + 10;
+        ctx.fillRect(x1, y1 - 20, labelWidth, 20);
+        
+        // 绘制标签文本
+        ctx.fillStyle = 'white';
+        ctx.fillText(label, x1 + 5, y1 - 5);
+    });
+}
+
+// 更新检测类型显示
+function updateDetectionTypeDisplay(detectType) {
+    const videoStatus2 = safeGetElement('videoStatus2');
+    if (!videoStatus2) return;
+    
+    if (detectType === 'zdjy_ld') {
+        videoStatus2.textContent = "检测到流动摊位";
+        videoStatus2.style.backgroundColor = 'rgba(255, 77, 79, 0.8)';
+    } else if (detectType === 'zdjy_gd') {
+        videoStatus2.textContent = "检测到固定摊位";
+        videoStatus2.style.backgroundColor = 'rgba(82, 196, 26, 0.8)';
+    } else {
+        videoStatus2.textContent = "未检测到摊位";
+        videoStatus2.style.backgroundColor = 'rgba(24, 144, 255, 0.8)';
+    }
 }
 
 // 启动摄像头
@@ -134,16 +328,16 @@ async function startCamera(id) {
         
         const stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
         
-        const video = document.getElementById(`video${id}`);
+        const video = safeGetElement(`video${id}`);
         if (!video) {
             console.error(`未找到video元素: video${id}`);
             throw new Error(`未找到video元素: video${id}`);
         }
         
-        const canvas = document.getElementById(`canvas${id}`);
+        const canvas = safeGetElement(`canvas1`);
         if (!canvas) {
-            console.error(`未找到canvas元素: canvas${id}`);
-            throw new Error(`未找到canvas元素: canvas${id}`);
+            console.error(`未找到canvas元素: canvas1`);
+            throw new Error(`未找到canvas元素: canvas1`);
         }
         
         video.srcObject = stream;
@@ -153,6 +347,8 @@ async function startCamera(id) {
         video.onloadedmetadata = function() {
             console.log(`视频元数据已加载，分辨率: ${video.videoWidth}x${video.videoHeight}`);
             video.play().catch(e => console.error('视频播放失败:', e));
+            
+            // 不需要在这里设置定时分析，因为已经在页面加载时设置了
         };
         
         video.onerror = function(e) {
@@ -160,18 +356,14 @@ async function startCamera(id) {
         };
         
         // 更新按钮状态
-        const startBtn = document.getElementById(`startBtn${id}`);
-        const stopBtn = document.getElementById(`stopBtn${id}`);
-        const captureBtn = document.getElementById(`captureBtn${id}`);
-        const recordBtn = document.getElementById(`recordBtn${id}`);
+        const startBtn = safeGetElement(`startBtn1`);
+        const stopBtn = safeGetElement(`stopBtn1`);
         
         if (startBtn) startBtn.disabled = true;
         if (stopBtn) stopBtn.disabled = false;
-        if (captureBtn) captureBtn.disabled = false;
-        if (recordBtn) recordBtn.disabled = false;
         
         // 更新状态显示
-        const statusEl = document.getElementById(`status${id}`);
+        const statusEl = safeGetElement(`status${id}`);
         if (statusEl) {
             statusEl.textContent = '在线';
             statusEl.className = 'status online';
@@ -180,9 +372,6 @@ async function startCamera(id) {
         // 更新在线摄像头数量
         onlineCameras++;
         updateOnlineCameras();
-        
-        // 开始分析视频流
-        startAnalyzing(id);
         
     } catch (error) {
         console.error('访问摄像头时出错:', error);
@@ -238,23 +427,34 @@ function stopCamera(id) {
             delete mediaRecorders[id];
         }
         
-        // 更新按钮状态
-        document.getElementById(`startBtn${id}`).disabled = false;
-        document.getElementById(`stopBtn${id}`).disabled = true;
-        document.getElementById(`captureBtn${id}`).disabled = true;
-        document.getElementById(`recordBtn${id}`).disabled = true;
+        // 安全地更新按钮状态
+        const startBtn = safeGetElement(`startBtn${id}`);
+        const stopBtn = safeGetElement(`stopBtn${id}`);
+        const captureBtn = safeGetElement(`captureBtn${id}`);
         
-        // 更新状态显示
-        document.getElementById(`status${id}`).textContent = '未连接';
-        document.getElementById(`status${id}`).className = 'status';
+        if (startBtn) startBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = true;
+        if (captureBtn) captureBtn.disabled = true;
+        
+        // 安全地更新状态显示
+        const statusEl = safeGetElement(`status${id}`);
+        if (statusEl) {
+            statusEl.textContent = '未连接';
+            statusEl.className = 'status';
+        }
         
         // 清除视频显示
-        document.getElementById(`video${id}`).srcObject = null;
+        const video = safeGetElement(`video${id}`);
+        if (video) {
+            video.srcObject = null;
+        }
         
         // 清除画布
-        const canvas = document.getElementById(`canvas${id}`);
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const canvas = safeGetElement(`canvas${id}`);
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
         
         // 更新在线摄像头数量
         onlineCameras--;
@@ -378,9 +578,19 @@ function startAnalyzing(id) {
     });
 }
 
+// 更新在线摄像头数量
+function updateOnlineCameras() {
+    const onlineCamerasEl = safeGetElement('onlineCameras');
+    if (onlineCamerasEl) {
+        onlineCamerasEl.textContent = `${onlineCameras}/1`;
+    }
+}
+
 // 添加警报
 function addAlert(cameraId, type, confidence) {
-    const alertList = document.getElementById('alertList');
+    const alertList = safeGetElement('alertList');
+    if (!alertList) return;
+    
     const alertDiv = document.createElement('div');
     alertDiv.className = 'alert-item';
     
@@ -400,23 +610,24 @@ function addAlert(cameraId, type, confidence) {
     
     // 限制显示最近的10条警报
     while (alertList.children.length > 10) {
-                alertList.removeChild(alertList.lastChild);
-            }
-        }
+        alertList.removeChild(alertList.lastChild);
+    }
+}
 
 // 更新检测率
 function updateDetectionRate() {
     const now = Date.now();
     // 移除超过一分钟的检测记录
-    lastMinuteDetections = lastMinuteDetections.filter(time => now - time <= 60000);
+    lastMinuteDetections = lastMinuteDetections.filter(detection => {
+        return (now - detection.time.getTime()) <= 60000;
+    });
     
-    const rate = lastMinuteDetections.length;
-    document.getElementById('detectionRate').textContent = `${rate}次/分钟`;
-}
-
-// 更新在线摄像头数量
-function updateOnlineCameras() {
-    document.getElementById('onlineCameras').textContent = `${onlineCameras}/4`;
+    const rate = lastMinuteDetections.reduce((sum, detection) => sum + detection.count, 0);
+    
+    const detectionRateEl = safeGetElement('detectionRate');
+    if (detectionRateEl) {
+        detectionRateEl.textContent = `${rate}次/分钟`;
+    }
 }
 
 // 截图功能
@@ -495,56 +706,178 @@ function toggleLayout() {
     grid.classList.toggle('single-view');
 }
 
-// 处理后视频的截图功能
-function captureProcessedImage(id) {
-    const video = document.getElementById(`processedVideo${id}`);
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    
-    // 创建下载链接
-    const link = document.createElement('a');
-    link.download = `processed_capture_${id}_${new Date().toISOString()}.jpg`;
-    link.href = canvas.toDataURL('image/jpeg');
-    link.click();
+// 在初始化页面时安全获取元素
+function safeGetElement(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+        console.log(` 找不到元素: ${id}`);
+        return null;
+    }
+    return element;
 }
 
-// 处理后视频的录制功能
-function toggleProcessedRecording(id) {
-    const video = document.getElementById(`processedVideo${id}`);
-    const recordBtn = document.getElementById(`recordProcessedBtn${id}`);
-    
-    if (!mediaRecorders[id]) {
-        // 开始录制
-        const stream = video.srcObject;
-        const mediaRecorder = new MediaRecorder(stream);
-        const chunks = [];
-        
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) {
-                chunks.push(e.data);
+// 检查登录状态
+function checkLoginStatus() {
+    fetch('/check_login')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.logged_in) {
+                window.location.href = '/login';
             }
-        };
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            window.location.href = '/login';
+        });
+}
+
+// 切换AI分析状态
+function toggleAI() {
+    try {
+        // 使用safeGetElement避免null错误
+        const aiBtn = safeGetElement('aiBtn');
+        const aiStatus = safeGetElement('aiStatus');
         
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.download = `processed_recording_${id}_${new Date().toISOString()}.webm`;
-            link.href = url;
-            link.click();
-            URL.revokeObjectURL(url);
-        };
+        // 如果找不到aiBtn元素，直接返回
+        if (!aiBtn) {
+            console.log(" 找不到aiBtn元素，无法切换AI分析状态");
+            return;
+        }
         
-        mediaRecorder.start();
-        mediaRecorders[id] = mediaRecorder;
-        recordBtn.style.color = 'red';
-    } else {
-        // 停止录制
-        mediaRecorders[id].stop();
-        delete mediaRecorders[id];
-        recordBtn.style.color = '';
+        const isActive = aiBtn.classList.contains('active');
+        
+        if (isActive) {
+            // 停止AI分析
+            aiBtn.classList.remove('active');
+            if (aiStatus) {
+                aiStatus.textContent = "AI已停止";
+                aiStatus.style.color = "#a0a0a0";
+            }
+        } else {
+            // 启动AI分析
+            aiBtn.classList.add('active');
+            if (aiStatus) {
+                aiStatus.textContent = "AI已启动";
+                aiStatus.style.color = "#1890ff";
+            }
+            
+            // 立即进行一次分析
+            processCameraFrame();
+        }
+    } catch (error) {
+        console.error(' 启动AI推理出错:', error);
     }
-} 
+}
+
+// 全局错误处理器
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('全局错误:', message, '| 位置:', source, lineno, colno);
+    return false; // 允许默认错误处理
+};
+
+// 添加异常监视器
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('未处理的Promise拒绝:', event.reason);
+});
+
+// 监测页面状态
+function checkPageStatus() {
+    // 检查关键元素
+    const video1 = safeGetElement('video1');
+    const canvas1 = safeGetElement('canvas1');
+    
+    if (!video1) {
+        console.error('页面关键元素缺失: video1');
+    }
+    
+    if (!canvas1) {
+        console.error('页面关键元素缺失: canvas1');
+    }
+    
+    // 检查摄像头状态
+    if (streams[1]) {
+        console.log('摄像头状态: 已连接');
+    } else {
+        console.log('摄像头状态: 未连接');
+    }
+}
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        console.log('页面加载完成，开始初始化...');
+        
+        // 检查登录状态
+        checkLoginStatus();
+        
+        // 安全获取并设置元素事件
+        const fullscreenBtn = safeGetElement('fullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', function() {
+                toggleFullscreen('video1');
+            });
+        }
+        
+        const layoutBtn = safeGetElement('layoutBtn');
+        if (layoutBtn) {
+            layoutBtn.addEventListener('click', toggleLayout);
+        }
+        
+        // 更新检测率
+        setInterval(updateDetectionRate, 1000);
+        
+        console.log('页面初始化完成');
+        
+        // 更新时间戳（如果需要）
+        // updateTimestamps();
+        
+        // 自动启动摄像头
+        startCamera(1);
+        
+        // 更新状态
+        const videoStatus1 = safeGetElement('videoStatus1');
+        if (videoStatus1) {
+            videoStatus1.textContent = "摄像头已启动";
+        }
+        
+        const videoName1 = safeGetElement('videoName1');
+        if (videoName1) {
+            videoName1.textContent = "本地摄像头";
+        }
+        
+        const status1 = safeGetElement('status1');
+        if (status1) {
+            status1.textContent = "准备中";
+            status1.className = "status";
+        }
+        
+        // 在页面加载后延迟2秒启动定时分析，给摄像头足够的启动时间
+        setTimeout(() => {
+            try {
+                // 设置定时分析，每2秒分析一次
+                setInterval(() => {
+                    if (streams[1]) {  // 确保摄像头已启动
+                        processCameraFrame();
+                    }
+                }, 2000);
+            } catch (e) {
+                console.error(' 设置定时分析出错:', e);
+            }
+        }, 2000);
+
+        // 在页面加载后检查页面状态
+        setTimeout(checkPageStatus, 1000);
+        
+        // 自动开启AI推理
+        setTimeout(() => {
+            try {
+                // 直接调用processCameraFrame，而不是toggleAI
+                processCameraFrame();
+            } catch (err) {
+                console.error('启动分析出错:', err);
+            }
+        }, 3000);
+    } catch (err) {
+        console.error('页面初始化出错:', err);
+    }
+}); 

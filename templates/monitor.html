@@ -7,13 +7,340 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/monitor.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-</head>
 <style>
     body {
-        background-color: #002a54;
-        color: white; /* 确保文本颜色在深色背景上可读 */
+            background: linear-gradient(145deg, #001529, #002a54);
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .page-title {
+            text-align: center;
+            margin: 15px auto 5px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #e6e6e6;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+        
+        .page-title::after {
+            content: "";
+            display: block;
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, #1890ff, #40a9ff);
+            margin: 8px auto;
+            border-radius: 3px;
+        }
+        
+        .page-subtitle {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #8c8c8c;
+            margin-bottom: 15px;
+        }
+        
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .monitor-section {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .status-bar {
+            margin-bottom: 10px;
+            background: rgba(0, 21, 41, 0.6);
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .monitor-item {
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        .monitor-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .video-container {
+            padding-top: 65%;
+        }
+        
+        .alert-section {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .alert-panel {
+            height: 100%;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 10px 15px;
+            background: rgba(255, 77, 79, 0.1);
+        }
+        
+        .alert-list {
+            max-height: calc(100vh - 260px);
+            overflow-y: auto;
+        }
+        
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .control-btn-big {
+            margin: 0;
+        }
+        
+        @media (max-width: 992px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .monitor-grid.single-view {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* 文件上传区域样式 */
+        .upload-container {
+            background: #001529;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(24, 144, 255, 0.3);
+        }
+        
+        .upload-container h3 {
+            color: #1890ff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .upload-icon {
+            margin-right: 10px;
+        }
+        
+        .file-input-container {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            background: rgba(24, 144, 255, 0.2);
+            border: 1px solid rgba(24, 144, 255, 0.5);
+            color: #1890ff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        
+        .file-input-label:hover {
+            background: rgba(24, 144, 255, 0.3);
+        }
+        
+        #selectedFileName {
+            color: #a0a0a0;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(90deg, #1890ff, #40a9ff);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(24, 144, 255, 0.5);
+        }
+        
+        .upload-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .upload-status.uploading {
+            color: #faad14;
+        }
+        
+        .upload-status.success {
+            color: #52c41a;
+        }
+        
+        .upload-status.error {
+            color: #ff4d4f;
+        }
+        
+        /* 视频列表样式 */
+        .video-list-container {
+            background: #001529;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .video-list-container h3 {
+            color: #1890ff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .list-icon {
+            margin-right: 10px;
+        }
+        
+        .video-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+        }
+        
+        .video-item {
+            background: rgba(0, 21, 41, 0.8);
+            border: 1px solid rgba(24, 144, 255, 0.2);
+            border-radius: 4px;
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        
+        .video-item:hover {
+            background: rgba(24, 144, 255, 0.1);
+            border-color: rgba(24, 144, 255, 0.5);
+        }
+        
+        .video-name {
+            color: #e6e6e6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+        }
+        
+        .video-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .video-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: all 0.2s;
+        }
+        
+        .video-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .play-btn {
+            color: #52c41a;
+        }
+        
+        .delete-btn {
+            color: #ff4d4f;
+        }
+        
+        .empty-video-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 5px;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        
+        .empty-video-list .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: rgba(24, 144, 255, 0.5);
+        }
+        
+        .empty-video-list .empty-text {
+            font-size: 0.9rem;
+        }
+        
+        /* AI推理样式 */
+        .ai-inference {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(24, 144, 255, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+        
+        .detection-box {
+            position: absolute;
+            border: 2px solid #ff4d4f;
+            background-color: rgba(255, 77, 79, 0.2);
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        .detection-label {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            background-color: rgba(255, 77, 79, 0.8);
+            color: white;
+            padding: 2px 6px;
+            font-size: 12px;
+            border-radius: 3px;
+            white-space: nowrap;
     }
 </style>
+</head>
 <body class="monitor-page">
     <!-- 顶部导航栏 -->
     <nav class="nav-bar">
@@ -30,108 +357,121 @@
         </div>
     </nav>
 
-    <!-- 添加顶部权限请求按钮 -->
-    <div style="text-align: center; margin: 10px auto; max-width: 600px; background-color: #40a9ff; color: white; padding: 10px; border-radius: 5px; cursor: pointer;" onclick="requestCameraPermission();">
-        <b>点击此处请求摄像头权限</b> &nbsp; 📷 &nbsp; <small>(如果摄像头不工作，请先点击此按钮)</small>
-    </div>
-
-    <!-- 添加状态栏 -->
-    <div class="status-bar">
-        <div class="status-item">
-            <span class="status-label">在线摄像头：</span>
-            <span class="status-value" id="onlineCameras">0/2</span>
-        </div>
-        <div class="status-item">
-            <span class="status-label">检测率：</span>
-            <span class="status-value" id="detectionRate">0次/分钟</span>
-        </div>
-    </div>
-
-    <!-- 添加摄像头权限提示 -->
-    <div class="camera-permission-tip" style="background-color: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none;" id="cameraPermissionTip">
-        <h3 style="margin-top: 0; color: #ffcc00;">⚠️ 摄像头权限提示</h3>
-        <p>要使用实时监控功能，请在浏览器弹出的权限请求中<span style="color: #4CAF50; font-weight: bold;">允许</span>访问摄像头。</p>
-        <p>如果没有看到权限请求对话框，请点击下方按钮手动申请权限：</p>
-        <button style="background: #40a9ff; border: none; color: white; padding: 8px 15px; border-radius: 3px; cursor: pointer; margin: 10px 0;" onclick="requestCameraPermission();">
-            <b>申请摄像头权限</b>
-        </button>
-        <p>如果您已拒绝权限，请按照以下步骤重新授权：</p>
-        <ol style="padding-left: 20px;">
-            <li>点击地址栏左侧的锁定/信息图标</li>
-            <li>找到"摄像头"权限设置</li>
-            <li>将其更改为"允许"</li>
-            <li>刷新页面</li>
-        </ol>
-        <button style="background: #4CAF50; border: none; color: white; padding: 5px 10px; border-radius: 3px; cursor: pointer;" onclick="document.getElementById('cameraPermissionTip').style.display='none';">知道了</button>
-    </div>
-
+    <!-- 页面标题 -->
+    <div class="page-title">实时视频监测</div>
+    <div class="page-subtitle">系统监测和分析占道经营行为，提供智能预警</div>
+    
+    <!-- 主容器 -->
     <div class="main-container">
-        <div class="monitor-grid" id="monitorGrid">
-            <div class="monitor-item">
-                <div class="video-container">
-                    <video id="video1" autoplay muted playsinline></video>
-                    <canvas id="canvas1" class="overlay-canvas"></canvas>
+        <!-- 仪表盘布局 -->
+        <div class="dashboard-layout">
+            <!-- 监控区域 -->
+            <div class="monitor-section">
+                <!-- 状态栏 -->
+                <div class="status-bar">
+                    <div class="status-item">
+                        <span class="status-label">在线摄像头：</span>
+                        <span class="status-value" id="onlineCameras">0/2</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">检测率：</span>
+                        <span class="status-value" id="detectionRate">0次/分钟</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">系统状态：</span>
+                        <span class="status-value" id="systemStatus">运行中</span>
+                    </div>
                 </div>
-                <div class="monitor-info">
-                    <span class="location">监控点 A</span>
-                    <span class="status" id="status1">未连接</span>
+
+                <!-- 监控视频网格 -->
+                <div class="monitor-grid" id="monitorGrid">
+                    <!-- 摄像头原始视频区域 -->
+                    <div class="monitor-item">
+                        <div class="video-container">
+                            <video id="video1" autoplay muted playsinline></video>
+                            <div class="camera-id">实时摄像头</div>
+                            <div class="timestamp" id="timestamp1">--:--:--</div>
+                            <div class="fps-counter" id="fps1">-- FPS</div>
+                            <div class="video-status-badge" id="videoStatus1">准备中</div>
+                            <div class="scanline"></div>
+                        </div>
+                        <div class="monitor-info">
+                            <span class="location" id="videoName1">本地摄像头</span>
+                            <span class="status" id="status1">未播放</span>
+                        </div>
+                        <div class="monitor-controls">
+                            <button class="control-btn" onclick="captureImage(1)" id="captureBtn1" title="截图">
+                                <span class="btn-icon">📷</span>
+                            </button>
+                            <button class="control-btn" onclick="toggleFullscreen('video1')" title="全屏">
+                                <span class="btn-icon">🔍</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- AI分析视频区域 -->
+                    <div class="monitor-item">
+                        <div class="video-container">
+                            <canvas id="canvas1" class="overlay-canvas"></canvas>
+                            <div class="camera-id">AI分析结果</div>
+                            <div class="timestamp" id="timestamp2">--:--:--</div>
+                            <div class="video-status-badge" id="videoStatus2">准备中</div>
+                            <div class="ai-inference" id="aiStatus">AI分析中</div>
+                            <div class="scanline"></div>
+                        </div>
+                        <div class="monitor-info">
+                            <span class="location" id="videoName2">实时分析</span>
+                            <span class="status" id="status2">准备中</span>
+                        </div>
+                        <div class="monitor-controls">
+                            <button class="control-btn" onclick="processCameraFrame()" id="processCameraBtn" title="立即分析">
+                                <span class="btn-icon">🔍</span>
+                            </button>
+                            <button class="control-btn" onclick="toggleFullscreen('canvas1')" title="全屏">
+                                <span class="btn-icon">🔍</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="monitor-controls">
-                    <button class="control-btn" onclick="startCamera(1)" id="startBtn1">
-                        <span class="btn-icon">▶️</span>
-                    </button>
-                    <button class="control-btn" onclick="stopCamera(1)" id="stopBtn1" disabled>
-                        <span class="btn-icon">⏹️</span>
-                    </button>
-                    <button class="control-btn" onclick="captureImage(1)" id="captureBtn1" disabled>
-                        <span class="btn-icon">📷</span>
-                    </button>
-                    <button class="control-btn" onclick="toggleRecording(1)" id="recordBtn1" disabled>
-                        <span class="btn-icon">🔴</span>
-                    </button>
-                    <button class="control-btn" onclick="toggleFullscreen('video1')">
-                        <span class="btn-icon">🔍</span>
-                    </button>
+
+                <!-- 控制面板 -->
+                <div class="control-panel">
+                    <div class="control-item">
+                        <button id="startBtn1" class="action-btn primary" onclick="startCamera(1)">
+                            <span class="btn-icon">▶️</span>启动摄像头
+                        </button>
+                        <button id="stopBtn1" class="action-btn danger" onclick="stopCamera(1)" disabled>
+                            <span class="btn-icon">⏹️</span>停止摄像头
+                        </button>
+                    </div>
+                    <div class="control-item">
+                        <button id="layoutBtn" class="action-btn">
+                            <span class="btn-icon">🔄</span>切换布局
+                        </button>
+                        <button id="fullscreenBtn" class="action-btn">
+                            <span class="btn-icon">📺</span>全屏模式
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="monitor-item">
-                <div class="video-container">
-                    <video id="processedVideo1" autoplay muted></video>
-                    <canvas id="processedCanvas1" class="overlay-canvas"></canvas>
-                </div>
-                <div class="monitor-info2">
-                    <span class="location">处理后监控点 A</span>
-                </div>
-                <div class="monitor-controls">
-                    <button class="control-btn" onclick="captureProcessedImage(1)" id="captureProcessedBtn1">
-                        <span class="btn-icon">📸</span>
-                    </button>
-                    <button class="control-btn" onclick="toggleProcessedRecording(1)" id="recordProcessedBtn1">
-                        <span class="btn-icon">⏺️</span>
-                    </button>
-                    <button class="control-btn" onclick="toggleFullscreen('processedVideo1')" id="fullscreenProcessedBtn1">
-                        <span class="btn-icon">🔲</span>
-                    </button>
-                </div>
-            </div>
+
+            <!-- 警报区域 -->
+            <div class="alert-section">
+                <div class="alert-panel" id="alertPanel">
+                    <div class="panel-header">
+                        <h3><span class="alert-icon">🚨</span>实时警报</h3>
+                        <button class="minimize-btn" id="minimizeAlerts">−</button>
         </div>
-        <div class="alert-panel">
-            <h3>实时警报</h3>
-            <button class="minimize-btn">−</button>
             <div class="alert-list" id="alertList">
                 <!-- 警报会通过 JavaScript 动态添加 -->
+                        <div class="empty-alerts" id="emptyAlerts">
+                            <div class="empty-icon">🔔</div>
+                            <div class="empty-text">暂无警报，系统正在监测中...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-
-    <!-- 添加控制按钮 -->
-    <div class="control-panel" style="text-align: center; margin: 5px auto;">
-        <button id="fullscreenBtn" class="control-btn-big">
-            <span class="btn-icon">🔍</span> 全屏
-        </button>
-        <button id="layoutBtn" class="control-btn-big">
-            <span class="btn-icon">🔀</span> 切换布局
-        </button>
     </div>
 
     <!-- 底部导航栏 -->
@@ -183,67 +523,631 @@
             <span class="btn-text">关于系统</span>
         </a>
     </div>
-    {% if is_admin %}
-    {% endif %}
 
-    <!-- 先加载主要的 JS 文件 -->
+    <!-- JS 文件 -->
     <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script>
-    // 内联JS代码应该放在主要JS文件加载后
-    function toggleFullscreen(videoId) {
-        const video = document.getElementById(videoId);
-        const container = document.querySelector('.main-container');
-        
-        if (!document.fullscreenElement) {
-            video.requestFullscreen().then(() => {
-                container.classList.add('fullscreen-mode');
-            }).catch(err => {
-                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-            });
-        } else {
-            document.exitFullscreen().then(() => {
-                container.classList.remove('fullscreen-mode');
+        // 初始化变量
+        let currentVideo = null;
+        let aiEnabled = false;
+        let detectionData = [];
+        let lastFrameTime = 0;
+        let fps = 0;
+        let detectionCounter = 0;
+
+        // 添加视频帧推理和渲染相关的变量
+        let isInferencing = false;
+        let inferenceCanvas = null;
+        let inferenceCtx = null;
+        // 视频文件上传处理
+        const videoFileInput = document.getElementById('videoFile');
+        if (videoFileInput) {
+            videoFileInput.addEventListener('change', function(e) {
+                const fileName = e.target.files[0] ? e.target.files[0].name : '未选择文件';
+                const selectedFileName = document.getElementById('selectedFileName');
+                if (selectedFileName) {
+                    selectedFileName.textContent = fileName;
+                }
             });
         }
-    }
 
-    // 添加最小化功能
-    document.querySelector('.minimize-btn').addEventListener('click', function(e) {
-        e.stopPropagation();
-        const alertPanel = document.querySelector('.alert-panel');
-        alertPanel.classList.toggle('minimized');
-        this.textContent = alertPanel.classList.contains('minimized') ? '+' : '−';
-    });
+        // 上传视频按钮点击事件
+        const uploadBtn = document.getElementById('uploadVideoBtn');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', function() {
+                const fileInput = document.getElementById('videoFile');
+                if (!fileInput || !fileInput.files[0]) {
+                    alert('请先选择视频文件');
+                    return;
+                }
 
-    // 点击最小化的面板时展开
-    document.querySelector('.alert-panel').addEventListener('click', function() {
-        if (this.classList.contains('minimized')) {
-            this.classList.remove('minimized');
-            this.querySelector('.minimize-btn').textContent = '−';
+                const formData = new FormData();
+                formData.append('video', fileInput.files[0]);
+
+                const uploadStatus = document.getElementById('uploadStatus');
+                if (uploadStatus) {
+                    uploadStatus.textContent = '正在上传...';
+                    uploadStatus.className = 'upload-status uploading';
+                }
+
+                fetch('/upload_video', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (uploadStatus) {
+                            uploadStatus.textContent = '上传成功: ' + data.data.filename;
+                            uploadStatus.className = 'upload-status success';
+                        }
+                        
+                        // 重置文件输入
+                        if (fileInput) {
+                            fileInput.value = '';
+                            const selectedFileName = document.getElementById('selectedFileName');
+                            if (selectedFileName) {
+                                selectedFileName.textContent = '未选择文件';
+                            }
+                        }
+                        
+                        // 刷新视频列表
+                        loadVideoList();
+                    } else {
+                        if (uploadStatus) {
+                            uploadStatus.textContent = '上传失败: ' + data.message;
+                            uploadStatus.className = 'upload-status error';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('上传错误:', error);
+                    if (uploadStatus) {
+                        uploadStatus.textContent = '上传错误: ' + error.message;
+                        uploadStatus.className = 'upload-status error';
+                    }
+                });
+            });
         }
-    });
 
-    // 监听全屏变化
-    document.addEventListener('fullscreenchange', function() {
-        const container = document.querySelector('.main-container');
+        // 加载视频列表
+        function loadVideoList() {
+            fetch('/api/videos')
+            .then(response => response.json())
+            .then(data => {
+                console.log('获取视频列表:', data); // 打印视频列表数据
+                
+                if (data.status === 'success') {
+                    const videoList = document.getElementById('videoList');
+                    const onlineCameras = document.getElementById('onlineCameras');
+                    
+                    // 检查元素是否存在
+                    if (!videoList) {
+                        console.error('找不到视频列表元素');
+                        return;
+                    }
+                    
+                    // 清空现有列表
+                    videoList.innerHTML = '';
+                    
+                    if (data.data.length === 0) {
+                        // 无视频时显示提示
+                        videoList.innerHTML = `
+                            <div class="empty-video-list">
+                                <div class="empty-icon">🎬</div>
+                                <div class="empty-text">暂无视频文件，请上传视频</div>
+                            </div>
+                        `;
+                        
+                        // 更新系统状态
+                        if (onlineCameras) {
+                            onlineCameras.textContent = '0/2';
+                        }
+                    } else {
+                        // 添加视频列表项
+                        data.data.forEach(video => {
+                            console.log('处理视频:', video); // 打印每个视频信息
+                            
+                            const videoItem = document.createElement('div');
+                            videoItem.className = 'video-item';
+                            videoItem.dataset.video = video.name;
+                            
+                            videoItem.innerHTML = `
+                                <span class="video-name">${video.name}</span>
+                                <div class="video-actions">
+                                    <button class="video-btn play-btn" data-video="${video.name}" title="播放">▶️</button>
+                                    <button class="video-btn delete-btn" data-video="${video.name}" title="删除">🗑️</button>
+                                </div>
+                            `;
+                            
+                            videoList.appendChild(videoItem);
+                        });
+                        
+                        // 绑定播放和分析按钮事件
+                        bindVideoButtons();
+                        
+                        // 更新系统状态
+                        if (onlineCameras) {
+                            onlineCameras.textContent = '0/2';
+                        }
+                    }
+                } else {
+                    console.error('获取视频列表失败:', data.message);
+                    addAlert('系统', '获取视频列表失败', '100%');
+                }
+            })
+            .catch(error => {
+                console.error('获取视频列表错误:', error);
+                addAlert('系统', '获取视频列表出错', '100%');
+            });
+        }
+
+        // 绑定视频按钮事件
+        function bindVideoButtons() {
+            // 播放按钮事件
+            document.querySelectorAll('.play-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const videoName = this.dataset.video;
+                    playVideo(videoName);
+                });
+            });
+            
+            // 删除按钮事件
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const videoName = this.dataset.video;
+                    if (confirm(`确定要删除视频 ${videoName} 吗？`)) {
+                        deleteVideo(videoName);
+                    }
+                });
+            });
+        }
+
+        // 播放视频
+        function playVideo(videoName) {
+            try {
+                console.log('尝试播放视频:', videoName);
+                currentVideo = videoName;
+                
+                // 更新原始视频
+                const videoElement1 = document.getElementById('video1');
+                if (!videoElement1) {
+                    console.error('未找到video1元素');
+                    addAlert('系统', '视频元素未找到', '100%');
+                    return;
+                }
+                
+                videoElement1.src = `/static/videos/${videoName}`;
+                videoElement1.load();
+                videoElement1.muted = true; // 确保静音，防止浏览器策略阻止自动播放
+                
+                // 更新AI分析视频
+                const videoElement2 = document.getElementById('video2');
+                if (!videoElement2) {
+                    console.error('未找到video2元素');
+                    addAlert('系统', '视频元素未找到', '100%');
+                    return;
+                }
+                
+                videoElement2.src = `/static/videos/${videoName}`;
+                videoElement2.load();
+                videoElement2.muted = true; // 确保静音，防止浏览器策略阻止自动播放
+                
+                // 更新视频信息
+                const videoName1 = document.getElementById('videoName1');
+                const status1 = document.getElementById('status1');
+                const videoStatus1 = document.getElementById('videoStatus1');
+                
+                if (videoName1) videoName1.textContent = videoName;
+                if (status1) {
+                    status1.textContent = '播放中';
+                    status1.className = 'status online';
+                }
+                if (videoStatus1) videoStatus1.textContent = '播放中';
+                
+                const videoName2 = document.getElementById('videoName2');
+                const status2 = document.getElementById('status2');
+                const videoStatus2 = document.getElementById('videoStatus2');
+                
+                if (videoName2) videoName2.textContent = videoName;
+                if (status2) {
+                    status2.textContent = '播放中';
+                    status2.className = 'status online';
+                }
+                if (videoStatus2) videoStatus2.textContent = '播放中';
+                
+                // 启用截图按钮
+                const captureBtn1 = document.getElementById('captureBtn1');
+                const captureBtn2 = document.getElementById('captureBtn2');
+                
+                if (captureBtn1) captureBtn1.disabled = false;
+                if (captureBtn2) captureBtn2.disabled = false;
+                
+                // 监听视频结束事件
+                videoElement1.onended = function() {
+                    // 播放结束后播放下一个视频
+                    playNextVideo();
+                };
+                
+                console.log('尝试播放视频元素');
+                // 尝试播放视频 - 使用Promise链确保播放成功
+                Promise.all([
+                    videoElement1.play()
+                        .catch(e => {
+                            console.error('视频1播放失败:', e);
+                            // 如果失败，再次尝试播放
+                            videoElement1.muted = true;
+                            // 直接处理播放报错情况，不再抛出异常
+                            return videoElement1.play().catch(e2 => {
+                                console.error('视频1第二次播放失败:', e2);
+                                return Promise.resolve(); // 继续流程而不抛出错误
+                            });
+                        }),
+                    videoElement2.play()
+                        .catch(e => {
+                            console.error('视频2播放失败:', e);
+                            // 如果失败，再次尝试播放
+                            videoElement2.muted = true;
+                            // 直接处理播放报错情况，不再抛出异常
+                            return videoElement2.play().catch(e2 => {
+                                console.error('视频2第二次播放失败:', e2);
+                                return Promise.resolve(); // 继续流程而不抛出错误
+                            });
+                        })
+                ]).then(() => {
+                    console.log('视频播放成功，或至少已处理错误');
+                    
+                    // 如果AI启用，开始推理
+                    if (aiEnabled) {
+                        startAIInference();
+                    }
+                }).catch(e => {
+                    console.error('视频播放最终失败:', e);
+                    // 显示错误消息
+                    if (videoStatus1) videoStatus1.textContent = '播放失败';
+                    if (videoStatus2) videoStatus2.textContent = '播放失败';
+                    
+                    // 添加警报
+                    addAlert('系统', '视频播放失败，请检查视频文件或手动点击播放按钮', '100%');
+                });
+            } catch (error) {
+                console.error('播放视频函数出错:', error);
+                addAlert('系统', `播放视频出错: ${error.message}`, '100%');
+            }
+        }
+
+        // 删除视频
+        function deleteVideo(videoName) {
+            fetch(`/api/videos/${videoName}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 如果当前播放的视频被删除，停止播放
+                    if (currentVideo === videoName) {
+                        stopCurrentVideo();
+                    }
+                    
+                    // 刷新视频列表
+                    loadVideoList();
+                    
+                    // 添加警报
+                    addAlert('系统', `视频 ${videoName} 已删除`, '100%');
+                } else {
+                    alert(`删除失败: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('删除视频错误:', error);
+                alert(`删除出错: ${error.message}`);
+            });
+        }
+
+        // 停止当前视频播放
+        function stopCurrentVideo() {
+            const videoElement1 = document.getElementById('video1');
+            videoElement1.pause();
+            videoElement1.src = '';
+            
+            const videoElement2 = document.getElementById('video2');
+            videoElement2.pause();
+            videoElement2.src = '';
+            
+            currentVideo = null;
+            
+            // 更新视频信息
+            document.getElementById('videoName1').textContent = '未选择视频';
+            document.getElementById('status1').textContent = '未播放';
+            document.getElementById('status1').className = 'status';
+            document.getElementById('videoStatus1').textContent = '准备中';
+            
+            document.getElementById('videoName2').textContent = '未选择视频';
+            document.getElementById('status2').textContent = '未播放';
+            document.getElementById('status2').className = 'status';
+            document.getElementById('videoStatus2').textContent = '准备中';
+            
+            // 禁用截图按钮
+            document.getElementById('captureBtn1').disabled = true;
+            document.getElementById('captureBtn2').disabled = true;
+        }
+
+        // 自动播放下一个视频
+        function playNextVideo() {
+            // 获取所有视频
+            fetch('/api/videos')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.data.length > 0) {
+                    // 找到当前视频的索引
+                    const videos = data.data;
+                    const currentIndex = currentVideo ? videos.findIndex(v => v.name === currentVideo) : -1;
+                    
+                    // 如果找到当前视频且不是最后一个，播放下一个
+                    if (currentIndex >= 0 && currentIndex < videos.length - 1) {
+                        const nextVideo = videos[currentIndex + 1].name;
+                        playVideo(nextVideo);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('获取视频列表错误:', error);
+            });
+        }
+
+        // 添加警报
+        function addAlert(camera, content, confidence) {
+            try {
+                const alertList = document.getElementById('alertList');
+                const emptyAlerts = document.getElementById('emptyAlerts');
+                
+                if (!alertList) {
+                    console.error('警报列表元素不存在');
+                    return;
+                }
+                
+                // 隐藏空警报提示
+                if (emptyAlerts) {
+                    emptyAlerts.style.display = 'none';
+                }
+                
+                // 创建当前时间
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                
+                // 添加一个警报
+                const alertItem = document.createElement('div');
+                alertItem.className = 'alert-item';
+                alertItem.innerHTML = `
+                    <div class="alert-header">
+                        <span class="alert-time">${timeString}</span>
+                        <span class="alert-camera">${camera}</span>
+                    </div>
+                    <div class="alert-content">${content}</div>
+                    <span class="alert-confidence">置信度: ${confidence}</span>
+                `;
+                
+                alertList.insertBefore(alertItem, alertList.firstChild);
+                
+                // 使警报项闪烁一下
+                setTimeout(() => {
+                    alertItem.classList.add('highlight');
+                    setTimeout(() => {
+                        alertItem.classList.remove('highlight');
+                    }, 2000);
+                }, 300);
+            } catch (error) {
+                console.error('添加警报出错:', error);
+            }
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                console.log('页面加载完成，开始初始化...');
+                
+                // 安全获取DOM元素的辅助函数
+                function safeGetElement(id) {
+                    const el = document.getElementById(id);
+                    if (!el) console.warn(`找不到元素: ${id}`);
+                    return el;
+                }
+                
+                // 初始化页面
+                loadVideoList();
+                
+                console.log('开始加载视频列表...');
+                
+                // 加载完成后自动播放第一个视频
+                fetch('/api/videos')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('获取视频列表成功:', data);
+                    if (data.status === 'success' && data.data && data.data.length > 0) {
+                        // 自动播放第一个视频
+                        const firstVideo = data.data[0].name;
+                        console.log('准备播放第一个视频:', firstVideo);
+                        
+                        // 延迟一秒再播放，确保DOM完全加载
+                        setTimeout(() => {
+                            playVideo(firstVideo);
+                        }, 1000);
+                    } else {
+                        console.log('没有可播放的视频或数据格式问题:', data);
+                        // 清空视频加载状态
+                        const videoStatus1 = safeGetElement('videoStatus1');
+                        const videoStatus2 = safeGetElement('videoStatus2');
+                        
+                        if (videoStatus1) videoStatus1.textContent = '无视频';
+                        if (videoStatus2) videoStatus2.textContent = '无视频';
+                    }
+                })
+                .catch(error => {
+                    console.error('获取视频列表错误:', error);
+                    // 添加警报
+                    addAlert('系统', `加载视频列表失败: ${error.message}`, '100%');
+                });
+                
+                // 更新时间戳
+                updateTimestamps();
+                
+                // 绑定按钮事件
+                const refreshBtn = safeGetElement('refreshBtn');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', function() {
+                        loadVideoList();
+                        this.classList.add('refreshing');
+                        setTimeout(() => {
+                            this.classList.remove('refreshing');
+                        }, 2000);
+                    });
+                }
+                
+                // 自动开启AI推理
+                setTimeout(() => {
+                    try {
+                        // 直接调用processCameraFrame，而不是toggleAI
+                        processCameraFrame();
+                    } catch (err) {
+                        console.error('启动分析出错:', err);
+                    }
+                }, 3000);
+                
+                console.log('页面初始化完成');
+            } catch (err) {
+                console.error('页面初始化出错:', err);
+            }
+        });
+
+        // 全屏切换函数
+        function toggleFullscreen(videoId) {
+            const videoElement = document.getElementById(videoId);
+            if (!videoElement) return;
+            
         if (document.fullscreenElement) {
-            container.classList.add('fullscreen-mode');
+                document.exitFullscreen();
+                document.body.classList.remove('fullscreen-mode');
         } else {
-            container.classList.remove('fullscreen-mode');
-            // 退出全屏时恢复面板状态
-            const alertPanel = document.querySelector('.alert-panel');
-            alertPanel.classList.remove('minimized');
-            alertPanel.querySelector('.minimize-btn').textContent = '−';
+                videoElement.requestFullscreen().catch(err => {
+                    console.error(`全屏模式错误: ${err.message}`);
+                });
+                document.body.classList.add('fullscreen-mode');
+            }
         }
-    });
-
-    // 布局切换功能
-    function toggleLayout() {
+        
+        // 警报面板最小化功能
+        const minimizeBtn = document.getElementById('minimizeAlerts');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', function() {
+                const panel = document.getElementById('alertPanel');
+                
+                if (panel.classList.contains('minimized')) {
+                    panel.classList.remove('minimized');
+                    this.textContent = '−';
+                } else {
+                    panel.classList.add('minimized');
+                    this.textContent = '+';
+                }
+            });
+        }
+        
+        // 布局切换
+        const layoutBtn = document.getElementById('layoutBtn');
+        if (layoutBtn) {
+            layoutBtn.addEventListener('click', function() {
         const grid = document.getElementById('monitorGrid');
-        if (grid) {
             grid.classList.toggle('single-view');
+            });
         }
+        
+        // 全屏按钮
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', function() {
+                const container = document.querySelector('.main-container');
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    container.requestFullscreen().catch(err => {
+                        console.error(`全屏错误: ${err.message}`);
+                    });
+                }
+            });
+        }
+        
+        // 更新时间戳
+        function updateTimestamps() {
+            const now = new Date();
+            const timeString = now.toTimeString().split(' ')[0];
+            
+            document.getElementById('timestamp1').innerText = timeString;
+            document.getElementById('timestamp2').innerText = timeString;
+            
+            setTimeout(updateTimestamps, 1000);
+        }
+
+        // 无需AI推理功能，已被JavaScript中的processCameraFrame替代
+        function toggleAI() {
+            console.log('此功能已被替代，请使用processCameraFrame');
+        }
+        
+        // 开始AI推理函数已被替代
+        function startAIInference() {
+            console.log('此功能已被替代，请使用processCameraFrame');
+        }
+        
+        // 停止AI推理函数已被替代
+        function stopAIInference() {
+            console.log('此功能已被替代，请使用processCameraFrame');
+        }
+        
+        // 捕获视频截图
+        function captureImage(videoNum) {
+            const videoElement = document.getElementById(`video${videoNum}`);
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            
+            // 绘制检测框
+            if (aiEnabled && videoNum === 2) {
+                detectionData.forEach(detection => {
+                    // 绘制检测框
+                    ctx.strokeStyle = '#ff4d4f';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(detection.x, detection.y, detection.width, detection.height);
+                    
+                    // 绘制半透明填充
+                    ctx.fillStyle = 'rgba(255, 77, 79, 0.2)';
+                    ctx.fillRect(detection.x, detection.y, detection.width, detection.height);
+                    
+                    // 绘制标签
+                    ctx.fillStyle = 'rgba(255, 77, 79, 0.8)';
+                    ctx.fillRect(detection.x, detection.y - 20, 120, 20);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '12px Arial';
+                    ctx.fillText(`${detection.class} ${(detection.confidence * 100).toFixed(0)}%`, detection.x + 5, detection.y - 5);
+                });
+            }
+            
+            // 转换为图片并下载
+            const dataURL = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
+            a.href = dataURL;
+            a.download = `screenshot_${timestamp}.png`;
+            a.click();
+            
+            // 添加警报
+            addAlert('系统', '已保存截图', '100%');
     }
     </script>
 </body>

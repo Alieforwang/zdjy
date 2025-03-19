@@ -314,6 +314,7 @@ class DatabaseManager():
                     file_type VARCHAR(50),
                     file_path VARCHAR(255),
                     result_path VARCHAR(255),
+                    result_folder VARCHAR(255) DEFAULT 'static/@results',
                     detect_type VARCHAR(50),
                     confidence DECIMAL(5,4),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

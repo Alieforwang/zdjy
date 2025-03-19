@@ -121,6 +121,11 @@ document.addEventListener('DOMContentLoaded', function() {
             resultUrl = resultUrl.replace('/static/uploads/result_', '/static/result_');
         }
         
+        // 修复/static/@results/static/这样的重复路径问题
+        if (resultUrl.includes('/static/@results/static/')) {
+            resultUrl = resultUrl.replace('/static/@results/static/', '/static/@results/');
+        }
+        
         // 添加时间戳防止缓存
         const timestamp = new Date().getTime();
         const originalUrlWithTimestamp = `${originalUrl}?t=${timestamp}`;
@@ -165,11 +170,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="detail-container">
                     <div class="detail-section">
                         <h4>原始图片</h4>
-                        <img src="${originalUrlWithTimestamp}" class="detail-media" alt="原始图片" onerror="this.src='/static/default_result.jpg'; console.error('原始图片加载失败：${originalUrl}');">
+                        <img src="${originalUrlWithTimestamp}" class="detail-media" alt="原始图片" onerror="this.src='/static/@results/default_result.jpg'; console.error('原始图片加载失败：${originalUrl}');">
                     </div>
                     <div class="detail-section">
                         <h4>分析结果</h4>
-                        <img src="${resultUrlWithTimestamp}" class="detail-media" alt="分析结果" onerror="this.src='/static/default_result.jpg'; console.error('结果图片加载失败：${resultUrl}');">
+                        <img src="${resultUrlWithTimestamp}" class="detail-media" alt="分析结果" onerror="this.src='/static/@results/default_result.jpg'; console.error('结果图片加载失败：${resultUrl}');">
                     </div>
                     <div class="detail-actions">
                         <button onclick="downloadResult('${resultUrl.split('/').pop().split('?')[0]}')">
