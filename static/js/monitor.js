@@ -8,6 +8,7 @@ let lastMinuteDetections = [];
 let frameCount = 0;
 let isCameraMode = true;  // 默认处于摄像头模式
 let cameraInterval = null; // 用于摄像头模式的定时器
+let currentCameraId = 0;  // 当前选中的摄像头ID，默认为内置摄像头
 
 // 添加浏览器兼容性检查和polyfill
 (function() {
@@ -298,9 +299,57 @@ function updateDetectionTypeDisplay(detectType) {
     }
 }
 
-// 启动摄像头
-async function startCamera(id) {
-    console.log(`开始启动摄像头 ID: ${id}`);
+// 选择摄像头
+async function selectCamera(cameraId) {
+    try {
+        console.log(`选择摄像头: ${cameraId}`);
+        
+        // 如果当前有摄像头在运行，先停止它
+        if (streams[1]) {
+            await stopCamera(1);
+        }
+        
+        // 更新当前摄像头ID
+        currentCameraId = cameraId;
+        
+        // 高亮显示选中的按钮
+        document.querySelectorAll('.camera-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const selectedBtn = document.getElementById(`cameraBtn${cameraId}`);
+        if (selectedBtn) {
+            selectedBtn.classList.add('active');
+        }
+        
+        // 更新摄像头名称显示
+        const videoName1 = document.getElementById('videoName1');
+        if (videoName1) {
+            if (cameraId === 0) {
+                videoName1.textContent = '内置摄像头';
+            } else if (cameraId === 1) {
+                videoName1.textContent = '外置摄像头1';
+            } else if (cameraId === 2) {
+                videoName1.textContent = '外置摄像头2';
+            }
+        }
+        
+        // 启动选中的摄像头
+        await startCamera(1, cameraId);
+        
+        // 启动AI分析
+        setTimeout(() => {
+            processCameraFrame();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('选择摄像头出错:', error);
+        alert(`选择摄像头出错: ${error.message}`);
+    }
+}
+
+// 启动摄像头（修改为支持指定设备索引）
+async function startCamera(id, deviceIndex = 0) {
+    console.log(`开始启动摄像头 ID: ${id}, 设备索引: ${deviceIndex}`);
     
     // 先检查浏览器是否支持navigator.mediaDevices
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -322,8 +371,31 @@ async function startCamera(id) {
     }
     
     try {
+        // 获取摄像头列表
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        console.log('检测到摄像头设备:', videoDevices.map(d => d.label || `设备 ${d.deviceId.substr(0, 8)}...`));
+        
+        if (videoDevices.length === 0) {
+            throw new Error('未检测到任何摄像头设备');
+        }
+        
+        // 确保选择的设备索引在有效范围内
+        if (deviceIndex >= videoDevices.length) {
+            console.warn(`请求的设备索引 ${deviceIndex} 超出范围，降级到使用第一个可用设备`);
+            deviceIndex = 0;
+        }
+        
+        // 获取选定设备的ID
+        const selectedDevice = videoDevices[deviceIndex];
+        console.log(`选择摄像头设备: ${selectedDevice.label || `设备 ${selectedDevice.deviceId.substr(0, 8)}...`}`);
+        
         // 获取适合当前设备的视频约束条件
         const constraints = getOptimalConstraints();
+        // 添加设备ID到约束条件
+        constraints.deviceId = { exact: selectedDevice.deviceId };
+        
         console.log('使用的视频约束:', constraints);
         
         const stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
@@ -854,63 +926,28 @@ function loadVideoList() {
     }
 }
 
-// 初始化页面
+// 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
     try {
         console.log('页面加载完成，开始初始化...');
         
-        // 检查登录状态
-        checkLoginStatus();
+        // 安全获取DOM元素的辅助函数
+        function safeGetElement(id) {
+            const el = document.getElementById(id);
+            if (!el) console.warn(`找不到元素: ${id}`);
+            return el;
+        }
         
-        // 尝试加载视频列表
+        // 初始化页面
         loadVideoList();
         
-        // 刷新按钮
-        const refreshBtn = safeGetElement('refreshBtn');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', loadVideoList);
+        // 初始化摄像头选择按钮
+        const cameraBtn0 = safeGetElement('cameraBtn0');
+        if (cameraBtn0) {
+            cameraBtn0.classList.add('active'); // 默认选中内置摄像头
         }
         
-        // 安全获取并设置元素事件
-        const fullscreenBtn = safeGetElement('fullscreenBtn');
-        if (fullscreenBtn) {
-            fullscreenBtn.addEventListener('click', function() {
-                toggleFullscreen('video1');
-            });
-        }
-        
-        const layoutBtn = safeGetElement('layoutBtn');
-        if (layoutBtn) {
-            layoutBtn.addEventListener('click', toggleLayout);
-        }
-        
-        // 更新检测率
-        setInterval(updateDetectionRate, 1000);
-        
-        console.log('页面初始化完成');
-        
-        // 更新时间戳（如果需要）
-        // updateTimestamps();
-        
-        // 自动启动摄像头
-        startCamera(1);
-        
-        // 更新状态
-        const videoStatus1 = safeGetElement('videoStatus1');
-        if (videoStatus1) {
-            videoStatus1.textContent = "摄像头已启动";
-        }
-        
-        const videoName1 = safeGetElement('videoName1');
-        if (videoName1) {
-            videoName1.textContent = "本地摄像头";
-        }
-        
-        const status1 = safeGetElement('status1');
-        if (status1) {
-            status1.textContent = "准备中";
-            status1.className = "status";
-        }
+        console.log('开始加载视频列表...');
         
         // 在页面加载后延迟2秒启动定时分析，给摄像头足够的启动时间
         setTimeout(() => {

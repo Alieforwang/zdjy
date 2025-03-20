@@ -340,7 +340,49 @@
             font-size: 12px;
             border-radius: 3px;
             white-space: nowrap;
-    }
+        }
+        
+        /* 摄像头选择按钮样式 */
+        .camera-select-container {
+            margin: 8px 0;
+            padding: 5px 0;
+            border-top: 1px solid rgba(24, 144, 255, 0.2);
+            border-bottom: 1px solid rgba(24, 144, 255, 0.2);
+        }
+        
+        .camera-select-title {
+            font-size: 0.85rem;
+            color: #8c8c8c;
+            margin-bottom: 5px;
+        }
+        
+        .camera-select-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .camera-btn {
+            background: rgba(0, 21, 41, 0.6);
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            color: #1890ff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .camera-btn:hover {
+            background: rgba(24, 144, 255, 0.1);
+            border-color: rgba(24, 144, 255, 0.5);
+        }
+        
+        .camera-btn.active {
+            background: rgba(24, 144, 255, 0.2);
+            border-color: #1890ff;
+            color: white;
+        }
 </style>
 </head>
 <body class="monitor-page">
@@ -401,6 +443,15 @@
                             <span class="location" id="videoName1">本地摄像头</span>
                             <span class="status" id="status1">未播放</span>
                         </div>
+                        <!-- 摄像头选择按钮组 -->
+                        <div class="camera-select-container">
+                            <div class="camera-select-title">选择摄像头:</div>
+                            <div class="camera-select-buttons">
+                                <button class="camera-btn" id="cameraBtn0" onclick="selectCamera(0)">内置摄像头</button>
+                                <button class="camera-btn" id="cameraBtn1" onclick="selectCamera(1)">外置摄像头1</button>
+                                <button class="camera-btn" id="cameraBtn2" onclick="selectCamera(2)">外置摄像头2</button>
+                            </div>
+                        </div>
                         <div class="monitor-controls">
                             <button class="control-btn" onclick="captureImage(1)" id="captureBtn1" title="截图">
                                 <span class="btn-icon">📷</span>
@@ -439,7 +490,7 @@
                 <!-- 控制面板 -->
                 <div class="control-panel">
                     <div class="control-item">
-                        <button id="startBtn1" class="action-btn primary" onclick="startCamera(1)">
+                        <button id="startBtn1" class="action-btn primary" onclick="startCamera(1, currentCameraId)">
                             <span class="btn-icon">▶️</span>启动摄像头
                         </button>
                         <button id="stopBtn1" class="action-btn danger" onclick="stopCamera(1)" disabled>
@@ -463,9 +514,9 @@
                     <div class="panel-header">
                         <h3><span class="alert-icon">🚨</span>实时警报</h3>
                         <button class="minimize-btn" id="minimizeAlerts">−</button>
-        </div>
-            <div class="alert-list" id="alertList">
-                <!-- 警报会通过 JavaScript 动态添加 -->
+                    </div>
+                    <div class="alert-list" id="alertList">
+                        <!-- 警报会通过 JavaScript 动态添加 -->
                         <div class="empty-alerts" id="emptyAlerts">
                             <div class="empty-icon">🔔</div>
                             <div class="empty-text">暂无警报，系统正在监测中...</div>
@@ -1032,10 +1083,10 @@
             const videoElement = document.getElementById(videoId);
             if (!videoElement) return;
             
-        if (document.fullscreenElement) {
+            if (document.fullscreenElement) {
                 document.exitFullscreen();
                 document.body.classList.remove('fullscreen-mode');
-        } else {
+            } else {
                 videoElement.requestFullscreen().catch(err => {
                     console.error(`全屏模式错误: ${err.message}`);
                 });
@@ -1063,8 +1114,8 @@
         const layoutBtn = document.getElementById('layoutBtn');
         if (layoutBtn) {
             layoutBtn.addEventListener('click', function() {
-        const grid = document.getElementById('monitorGrid');
-            grid.classList.toggle('single-view');
+                const grid = document.getElementById('monitorGrid');
+                grid.classList.toggle('single-view');
             });
         }
         
@@ -1150,7 +1201,7 @@
             
             // 添加警报
             addAlert('系统', '已保存截图', '100%');
-    }
+        }
     </script>
 </body>
 </html> 
