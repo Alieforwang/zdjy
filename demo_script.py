@@ -8,7 +8,7 @@ import os
 
 class SmartMonitorSystem:
     def __init__(self):
-        self.model = YOLO('models3/best.pt')  # 加载预训练模型
+        self.model = YOLO('models/best.pt')  # 加载预训练模型
         self.camera = None
         self.processing = False
         self.detection_results = []

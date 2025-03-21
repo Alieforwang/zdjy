@@ -2,7 +2,32 @@ import mysql.connector
 from mysql.connector import Error, pooling
 import time
 import threading
-from config import DB_CONFIG
+import os
+import sys
+
+# 尝试导入config模块，如果失败则尝试其他路径
+try:
+    from config import DB_CONFIG
+except ImportError:
+    # 添加项目根目录到sys.path
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    try:
+        from config import DB_CONFIG
+    except ImportError:
+        # 如果还是找不到，使用默认配置
+        print("警告: 无法导入config.py，使用默认数据库配置")
+        DB_CONFIG = {
+            'host': '127.0.0.1',
+            'user': 'root',
+            'password': '123456',
+            'database': 'tiaozhanbei',
+            'charset': 'utf8mb4',
+            'pool_size': 10,
+            'pool_name': 'mysql_pool',
+            'pool_reset_session': True,
+            'autocommit': True,
+            'use_pure': True
+        }
 
 # 全局连接池实例
 connection_pool = None
@@ -32,8 +57,11 @@ def get_connection_pool(pool_size=10, pool_name="mysql_pool"):
     return connection_pool
 
 class DatabaseManager():
-    def __init__(self, host='127.0.0.1', user='root', password='123456', database='tiaozhanbei'):
-        # 使用配置文件中的默认值
+    def __init__(self):
+        """
+        初始化数据库管理器，使用config.py中的DB_CONFIG配置
+        """
+        # 使用config.py中的配置值
         self.host = DB_CONFIG['host']
         self.user = DB_CONFIG['user']
         self.password = DB_CONFIG['password']
@@ -81,15 +109,15 @@ class DatabaseManager():
                 if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
                     return
             else:
-                # 直接创建连接
-                self.connection = mysql.connector.connect(
-                    host=self.host,
-                    user=self.user,
-                    password=self.password,
-                    database=self.database,
-                    use_pure=True,  # 使用纯Python实现减少内存消耗
-                    autocommit=True
-                )
+                # 直接创建连接（使用config.py中的完整配置）
+                connection_config = DB_CONFIG.copy()
+                # 移除连接池特有的配置项
+                pool_config_keys = ['pool_size', 'pool_name', 'pool_reset_session']
+                for key in pool_config_keys:
+                    if key in connection_config:
+                        connection_config.pop(key)
+                
+                self.connection = mysql.connector.connect(**connection_config)
                 
         except Error as e:
             print(f"数据库连接错误: {e}")
@@ -103,14 +131,15 @@ class DatabaseManager():
                         pool = get_connection_pool(self._pool_size)
                         self.connection = pool.get_connection()
                     else:
-                        self.connection = mysql.connector.connect(
-                            host=self.host,
-                            user=self.user,
-                            password=self.password,
-                            database=self.database,
-                            use_pure=True,
-                            autocommit=True
-                        )
+                        # 使用与初始连接相同的配置
+                        connection_config = DB_CONFIG.copy()
+                        # 移除连接池特有的配置项
+                        pool_config_keys = ['pool_size', 'pool_name', 'pool_reset_session']
+                        for key in pool_config_keys:
+                            if key in connection_config:
+                                connection_config.pop(key)
+                        
+                        self.connection = mysql.connector.connect(**connection_config)
                     if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
                         print("重新连接成功")
                         return

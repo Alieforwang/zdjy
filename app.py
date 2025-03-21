@@ -1,4 +1,3 @@
-
 from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response
 from flask_cors import CORS
 import util.DBUtil as DBM
@@ -99,7 +98,12 @@ def get_model():
                     logger.info("无法导入torch，使用CPU设备")
                 
                 # 加载模型，允许自动回退到CPU
+                # YOLO类初始化不接受device参数
                 global_model = YOLO(model_path)
+                # 设置全局模型使用检测到的设备
+                if device == 'cuda' and torch.cuda.is_available():
+                    global_model.to('cuda')
+                    logger.info("模型已移动到CUDA设备")
                 
                 # 修正类别名映射，确保与训练时的标签顺序一致
                 # 根据训练数据，0-zdjy_gd（固定摊位），1-zdjy_ld（流动摊位）
@@ -390,8 +394,16 @@ def init_detection_tables():
     except Exception as e:
         logger.error(f"初始化检测结果表失败: {str(e)}")
 
-# 创建模型实例 - 使用CPU设备而非CUDA
-model = YOLOv8(weights='models/best.pt', device='cpu', load_params={'weights_only': True})
+# 创建模型实例 - 自动选择设备(GPU优先)
+try:
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"模型初始化时自动选择设备: {device}")
+except ImportError:
+    device = 'cpu'
+    logger.info("无法导入torch，使用CPU设备")
+
+model = YOLOv8(weights='models/best.pt', device=device, load_params={'weights_only': True})
 
 @app.route('/')
 def index():
@@ -2405,8 +2417,21 @@ def delete_video(filename):
         logger.error(f"删除视频时出错: {str(e)}")
         return jsonify({'status': 'error', 'message': f'删除视频失败: {str(e)}'}), 500
 
-# 加载YOLOv8模型
+# 加载YOLOv8模型 - 自动选择设备(GPU优先)
+try:
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"YOLO模型初始化时自动选择设备: {device}")
+except ImportError:
+    device = 'cpu'
+    logger.info("无法导入torch，使用CPU设备")
+
+# YOLO类初始化不接受device参数
 model = YOLO('models/best.pt')
+# 设置模型使用检测到的设备
+if device == 'cuda' and torch.cuda.is_available():
+    model.to('cuda')
+    logger.info("推理模型已移动到CUDA设备")
 
 @app.route('/api/inference', methods=['POST'])
 def inference():
