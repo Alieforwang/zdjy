@@ -8,6 +8,15 @@ document.addEventListener('DOMContentLoaded', function() {
         'zdjy_gd': '固定摊位'
     };
     
+    // 导出历史记录
+    function exportHistory() {
+        const dateFilter = document.getElementById('dateFilter').value;
+        const typeFilter = document.getElementById('typeFilter').value;
+        
+        // 使用window.location跳转到导出API，同时传递筛选参数
+        window.location.href = `/api/history/export?days=${dateFilter}&type=${typeFilter}`;
+    }
+    
     // 加载历史记录
     function loadHistory() {
         const dateFilter = document.getElementById('dateFilter').value;
@@ -65,6 +74,9 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPage = 1;
         loadHistory();
     });
+    
+    // 绑定导出按钮事件
+    document.getElementById('exportBtn').addEventListener('click', exportHistory);
     
     // 绑定分页按钮事件
     document.getElementById('prevPage').addEventListener('click', () => {

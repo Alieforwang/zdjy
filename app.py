@@ -1,4 +1,4 @@
-from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response
+from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response, send_file
 from flask_cors import CORS
 import util.DBUtil as DBM
 import os
@@ -31,6 +31,7 @@ import sqlite3
 import base64
 import io
 from PIL import Image
+import csv
 
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
@@ -3091,6 +3092,127 @@ def get_dashboard_real_stats():
             'success': False,
             'message': str(e)
         }), 500
+
+@app.route('/api/users/export', methods=['GET'])
+def export_users():
+    if 'user_id' not in session or not session.get('is_admin'):
+        return jsonify({'success': False, 'message': '未登录或无权限'}), 401
+    
+    try:
+        db = DBM.DatabaseManager()
+        db.connect()
+        users = db.query_data('SELECT id, username, is_admin, created_at FROM user')
+        db.disconnect()
+        
+        # 创建CSV内存文件
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入CSV头
+        writer.writerow(['用户ID', '用户名', '是否管理员', '创建时间'])
+        
+        # 写入数据
+        for user in users:
+            writer.writerow([
+                user[0],
+                user[1],
+                '是' if user[2] else '否',
+                user[3].strftime('%Y-%m-%d %H:%M:%S') if user[3] else ''
+            ])
+        
+        # 将指针移到开始
+        output.seek(0)
+        
+        # 创建响应
+        current_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8-sig')),  # 使用UTF-8 with BOM以支持中文
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'用户列表_{current_time}.csv'
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/history/export', methods=['GET'])
+def export_history():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': '请先登录'}), 401
+    
+    try:
+        type_filter = request.args.get('type', 'all')
+        days = request.args.get('days', 'all')
+        
+        db = DBM.DatabaseManager()
+        db.connect()
+        
+        # 构建查询条件
+        conditions = ['user_id = %s']
+        params = [session['user_id']]
+        
+        if days != 'all':
+            conditions.append('created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)')
+            params.append(days)
+        
+        if type_filter != 'all':
+            conditions.append('detect_type = %s')
+            type_mapping = {
+                'zdjy_ld': 'zdjy_ld',
+                'zdjy_gd': 'zdjy_gd'
+            }
+            params.append(type_mapping.get(type_filter, type_filter))
+        
+        # 构建查询语句
+        where_clause = ' AND '.join(conditions)
+        query = f'''
+            SELECT id, user_id, file_type, detect_type, confidence, created_at, file_path, result_path
+            FROM analysis_records 
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+        '''
+        
+        records = db.query_data(query, tuple(params))
+        db.disconnect()
+        
+        # 创建CSV内存文件
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入CSV头
+        writer.writerow(['ID', '检测时间', '检测类型', '置信度', '文件类型', '原始文件', '结果文件'])
+        
+        # 写入数据
+        for record in records:
+            detect_type_display = record[3]
+            if record[3] == 'zdjy_ld':
+                detect_type_display = '占道经营流动'
+            elif record[3] == 'zdjy_gd':
+                detect_type_display = '固定摊位'
+            
+            writer.writerow([
+                record[0],  # ID
+                record[5].strftime('%Y-%m-%d %H:%M:%S') if record[5] else '',  # 创建时间
+                detect_type_display,  # 检测类型
+                f'{float(record[4])*100:.2f}%' if record[4] else '',  # 置信度
+                record[2],  # 文件类型
+                os.path.basename(record[6]) if record[6] else '',  # 原始文件名
+                os.path.basename(record[7]) if record[7] else ''   # 结果文件名
+            ])
+        
+        # 将指针移到开始
+        output.seek(0)
+        
+        # 创建响应
+        current_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8-sig')),  # 使用UTF-8 with BOM以支持中文
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'检测历史_{current_time}.csv'
+        )
+    except Exception as e:
+        print(f"导出历史记录错误: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     try:

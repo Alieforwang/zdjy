@@ -378,4 +378,19 @@ tr {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.export-btn {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.export-btn:hover {
+    background-color: #0b7dda;
 } 

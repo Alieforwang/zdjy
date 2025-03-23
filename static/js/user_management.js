@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const tableBody = document.getElementById('tableBody');
     const searchInput = document.getElementById('searchInput');
     const addUserBtn = document.getElementById('addUserBtn');
+    const exportBtn = document.getElementById('exportBtn');
     const userModal = document.getElementById('userModal');
     const confirmModal = document.getElementById('confirmModal');
     const userForm = document.getElementById('userForm');
@@ -23,6 +24,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化页面
     initPage();
+    
+    // 导出用户数据
+    function exportUserData() {
+        // 使用window.location跳转到导出API
+        window.location.href = '/api/users/export';
+    }
     
     // 加载用户数据
     function loadUserData() {
@@ -338,35 +345,40 @@ document.addEventListener('DOMContentLoaded', function() {
         // 加载用户数据
         loadUserData();
         
-        // 添加事件监听器
-        addUserBtn.addEventListener('click', handleAddUser);
-        
-        searchInput.addEventListener('input', () => {
+        // 绑定事件
+        searchInput.addEventListener('input', function() {
             currentPage = 1;
             renderTable();
+            updatePagination();
         });
         
-        prevPageBtn.addEventListener('click', () => handlePageChange('prev'));
-        nextPageBtn.addEventListener('click', () => handlePageChange('next'));
+        // 分页按钮事件
+        prevPageBtn.addEventListener('click', function() {
+            handlePageChange(-1);
+        });
         
-        userForm.addEventListener('submit', submitUserForm);
+        nextPageBtn.addEventListener('click', function() {
+            handlePageChange(1);
+        });
         
-        document.getElementById('confirmDelete').addEventListener('click', confirmDeleteUser);
+        // 添加用户按钮事件
+        addUserBtn.addEventListener('click', handleAddUser);
         
-        // 关闭按钮
+        // 导出按钮事件
+        exportBtn.addEventListener('click', exportUserData);
+        
+        // 关闭模态框事件
         document.querySelectorAll('.close-btn, .cancel-btn').forEach(btn => {
             btn.addEventListener('click', function() {
-                closeModal(this.closest('.modal'));
+                const modal = this.closest('.modal');
+                closeModal(modal);
             });
         });
         
-        // 点击模态框背景关闭
-        window.addEventListener('click', function(event) {
-            if (event.target === userModal) {
-                closeModal(userModal);
-            } else if (event.target === confirmModal) {
-                closeModal(confirmModal);
-            }
-        });
+        // 表单提交事件
+        userForm.addEventListener('submit', submitUserForm);
+        
+        // 确认删除事件
+        document.getElementById('confirmDelete').addEventListener('click', confirmDeleteUser);
     }
 }); 
