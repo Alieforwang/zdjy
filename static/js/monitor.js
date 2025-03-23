@@ -10,6 +10,10 @@ let isCameraMode = true;  // 默认处于摄像头模式
 let cameraInterval = null; // 用于摄像头模式的定时器
 let currentCameraId = 0;  // 当前选中的摄像头ID，默认为内置摄像头
 
+// 记录当前选择的摄像头
+let currentCameraIndex = 0;
+let currentCameraIndex2 = 3;
+
 // 添加浏览器兼容性检查和polyfill
 (function() {
     // 确保老旧浏览器也能支持navigator.mediaDevices
@@ -300,390 +304,330 @@ function updateDetectionTypeDisplay(detectType) {
 }
 
 // 选择摄像头
-async function selectCamera(cameraId) {
-    try {
-        console.log(`选择摄像头: ${cameraId}`);
+function selectCamera(index) {
+    // 更新UI按钮状态
+    document.querySelectorAll('#cameraBtn0, #cameraBtn1, #cameraBtn2').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`#cameraBtn${index}`).classList.add('active');
+    
+    // 记录当前摄像头索引
+    currentCameraIndex = index;
+    
+    // 重新启动摄像头
+    stopCamera();
+    startCamera(index);
+    
+    // 更新位置信息
+    updateLocationInfo(index);
+}
+
+// 更新位置信息
+function updateLocationInfo(index) {
+    const locationElement = document.getElementById('locationInfo');
+    if (locationElement) {
+        let locationText = '未知位置';
         
-        // 如果当前有摄像头在运行，先停止它
-        if (streams[1]) {
-            await stopCamera(1);
+        // 根据摄像头索引设置位置信息
+        if (index === 0) {
+            locationText = '内置摄像头';
+        } else if (index === 1) {
+            locationText = '外置摄像头1';
+        } else if (index === 2) {
+            locationText = '外置摄像头2';
         }
         
-        // 更新当前摄像头ID
-        currentCameraId = cameraId;
-        
-        // 高亮显示选中的按钮
-        document.querySelectorAll('.camera-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        const selectedBtn = document.getElementById(`cameraBtn${cameraId}`);
-        if (selectedBtn) {
-            selectedBtn.classList.add('active');
-        }
-        
-        // 更新摄像头名称显示
-        const videoName1 = document.getElementById('videoName1');
-        if (videoName1) {
-            if (cameraId === 0) {
-                videoName1.textContent = '内置摄像头';
-            } else if (cameraId === 1) {
-                videoName1.textContent = '外置摄像头1';
-            } else if (cameraId === 2) {
-                videoName1.textContent = '外置摄像头2';
-            }
-        }
-        
-        // 启动选中的摄像头
-        await startCamera(1, cameraId);
-        
-        // 启动AI分析
-        setTimeout(() => {
-            processCameraFrame();
-        }, 1000);
-        
-    } catch (error) {
-        console.error('选择摄像头出错:', error);
-        alert(`选择摄像头出错: ${error.message}`);
+        locationElement.textContent = locationText;
     }
 }
 
-// 启动摄像头（修改为支持指定设备索引）
-async function startCamera(id, deviceIndex = 0) {
-    console.log(`开始启动摄像头 ID: ${id}, 设备索引: ${deviceIndex}`);
-    
-    // 先检查浏览器是否支持navigator.mediaDevices
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error('浏览器不支持mediaDevices API');
-        alert('您的浏览器不支持摄像头功能，请使用Chrome、Firefox或Edge浏览器');
-        return;
-    }
-    
-    // 检查摄像头权限
-    const permissionState = await checkCameraPermission().catch(err => {
-        console.error('权限检查出错:', err);
-        return false;
-    });
-    
-    if (!permissionState) {
-        console.log('未获得摄像头权限，无法启动');
-        alert('需要摄像头权限才能继续。请在浏览器设置中允许访问摄像头。');
-        return;
-    }
+// 启动摄像头
+let stream = null;
+async function startCamera(deviceIndex = 0) {
+    const videoElement = document.getElementById('videoElement');
+    if (!videoElement) return;
     
     try {
-        // 获取摄像头列表
+        // 检查是否有可用摄像头
+        if (typeof availableCameras !== 'undefined' && availableCameras.length === 0) {
+            console.log('没有检测到摄像头');
+            setAIStatusText('无可用摄像头');
+            if (document.getElementById('locationInfo')) {
+                document.getElementById('locationInfo').textContent = '无摄像头连接';
+            }
+            return;
+        }
+        
+        // 如果已有流，先停止
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        
+        // 获取视频设备列表
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         
-        console.log('检测到摄像头设备:', videoDevices.map(d => d.label || `设备 ${d.deviceId.substr(0, 8)}...`));
+        // 检查设备索引是否有效
+        const isValidIndex = deviceIndex >= 0 && deviceIndex < videoDevices.length;
         
-        if (videoDevices.length === 0) {
-            throw new Error('未检测到任何摄像头设备');
-        }
-        
-        // 确保选择的设备索引在有效范围内
-        if (deviceIndex >= videoDevices.length) {
-            console.warn(`请求的设备索引 ${deviceIndex} 超出范围，降级到使用第一个可用设备`);
-            deviceIndex = 0;
-        }
-        
-        // 获取选定设备的ID
-        const selectedDevice = videoDevices[deviceIndex];
-        console.log(`选择摄像头设备: ${selectedDevice.label || `设备 ${selectedDevice.deviceId.substr(0, 8)}...`}`);
-        
-        // 获取适合当前设备的视频约束条件
-        const constraints = getOptimalConstraints();
-        // 添加设备ID到约束条件
-        constraints.deviceId = { exact: selectedDevice.deviceId };
-        
-        console.log('使用的视频约束:', constraints);
-        
-        const stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
-        
-        const video = safeGetElement(`video${id}`);
-        if (!video) {
-            console.error(`未找到video元素: video${id}`);
-            throw new Error(`未找到video元素: video${id}`);
-        }
-        
-        const canvas = safeGetElement(`canvas1`);
-        if (!canvas) {
-            console.error(`未找到canvas元素: canvas1`);
-            throw new Error(`未找到canvas元素: canvas1`);
-        }
-        
-        video.srcObject = stream;
-        streams[id] = stream;
-        
-        // 添加视频加载事件处理
-        video.onloadedmetadata = function() {
-            console.log(`视频元数据已加载，分辨率: ${video.videoWidth}x${video.videoHeight}`);
-            video.play().catch(e => console.error('视频播放失败:', e));
-            
-            // 不需要在这里设置定时分析，因为已经在页面加载时设置了
+        let constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: false
         };
         
-        video.onerror = function(e) {
-            console.error('视频元素错误:', e);
-        };
-        
-        // 更新按钮状态
-        const startBtn = safeGetElement(`startBtn1`);
-        const stopBtn = safeGetElement(`stopBtn1`);
-        
-        if (startBtn) startBtn.disabled = true;
-        if (stopBtn) stopBtn.disabled = false;
-        
-        // 更新状态显示
-        const statusEl = safeGetElement(`status${id}`);
-        if (statusEl) {
-            statusEl.textContent = '在线';
-            statusEl.className = 'status online';
-        }
-        
-        // 更新在线摄像头数量
-        onlineCameras++;
-        updateOnlineCameras();
-        
-    } catch (error) {
-        console.error('访问摄像头时出错:', error);
-        
-        // 根据错误类型提供更详细的错误信息
-        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-            alert('摄像头访问被拒绝。请在浏览器设置中允许访问摄像头。');
-        } else if (error.name === 'NotFoundError') {
-            alert('未检测到摄像头设备，请确认摄像头已连接并正常工作');
-        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-            alert('摄像头可能被其他应用程序占用，请关闭其他使用摄像头的应用后重试');
-        } else if (error.name === 'OverconstrainedError') {
-            alert('摄像头不支持请求的分辨率，请尝试使用较低的分辨率');
+        // 如果设备索引有效，使用指定设备
+        if (isValidIndex) {
+            constraints.video.deviceId = { exact: videoDevices[deviceIndex].deviceId };
+            console.log(`使用摄像头设备 ${deviceIndex}: ${videoDevices[deviceIndex].label}`);
         } else {
-            alert(`访问摄像头时出错: ${error.message}`);
+            // 如果索引无效，使用默认设备并提示
+            console.log(`摄像头设备 ${deviceIndex} 不可用，使用默认摄像头`);
+            if (deviceIndex > 0) {
+                alert(`摄像头 ${deviceIndex} 不可用，请检查设备连接`);
+            }
         }
-    }
-}
-
-// 获取最佳视频约束条件
-function getOptimalConstraints() {
-    // 检测是否为移动设备
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // 移动设备使用较低分辨率以节省资源
-        return { 
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: { ideal: 'environment' } // 优先使用后置摄像头
-        };
-    } else {
-        // 桌面设备使用较高分辨率
-        return { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-        };
+        
+        // 请求摄像头访问权限
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // 设置视频源
+        videoElement.srcObject = stream;
+        
+        // 更新UI显示
+        updateCameraStatus(true);
+        if (document.getElementById('locationInfo')) {
+            updateLocationInfo(deviceIndex);
+        }
+        
+        console.log('摄像头已启动');
+    } catch (error) {
+        console.error('启动摄像头错误:', error);
+        setAIStatusText('摄像头访问失败');
+        updateCameraStatus(false);
+        
+        if (document.getElementById('locationInfo')) {
+            document.getElementById('locationInfo').textContent = '摄像头连接失败';
+        }
+        
+        // 如果是因为没有权限
+        if (error.name === 'NotAllowedError') {
+            alert('请允许访问摄像头以使用AI检测功能');
+        } else if (error.name === 'OverconstrainedError') {
+            // 如果是设备约束问题，尝试使用默认设备
+            console.log('摄像头设备约束错误，尝试使用默认摄像头');
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: false 
+                });
+                videoElement.srcObject = stream;
+                updateCameraStatus(true);
+            } catch (e) {
+                console.error('默认摄像头也无法启动:', e);
+            }
+        }
     }
 }
 
 // 停止摄像头
-function stopCamera(id) {
-    if (streams[id]) {
-        streams[id].getTracks().forEach(track => track.stop());
-        delete streams[id];
-        
-        // 停止分析
-        analyzing[id] = false;
-        
-        // 停止录制
-        if (mediaRecorders[id]) {
-            mediaRecorders[id].stop();
-            delete mediaRecorders[id];
-        }
-        
-        // 安全地更新按钮状态
-        const startBtn = safeGetElement(`startBtn${id}`);
-        const stopBtn = safeGetElement(`stopBtn${id}`);
-        const captureBtn = safeGetElement(`captureBtn${id}`);
-        
-        if (startBtn) startBtn.disabled = false;
-        if (stopBtn) stopBtn.disabled = true;
-        if (captureBtn) captureBtn.disabled = true;
-        
-        // 安全地更新状态显示
-        const statusEl = safeGetElement(`status${id}`);
-        if (statusEl) {
-            statusEl.textContent = '未连接';
-            statusEl.className = 'status';
-        }
-        
-        // 清除视频显示
-        const video = safeGetElement(`video${id}`);
-        if (video) {
-            video.srcObject = null;
-        }
-        
-        // 清除画布
-        const canvas = safeGetElement(`canvas${id}`);
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-        
-        // 更新在线摄像头数量
-        onlineCameras--;
-        updateOnlineCameras();
-    }
-}
-
-// 开始分析视频流
-function startAnalyzing(id) {
-    const video = document.getElementById(`video${id}`);
-    const canvas = document.getElementById(`canvas${id}`);
-    const ctx = canvas.getContext('2d');
-    
-    analyzing[id] = true;
-    
-    async function analyzeFrame() {
-        if (!analyzing[id] || !streams[id]) return;
-        
-        try {
-            // 将视频帧绘制到左侧画布上
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            
-            // 将画布转换为 blob
-            const blob = await new Promise(resolve => {
-                canvas.toBlob(resolve, 'image/jpeg');
-            });
-            
-            // 创建 FormData 对象
-            const formData = new FormData();
-            formData.append('frame', blob);
-            
-            // 发送到服务器进行分析
-            const response = await fetch('/analyze_frame', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                // 清除之前的标注
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(video, 0, 0);
-                
-                // 绘制检测结果到左侧画布
-                result.detections.forEach(detection => {
-                    const [x1, y1, x2, y2] = detection.bbox;
-                    const confidence = detection.confidence;
-                    const className = detection.class;
-                    
-                    // 绘制边界框
-                    ctx.strokeStyle = '#00ff00';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-                    
-                    // 绘制标签背景
-                    ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                    const label = `${className} ${(confidence * 100).toFixed(1)}%`;
-                    const labelWidth = ctx.measureText(label).width + 4;
-                    ctx.fillRect(x1, y1 - 20, labelWidth, 20);
-                    
-                    // 绘制标签文本
-                    ctx.fillStyle = '#000000';
-                    ctx.font = '14px Arial';
-                    ctx.fillText(label, x1 + 2, y1 - 5);
-                    
-                    // 如果检测到目标，添加到警报列表
-                    if (confidence > 0.5) {
-                        addAlert(id, className, confidence);
-                        detectionCount++;
-                        lastMinuteDetections.push(Date.now());
-                    }
-                });
-                
-                // 绘制检测结果到右侧画布
-                const rightCanvas = document.getElementById(`processedCanvas${id}`);
-                rightCanvas.width = video.videoWidth;
-                rightCanvas.height = video.videoHeight;
-                const rightCtx = rightCanvas.getContext('2d');
-                rightCtx.clearRect(0, 0, rightCanvas.width, rightCanvas.height);
-                rightCtx.drawImage(video, 0, 0);
-                
-                result.detections.forEach(detection => {
-                    const [x1, y1, x2, y2] = detection.bbox;
-                    const confidence = detection.confidence;
-                    const className = detection.class;
-                    
-                    // 绘制边界框
-                    rightCtx.strokeStyle = '#00ff00';
-                    rightCtx.lineWidth = 2;
-                    rightCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-                    
-                    // 绘制标签背景
-                    rightCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                    const label = `${className} ${(confidence * 100).toFixed(1)}%`;
-                    const labelWidth = rightCtx.measureText(label).width + 4;
-                    rightCtx.fillRect(x1, y1 - 20, labelWidth, 20);
-                    
-                    // 绘制标签文本
-                    rightCtx.fillStyle = '#000000';
-                    rightCtx.font = '14px Arial';
-                    rightCtx.fillText(label, x1 + 2, y1 - 5);
-                });
-            }
-            
-        } catch (error) {
-            console.error('Analysis error:', error);
-        }
-        
-        // 继续分析下一帧
-        if (analyzing[id]) {
-            requestAnimationFrame(analyzeFrame);
-        }
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
     }
     
-    // 等待视频加载完成后开始分析
-    video.addEventListener('loadeddata', () => {
-        analyzeFrame();
-    });
+    const videoElement = document.getElementById('videoElement');
+    if (videoElement && videoElement.srcObject) {
+        videoElement.srcObject = null;
+    }
+    
+    updateCameraStatus(false);
 }
 
-// 更新在线摄像头数量
+// 更新摄像头状态
+function updateCameraStatus(isActive) {
+    const statusElement = document.getElementById('cameraStatus');
+    if (statusElement) {
+        statusElement.textContent = isActive ? '已连接' : '未连接';
+        statusElement.style.color = isActive ? '#4CAF50' : '#F44336';
+    }
+    
+    // 更新在线摄像头计数
+    updateOnlineCameras();
+}
+
+// 更新在线摄像头计数
 function updateOnlineCameras() {
-    const onlineCamerasEl = safeGetElement('onlineCameras');
-    if (onlineCamerasEl) {
-        onlineCamerasEl.textContent = `${onlineCameras}/1`;
+    const onlineCamerasElement = document.getElementById('onlineCameras');
+    if (onlineCamerasElement) {
+        let activeCount = 0;
+        if (stream) activeCount++;
+        
+        // 使用后端提供的总摄像头数量
+        const totalCameras = typeof cameraCount !== 'undefined' ? cameraCount : 2;
+        onlineCamerasElement.textContent = `${activeCount}/${totalCameras}`;
     }
 }
 
-// 添加警报
-function addAlert(cameraId, type, confidence) {
-    const alertList = safeGetElement('alertList');
-    if (!alertList) return;
+// 第二个摄像头窗口的选择函数
+function selectCamera2(index) {
+    // 更新UI按钮状态
+    document.querySelectorAll('#cameraBtn3, #cameraBtn4, #cameraBtn5').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`#cameraBtn${index}`).classList.add('active');
     
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert-item';
+    // 记录当前摄像头索引，实际摄像头索引需要映射到实际设备
+    // 3->0, 4->1, 5->2
+    const actualIndex = index - 3;
+    currentCameraIndex2 = index;
     
-    const time = new Date().toLocaleTimeString();
-    alertDiv.innerHTML = `
-        <div class="alert-header">
-            <span class="alert-time">${time}</span>
-            <span class="alert-camera">监控点 ${String.fromCharCode(64 + cameraId)}</span>
-        </div>
-        <div class="alert-content">
-            检测到${type}（置信度：${(confidence * 100).toFixed(1)}%）
-        </div>
-    `;
+    // 重新启动摄像头
+    stopCamera2();
+    startCamera2(actualIndex);
     
-    // 将新警报添加到列表顶部
-    alertList.insertBefore(alertDiv, alertList.firstChild);
-    
-    // 限制显示最近的10条警报
-    while (alertList.children.length > 10) {
-        alertList.removeChild(alertList.lastChild);
+    // 更新位置信息
+    updateLocationInfo2(index);
+}
+
+// 更新第二个摄像头的位置信息
+function updateLocationInfo2(index) {
+    const locationElement = document.getElementById('locationInfo2');
+    if (locationElement) {
+        let locationText = '未知位置';
+        
+        // 根据摄像头索引设置位置信息
+        if (index === 3) {
+            locationText = '内置摄像头';
+        } else if (index === 4) {
+            locationText = '外置摄像头1';
+        } else if (index === 5) {
+            locationText = '外置摄像头2';
+        }
+        
+        locationElement.textContent = locationText;
     }
+}
+
+// 第二个摄像头窗口的启动函数
+let stream2 = null;
+async function startCamera2(deviceIndex = 0) {
+    const videoElement = document.getElementById('videoElement2');
+    if (!videoElement) return;
+    
+    try {
+        // 检查是否有可用摄像头
+        if (typeof availableCameras !== 'undefined' && availableCameras.length === 0) {
+            console.log('没有检测到摄像头');
+            setAIStatusText2('无可用摄像头');
+            if (document.getElementById('locationInfo2')) {
+                document.getElementById('locationInfo2').textContent = '无摄像头连接';
+            }
+            return;
+        }
+        
+        // 如果已有流，先停止
+        if (stream2) {
+            stream2.getTracks().forEach(track => track.stop());
+        }
+        
+        // 获取视频设备列表
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        // 检查设备索引是否有效
+        const isValidIndex = deviceIndex >= 0 && deviceIndex < videoDevices.length;
+        
+        let constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: false
+        };
+        
+        // 如果设备索引有效，使用指定设备
+        if (isValidIndex) {
+            constraints.video.deviceId = { exact: videoDevices[deviceIndex].deviceId };
+            console.log(`使用摄像头设备 ${deviceIndex}: ${videoDevices[deviceIndex].label}`);
+        } else {
+            // 如果索引无效，使用默认设备并提示
+            console.log(`摄像头设备 ${deviceIndex} 不可用，使用默认摄像头`);
+            if (deviceIndex > 0) {
+                alert(`摄像头 ${deviceIndex} 不可用，请检查设备连接`);
+            }
+        }
+        
+        // 请求摄像头访问权限
+        stream2 = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // 设置视频源
+        videoElement.srcObject = stream2;
+        
+        // 更新UI显示
+        updateCameraStatus2(true);
+        if (document.getElementById('locationInfo2')) {
+            updateLocationInfo2(deviceIndex + 3);
+        }
+        
+        console.log('第二个摄像头已启动');
+    } catch (error) {
+        console.error('启动第二个摄像头错误:', error);
+        setAIStatusText2('摄像头访问失败');
+        updateCameraStatus2(false);
+        
+        if (document.getElementById('locationInfo2')) {
+            document.getElementById('locationInfo2').textContent = '摄像头连接失败';
+        }
+        
+        // 如果是因为没有权限
+        if (error.name === 'NotAllowedError') {
+            alert('请允许访问摄像头以使用AI检测功能');
+        } else if (error.name === 'OverconstrainedError') {
+            // 如果是设备约束问题，尝试使用默认设备
+            console.log('摄像头设备约束错误，尝试使用默认摄像头');
+            try {
+                stream2 = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: false 
+                });
+                videoElement.srcObject = stream2;
+                updateCameraStatus2(true);
+            } catch (e) {
+                console.error('默认摄像头也无法启动:', e);
+            }
+        }
+    }
+}
+
+// 停止第二个摄像头
+function stopCamera2() {
+    if (stream2) {
+        stream2.getTracks().forEach(track => track.stop());
+        stream2 = null;
+    }
+    
+    const videoElement = document.getElementById('videoElement2');
+    if (videoElement && videoElement.srcObject) {
+        videoElement.srcObject = null;
+    }
+    
+    updateCameraStatus2(false);
+}
+
+// 更新第二个摄像头状态
+function updateCameraStatus2(isActive) {
+    const statusElement = document.getElementById('cameraStatus2');
+    if (statusElement) {
+        statusElement.textContent = isActive ? '已连接' : '未连接';
+        statusElement.style.color = isActive ? '#4CAF50' : '#F44336';
+    }
+    
+    // 更新在线摄像头计数
+    updateOnlineCameras();
 }
 
 // 更新检测率
@@ -926,56 +870,334 @@ function loadVideoList() {
     }
 }
 
-// 页面加载时初始化
+// 页面加载完成后自动检测并选择摄像头
 document.addEventListener('DOMContentLoaded', function() {
-    try {
-        console.log('页面加载完成，开始初始化...');
-        
-        // 安全获取DOM元素的辅助函数
-        function safeGetElement(id) {
-            const el = document.getElementById(id);
-            if (!el) console.warn(`找不到元素: ${id}`);
-            return el;
-        }
-        
-        // 初始化页面
-        loadVideoList();
-        
-        // 初始化摄像头选择按钮
-        const cameraBtn0 = safeGetElement('cameraBtn0');
-        if (cameraBtn0) {
-            cameraBtn0.classList.add('active'); // 默认选中内置摄像头
-        }
-        
-        console.log('开始加载视频列表...');
-        
-        // 在页面加载后延迟2秒启动定时分析，给摄像头足够的启动时间
-        setTimeout(() => {
-            try {
-                // 设置定时分析，每2秒分析一次
-                setInterval(() => {
-                    if (streams[1]) {  // 确保摄像头已启动
-                        processCameraFrame();
-                    }
-                }, 2000);
-            } catch (e) {
-                console.error(' 设置定时分析出错:', e);
-            }
-        }, 2000);
-
-        // 在页面加载后检查页面状态
-        setTimeout(checkPageStatus, 1000);
-        
-        // 自动开启AI推理
-        setTimeout(() => {
-            try {
-                // 直接调用processCameraFrame，而不是toggleAI
-                processCameraFrame();
-            } catch (err) {
-                console.error('启动分析出错:', err);
-            }
-        }, 3000);
-    } catch (err) {
-        console.error('页面初始化出错:', err);
+    console.log('页面加载完成，检测摄像头');
+    
+    // 默认选择第一个摄像头
+    if (document.getElementById('cameraBtn0')) {
+        document.getElementById('cameraBtn0').classList.add('active');
     }
-}); 
+    
+    // 默认选择第二个摄像头窗口的摄像头
+    if (document.getElementById('cameraBtn3')) {
+        document.getElementById('cameraBtn3').classList.add('active');
+    }
+    
+    // 启动默认摄像头
+    startCamera(0);
+    startCamera2(0);
+});
+
+// 枚举视频设备
+async function enumerateVideoDevices() {
+    try {
+        console.log('枚举视频设备...');
+        
+        // 检查是否支持mediaDevices
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            console.error('浏览器不支持枚举设备');
+            return;
+        }
+        
+        // 首先请求摄像头权限，否则可能无法获取设备名称
+        const hasPermission = await checkCameraPermission();
+        if (!hasPermission) {
+            console.warn('无法枚举设备：摄像头权限被拒绝');
+            return;
+        }
+        
+        // 获取所有媒体设备
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        
+        // 过滤出视频输入设备
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        console.log('找到视频设备:', videoDevices.length);
+        videoDevices.forEach((device, index) => {
+            console.log(`设备 ${index}: ID = ${device.deviceId.substr(0, 10)}..., 标签 = ${device.label || '无标签'}`);
+        });
+        
+        // 更新设备选择按钮
+        updateCameraButtons(videoDevices);
+        
+        return videoDevices;
+    } catch (error) {
+        console.error('枚举视频设备出错:', error);
+        return [];
+    }
+}
+
+// 更新摄像头选择按钮
+function updateCameraButtons(videoDevices) {
+    // 对于第一个摄像头窗口的按钮
+    const buttons1 = [
+        document.getElementById('cameraBtn0'),
+        document.getElementById('cameraBtn1'), 
+        document.getElementById('cameraBtn2')
+    ];
+    
+    // 对于第二个摄像头窗口的按钮
+    const buttons2 = [
+        document.getElementById('cameraBtn3'),
+        document.getElementById('cameraBtn4'), 
+        document.getElementById('cameraBtn5')
+    ];
+    
+    // 如果没有发现摄像头
+    if (videoDevices.length === 0) {
+        console.warn('未发现摄像头设备');
+        // 禁用所有按钮，除了默认的
+        buttons1.forEach((btn, index) => {
+            if (btn && index > 0) {
+                btn.disabled = true;
+                btn.title = '未找到此摄像头';
+            }
+        });
+        buttons2.forEach((btn, index) => {
+            if (btn && index > 0) {
+                btn.disabled = true;
+                btn.title = '未找到此摄像头';
+            }
+        });
+        return;
+    }
+    
+    // 根据实际设备数量启用按钮
+    videoDevices.forEach((device, index) => {
+        // 第一个摄像头窗口最多显示三个摄像头
+        if (index < 3 && buttons1[index]) {
+            buttons1[index].disabled = false;
+            buttons1[index].title = device.label || `摄像头 ${index+1}`;
+        }
+        
+        // 第二个摄像头窗口也最多三个，但按钮索引从3开始
+        if (index < 3 && buttons2[index]) {
+            buttons2[index].disabled = false;
+            buttons2[index].title = device.label || `摄像头 ${index+1}`;
+        }
+    });
+    
+    // 禁用超出实际设备数量的按钮
+    for (let i = videoDevices.length; i < 3; i++) {
+        if (buttons1[i]) {
+            buttons1[i].disabled = true;
+            buttons1[i].title = '未找到此摄像头';
+        }
+        if (buttons2[i]) {
+            buttons2[i].disabled = true;
+            buttons2[i].title = '未找到此摄像头';
+        }
+    }
+}
+
+// 处理第二个摄像头当前帧
+function processCameraFrame2() {
+    if (!streams[3]) {
+        console.error('摄像头2未启动');
+        return;
+    }
+    
+    const video = document.getElementById('video3');
+    
+    // 创建一个临时canvas用于捕获视频帧
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = video.videoWidth;
+    tempCanvas.height = video.videoHeight;
+    
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+    
+    // 将canvas内容转为base64
+    const imageData = tempCanvas.toDataURL('image/jpeg');
+    
+    // 显示加载状态
+    const aiStatus = document.getElementById('aiStatus2');
+    if (aiStatus) {
+        aiStatus.textContent = "正在分析...";
+        aiStatus.style.color = "#1890ff";
+    }
+    
+    const status2El = document.getElementById('status4');
+    if (status2El) {
+        status2El.textContent = "分析中";
+        status2El.className = "status online";
+    }
+    
+    // 发送到服务器进行分析
+    fetch('/process_camera_frame', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            image: imageData,
+            camera_id: 2  // 指定是第二个摄像头
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // 更新分析结果
+            let detectionCountValue = data.detection_count || 0;
+            
+            if (aiStatus) {
+                aiStatus.textContent = `检测到${detectionCountValue}个目标`;
+            }
+            
+            if (status2El) {
+                status2El.textContent = `已完成分析`;
+            }
+            
+            // 显示结果图像
+            const resultImage = new Image();
+            resultImage.onload = function() {
+                const canvas = document.getElementById('canvas3');
+                if (!canvas) return;
+                
+                canvas.width = resultImage.width;
+                canvas.height = resultImage.height;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(resultImage, 0, 0, canvas.width, canvas.height);
+                
+                // 设置检测框和标签
+                drawDetectionBoxes(canvas, data.detections);
+            };
+            
+            // 使用服务器返回的结果图像URL
+            if (data.result_image) {
+                resultImage.src = data.result_image;
+            }
+            
+            // 更新检测计数
+            detectionCount += data.detection_count;
+            const now = new Date();
+            lastMinuteDetections.push({
+                time: now,
+                count: data.detection_count
+            });
+            
+            // 只有检测到占道经营时才添加警报并保存到数据库
+            if (data.detection_count > 0) {
+                const type = data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位';
+                addAlert(2, type, data.detections[0]?.confidence || 0.8);
+                
+                // 保存检测结果到数据库
+                saveDetectionResult(data, 2);  // 传入摄像头ID
+            }
+            
+            // 更新检测类型显示
+            updateDetectionTypeDisplay2(data.detect_type);
+        } else {
+            if (aiStatus) {
+                aiStatus.textContent = `分析失败: ${data.message}`;
+                aiStatus.style.color = "#ff4d4f";
+            }
+            
+            if (status2El) {
+                status2El.textContent = "分析失败";
+                status2El.className = "status";
+            }
+        }
+    })
+    .catch(error => {
+        console.error('分析错误:', error);
+        
+        if (aiStatus) {
+            aiStatus.textContent = "分析出错";
+            aiStatus.style.color = "#ff4d4f";
+        }
+        
+        if (status2El) {
+            status2El.textContent = "错误";
+            status2El.className = "status";
+        }
+    });
+}
+
+// 更新第二个AI分析窗口的检测类型显示
+function updateDetectionTypeDisplay2(detectType) {
+    const videoStatus4 = safeGetElement('videoStatus4');
+    if (!videoStatus4) return;
+    
+    if (detectType === 'zdjy_ld') {
+        videoStatus4.textContent = "检测到流动摊位";
+        videoStatus4.style.backgroundColor = 'rgba(255, 77, 79, 0.8)';
+    } else if (detectType === 'zdjy_gd') {
+        videoStatus4.textContent = "检测到固定摊位";
+        videoStatus4.style.backgroundColor = 'rgba(82, 196, 26, 0.8)';
+    } else {
+        videoStatus4.textContent = "未检测到摊位";
+        videoStatus4.style.backgroundColor = 'rgba(24, 144, 255, 0.8)';
+    }
+}
+
+// 保存检测结果到数据库 (修改为支持指定摄像头ID)
+function saveDetectionResult(data, cameraId = 1) {
+    // 确保只有当检测到占道经营时才保存
+    if (!data || !data.detection_count || data.detection_count <= 0) {
+        console.log('未检测到占道经营，不保存数据');
+        return;
+    }
+    
+    console.log('检测到占道经营，准备保存结果');
+    
+    // 发送保存请求
+    fetch('/save_detection_result', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            detection_data: data,
+            timestamp: new Date().toISOString(),
+            camera_id: cameraId, // 使用传入的摄像头ID
+            detection_type: data.detect_type,
+            confidence: data.detections[0]?.confidence || 0
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.status === 'success') {
+            console.log('检测结果保存成功:', result.message);
+        } else {
+            console.error('检测结果保存失败:', result.message);
+        }
+    })
+    .catch(error => {
+        console.error('保存检测结果时出错:', error);
+    });
+}
+
+// 更新检测率
+function updateDetectionRate() {
+    const now = Date.now();
+    // 移除超过一分钟的检测记录
+    lastMinuteDetections = lastMinuteDetections.filter(detection => {
+        return (now - detection.time.getTime()) <= 60000;
+    });
+    
+    const rate = lastMinuteDetections.reduce((sum, detection) => sum + detection.count, 0);
+    
+    const detectionRateEl = safeGetElement('detectionRate');
+    if (detectionRateEl) {
+        detectionRateEl.textContent = `${rate}次/分钟`;
+    }
+}
+
+// 更新检测率
+function updateDetectionRate() {
+    const now = Date.now();
+    // 移除超过一分钟的检测记录
+    lastMinuteDetections = lastMinuteDetections.filter(detection => {
+        return (now - detection.time.getTime()) <= 60000;
+    });
+    
+    const rate = lastMinuteDetections.reduce((sum, detection) => sum + detection.count, 0);
+    
+    const detectionRateEl = safeGetElement('detectionRate');
+    if (detectionRateEl) {
+        detectionRateEl.textContent = `${rate}次/分钟`;
+    }
+} 

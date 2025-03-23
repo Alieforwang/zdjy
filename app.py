@@ -83,37 +83,56 @@ class DecimalEncoder(json.JSONEncoder):
 global_model = None
 
 def get_model():
-    """获取全局模型实例，如果不存在则加载"""
-    global global_model
+    """
+    获取或初始化YOLO模型
+    """
+    global global_model, device
+    
     if global_model is None:
-        model_path = os.path.join('models', 'best.pt')
-        if os.path.exists(model_path):
-            try:
-                # 尝试检测是否有GPU可用
-                try:
-                    import torch
-                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-                    logger.info(f"自动选择设备: {device}")
-                except ImportError:
-                    device = 'cpu'
-                    logger.info("无法导入torch，使用CPU设备")
-                
-                # 加载模型，允许自动回退到CPU
-                # YOLO类初始化不接受device参数
-                global_model = YOLO(model_path)
-                # 设置全局模型使用检测到的设备
-                if device == 'cuda' and torch.cuda.is_available():
-                    global_model.to('cuda')
-                    logger.info("模型已移动到CUDA设备")
-                
-                # 修正类别名映射，确保与训练时的标签顺序一致
-                # 根据训练数据，0-zdjy_gd（固定摊位），1-zdjy_ld（流动摊位）
-                global_model.names = {0: 'zdjy_gd', 1: 'zdjy_ld'}
-                logger.info(f"已修正模型类别映射: {global_model.names}")
-                
-                logger.info("模型加载成功")
-            except Exception as e:
-                logger.error(f"模型加载错误: {str(e)}")
+        logging.info("尝试加载YOLO模型...")
+        try:
+            # 确定当前工作目录和模型路径
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(base_dir, 'models', 'best.pt')
+            abs_model_path = os.path.abspath(model_path)
+            
+            logging.info(f"尝试加载模型，相对路径: {model_path}")
+            logging.info(f"尝试加载模型，绝对路径: {abs_model_path}")
+            
+            # 检查模型文件是否存在
+            if not os.path.exists(model_path):
+                logging.error(f"模型文件不存在: {model_path}")
+                # 如果文件不存在，返回None而不是抛出异常
+                return None
+            
+            # 检测设备类型
+            if device == 'cuda':
+                logging.info("使用CUDA设备加载模型")
+            else:
+                logging.info("使用CPU设备加载模型")
+            
+            # 初始化模型
+            from yolov8 import YOLOv8
+            global_model = YOLOv8(model_path, device=device)
+            
+            # 确保模型有正确的自定义类别名称映射
+            if not hasattr(global_model, 'custom_names') or not global_model.custom_names:
+                logging.info("设置模型的自定义类别名称映射")
+                global_model.custom_names = {
+                    0: '占道经营-固定摊位',
+                    1: '占道经营-流动摊位'
+                }
+                logging.info(f"已设置自定义类别名称映射: {global_model.custom_names}")
+            
+            logging.info(f"YOLO模型加载成功")
+            
+        except Exception as e:
+            logging.error(f"加载模型时出错: {str(e)}")
+            # 如果出现异常，设置global_model为None并返回None
+            global_model = None
+            return None
+    
+    # 返回初始化的模型
     return global_model
 
 app = Flask(__name__)
@@ -568,24 +587,157 @@ def analysis():
     # 直接渲染模板，不使用前端重定向
     return render_template('analysis.html', is_admin=session.get('is_admin', False))
 
+# 检测可用摄像头
+def detect_available_cameras():
+    """检测连接到系统的摄像头并返回它们的列表，区分不同的物理设备"""
+    try:
+        available_cameras = []
+        
+        # 确保物理设备名称不重复
+        found_devices = set()
+        
+        for i in range(10):  # 最多检测10个摄像头
+            try:
+                # 尝试打开摄像头
+                cap = cv2.VideoCapture(i)
+                
+                # 检查摄像头是否成功打开
+                if cap.isOpened():
+                    # 读取一帧以获取分辨率和设备信息
+                    ret, frame = cap.read()
+                    
+                    if ret:
+                        # 获取分辨率
+                        height, width, _ = frame.shape
+                        resolution = f"{width}x{height}"
+                        
+                        # 尝试获取设备名称（在某些系统上可用）
+                        device_name = f"摄像头{i+1}"
+                        try:
+                            device_name = cap.getBackendName() or f"摄像头{i+1}"
+                        except:
+                            pass
+                        
+                        # 创建唯一标识符
+                        device_id = f"camera_{i}_{width}x{height}"
+                        
+                        # 检查是否重复
+                        if device_id not in found_devices:
+                            found_devices.add(device_id)
+                            
+                            # 添加到列表
+                            camera_info = {
+                                "index": i,
+                                "resolution": resolution,
+                                "deviceId": device_id,
+                                "deviceName": device_name,
+                                "isBuiltin": i == 0  # 通常第一个摄像头是内置的
+                            }
+                            available_cameras.append(camera_info)
+                            logging.info(f"检测到摄像头 {i}: {device_name} ({resolution})")
+                    
+                    # 释放摄像头
+                    cap.release()
+            except Exception as e:
+                logging.error(f"检测摄像头{i}时出错: {str(e)}")
+                continue
+        
+        # 对摄像头进行排序，确保内置摄像头在前面
+        available_cameras.sort(key=lambda x: (0 if x.get('isBuiltin', False) else 1, x['index']))
+        
+        return available_cameras
+    except Exception as e:
+        logging.error(f"检测摄像头时出错: {str(e)}")
+        return []
+
 @app.route('/monitor')
 def monitor():
-    # 直接检查会话状态
+    # 检查用户是否已登录
     if 'user_id' not in session:
-        logger.warning("用户未登录，尝试访问监控页面")
+        flash('请先登录', 'error')
         return redirect(url_for('login'))
-    # 检查视频文件夹是否存在
-    video_folder = os.path.join('static', 'videos')
-    if not os.path.exists(video_folder):
-        os.makedirs(video_folder, exist_ok=True)
-        logger.info(f"创建视频文件夹: {video_folder}")
-    # 获取视频文件列表
-    video_files = []
-    for filename in os.listdir(video_folder):
-        if filename.lower().endswith(('.mp4', '.avi', '.mov')):
-            video_files.append(filename)
-    logger.info(f"找到 {len(video_files)} 个视频文件")
-    return render_template('monitor.html', is_admin=session.get('is_admin', False), video_files=video_files)
+    
+    try:
+        # 检测可用摄像头
+        try:
+            cameras = detect_available_cameras()
+            # 确保cameras是一个列表，否则提供默认值
+            if not isinstance(cameras, list):
+                logging.warning("摄像头检测结果不是列表，提供默认值")
+                cameras = []
+            # 硬编码添加一个默认摄像头，确保页面可以载入
+            if len(cameras) == 0:
+                cameras = [{
+                    "index": 0,
+                    "resolution": "640x480",
+                    "deviceId": "camera_0",
+                    "deviceName": "默认摄像头",
+                    "isBuiltin": True
+                }]
+        except Exception as cam_err:
+            logging.error(f"摄像头检测失败: {str(cam_err)}")
+            # 提供默认摄像头信息以确保页面可以加载
+            cameras = [{
+                "index": 0,
+                "resolution": "640x480",
+                "deviceId": "camera_0",
+                "deviceName": "默认摄像头",
+                "isBuiltin": True
+            }]
+            
+        camera_count = len(cameras)
+        logging.info(f"传递给前端的摄像头数量: {camera_count}")
+        for i, cam in enumerate(cameras):
+            logging.info(f"摄像头 {i}: 索引={cam['index']}, 名称={cam.get('deviceName', '未命名')}")
+        
+        # 将摄像头数据转换为安全的JSON字符串
+        import json
+        camera_data = json.dumps(cameras)
+        
+        # 获取当前用户信息 - 使用MySQL数据库连接而不是SQLite
+        is_admin = False
+        try:
+            db = DBM.DatabaseManager()
+            result = db.execute_query("SELECT is_admin FROM user WHERE id = %s", (session['user_id'],))
+            
+            if result and isinstance(result, list) and len(result) > 0:
+                if isinstance(result[0], (list, tuple)) and len(result[0]) > 0:
+                    is_admin = bool(result[0][0])
+                elif isinstance(result[0], dict) and 'is_admin' in result[0]:
+                    is_admin = bool(result[0]['is_admin'])
+        except Exception as db_err:
+            logging.error(f"获取用户权限信息出错: {str(db_err)}")
+            # 尝试从会话中获取管理员状态
+            is_admin = session.get('is_admin', False)
+        
+        # 记录成功访问日志
+        logging.info(f"用户 {session.get('username')} 访问监控页面")
+        
+        # 渲染监控页面，传递摄像头信息
+        return render_template('monitor.html', is_admin=is_admin, cameras=cameras, camera_count=camera_count, camera_data=camera_data)
+    except Exception as e:
+        logging.error(f"访问监控页面时出错: {str(e)}")
+        # 即使出错也尝试渲染页面，提供默认值
+        try:
+            # 跳过数据库查询，直接使用session中的is_admin信息
+            is_admin = session.get('is_admin', False)
+            
+            # 提供默认摄像头信息
+            cameras = [{
+                "index": 0,
+                "resolution": "640x480",
+                "deviceId": "camera_0",
+                "deviceName": "默认摄像头",
+                "isBuiltin": True
+            }]
+            camera_data = json.dumps(cameras)
+            
+            # 提供空摄像头列表作为默认值
+            return render_template('monitor.html', is_admin=is_admin, cameras=cameras, camera_count=1, camera_data=camera_data)
+        except Exception as e2:
+            logging.error(f"尝试渲染监控页面失败: {str(e2)}")
+            flash('系统错误，请稍后再试', 'error')
+            return redirect(url_for('index'))
 
 @app.route('/history')
 def history():
@@ -1320,59 +1472,180 @@ def about():
 
 @app.route('/analyze_frame', methods=['POST'])
 def analyze_frame():
-    if 'frame' not in request.files:
-        return jsonify({'success': False, 'message': '没有收到帧数据'})
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': '未授权访问'})
+    
+    if 'image' not in request.files:
+        return jsonify({'success': False, 'error': '没有收到图像数据'})
     
     try:
-        frame_file = request.files['frame']
-        frame_data = frame_file.read()
+        # 获取摄像头ID
+        camera_id = request.form.get('camera_id', '1')
+        
+        # 获取并处理上传的图像
+        image_file = request.files['image']
+        image_data = image_file.read()
         
         # 将二进制数据转换为numpy数组
-        nparr = np.frombuffer(frame_data, np.uint8)
+        nparr = np.frombuffer(image_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return jsonify({'success': False, 'error': '无法解码图像'})
+        
+        # 获取图像尺寸
+        height, width = frame.shape[:2]
         
         # 使用全局模型进行预测
         model = get_model()
         if model is None:
-            return jsonify({'success': False, 'message': '模型加载失败'})
+            return jsonify({'success': False, 'error': '模型加载失败'})
         
-        # 如果图像太大，调整大小以减少内存使用
-        height, width = frame.shape[:2]
-        if height > 1000 or width > 1000:
-            scale = min(1000 / height, 1000 / width)
-            new_size = (int(width * scale), int(height * scale))
-            frame = cv2.resize(frame, new_size, interpolation=cv2.INTER_AREA)
-            
-        # 进行预测
+        # 进行预测 - 使用YOLOv8接口
         results = model.predict(
-            source=frame,
-            save=False,
-            conf=0.25
-        )[0]
+            img=frame,
+            conf_threshold=0.3  # 置信度阈值
+        )
+        
+        # 检查是否有结果返回
+        if results is None or len(results) == 0:
+            return jsonify({
+                'success': True,
+                'detections': [],
+                'image_size': {
+                    'width': width,
+                    'height': height
+                },
+                'camera_id': camera_id,
+                'timestamp': datetime.now().isoformat()
+            })
+        
+        # 获取第一个结果
+        result = results[0]
         
         # 获取检测结果
         detections = []
-        if hasattr(results, 'boxes') and len(results.boxes) > 0:
-            for box in results.boxes:
+        if hasattr(result, 'boxes') and len(result.boxes) > 0:
+            for box in result.boxes:
+                # 获取边界框坐标
                 x1, y1, x2, y2 = map(float, box.xyxy[0])
+                # 归一化坐标(转为0-1范围)
+                norm_x1, norm_y1 = x1 / width, y1 / height
+                norm_x2, norm_y2 = x2 / width, y2 / height
+                norm_width = norm_x2 - norm_x1
+                norm_height = norm_y2 - norm_y1
+                
+                # 获取置信度和类别
                 confidence = float(box.conf[0])
                 cls = int(box.cls[0])
-                class_name = results.names[cls]
                 
-                detections.append({
-                    'bbox': [x1, y1, x2, y2],
-                    'class': class_name,
-                    'confidence': confidence
-                })
+                # 获取类别名称，优先使用自定义名称
+                if hasattr(result, 'custom_names') and cls in result.custom_names:
+                    class_name = result.custom_names[cls]
+                else:
+                    class_name = result.names[cls]
+                
+                # 只筛选出占道经营相关的两个类别
+                if '占道经营' in class_name or cls == 0 or cls == 1:
+                    # 添加到检测结果
+                    detections.append({
+                        'box': {
+                            'x': norm_x1,
+                            'y': norm_y1,
+                            'width': norm_width,
+                            'height': norm_height
+                        },
+                        'class': class_name,
+                        'confidence': confidence
+                    })
+                    
+                    # 记录检测结果
+                    logging.info(f"摄像头{camera_id}检测到{class_name}，置信度{confidence:.2f}")
         
+        # 如果检测到占道经营行为，记录到数据库 - 修改为所有占道经营检测都记录
+        if detections:
+            try:
+                # 保存当前帧 - 原始图像
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                detection_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'detections')
+                if not os.path.exists(detection_dir):
+                    os.makedirs(detection_dir)
+                
+                # 生成唯一文件名
+                unique_filename = f"camera_{camera_id}_{timestamp}.jpg"
+                image_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                cv2.imwrite(image_path, frame)
+                logger.info(f"保存摄像头原始图像: {image_path}")
+                
+                # 将检测结果绘制到图像上并保存结果图
+                result_img = result.plot()
+                result_filename = f"result_{unique_filename}"
+                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+                cv2.imwrite(result_path, result_img)
+                logger.info(f"保存分析结果图像: {result_path}")
+                
+                # 保存到数据库
+                try:
+                    db = DBM.DatabaseManager()
+                    db.connect()
+                    
+                    # 获取当前用户ID
+                    user_id = session.get('user_id')
+                    if not user_id:
+                        user_id = 1  # 默认用户ID，如果没有登录
+                    
+                    # 保存分析记录 - 使用analysis_records表
+                    insert_query = """
+                    INSERT INTO analysis_records 
+                    (user_id, file_type, file_path, result_path, result_folder, detect_type, confidence, created_at) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                    """
+                    
+                    # 设置默认值
+                    file_type = 'camera'
+                    
+                    # 确定检测类型
+                    detect_type = 'zdjy_gd'  # 默认固定摊位
+                    for detection in detections:
+                        if '流动' in detection['class']:
+                            detect_type = 'zdjy_ld'
+                            break
+                    
+                    # 计算平均置信度
+                    avg_confidence = 0.0
+                    if detections:
+                        avg_confidence = sum(d["confidence"] for d in detections) / len(detections)
+                    
+                    # 执行插入
+                    db.update_data(
+                        insert_query, 
+                        (user_id, file_type, image_path, result_filename, app.config['RESULT_FOLDER'], detect_type, avg_confidence)
+                    )
+                    
+                    logger.info(f"摄像头{camera_id}分析结果保存至数据库，检测类型：{detect_type}，置信度：{avg_confidence}")
+                    
+                    db.disconnect()
+                    
+                except Exception as db_err:
+                    logging.error(f"保存检测记录到数据库时出错: {str(db_err)}")
+            except Exception as save_err:
+                logging.error(f"保存检测图像时出错: {str(save_err)}")
+        
+        # 返回检测结果
         return jsonify({
             'success': True,
-            'detections': detections
+            'detections': detections,
+            'image_size': {
+                'width': width,
+                'height': height
+            },
+            'camera_id': camera_id,
+            'timestamp': datetime.now().isoformat()
         })
-        
+    
     except Exception as e:
-        print(f"分析帧错误: {str(e)}")
-        return jsonify({'success': False, 'message': str(e)})
+        logging.error(f"分析视频帧时出错: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/analysis/chart-data', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'])
 def get_chart_data():
@@ -2450,12 +2723,24 @@ def inference():
         # 转换为OpenCV格式
         image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         
+        # 获取模型
+        model = get_model()
+        if model is None:
+            return jsonify({'status': 'error', 'message': '模型加载失败'})
+            
         # 使用YOLOv8进行推理
-        results = model(image_cv, conf=0.25)
+        results = model.predict(img=image_cv, conf_threshold=0.25)
         
+        # 检查是否有结果
+        if results is None or len(results) == 0:
+            return jsonify({'status': 'success', 'detections': []})
+            
         # 处理检测结果
         detections = []
         for result in results:
+            if not hasattr(result, 'boxes') or len(result.boxes) == 0:
+                continue
+                
             boxes = result.boxes
             for box in boxes:
                 # 获取边界框坐标（归一化）
@@ -2469,8 +2754,21 @@ def inference():
                 cls = int(box.cls[0].cpu().numpy())
                 conf = float(box.conf[0].cpu().numpy())
                 
-                # 获取类别名称
-                class_name = model.names[cls]
+                # 获取类别名称，优先使用自定义名称
+                if hasattr(result, 'custom_names') and cls in result.custom_names:
+                    class_name = result.custom_names[cls]
+                    # 确保是占道经营类别
+                    if '占道经营' not in class_name:
+                        continue
+                else:
+                    # 只处理类别0和1，对应占道经营的两种类型
+                    if cls == 0:
+                        class_name = "占道经营-固定摊位"
+                    elif cls == 1:
+                        class_name = "占道经营-流动摊位"
+                    else:
+                        # 跳过非占道经营类别
+                        continue
                 
                 detections.append({
                     'x': x,
@@ -2481,7 +2779,9 @@ def inference():
                     'confidence': conf
                 })
         
-        # 渲染检测结果
+        # 渲染检测结果 (这里使用第一个结果)
+        # 注意：即使我们筛选了返回的检测结果，原始渲染图像仍包含所有检测
+        # 如果需要只渲染占道经营类别，应进行额外处理
         result_image = results[0].plot()
         
         # 将OpenCV图像转换为base64
@@ -2501,14 +2801,34 @@ def inference():
             'message': f'推理过程出错: {str(e)}'
         })
 
-# 全局变量，用于控制摄像头的开启和关闭
+# 设置全局变量
+frames = []
+frame_count = 0
 camera = None
+camera2 = None
 camera_active = False
+camera2_active = False
+global_model = None  # 全局YOLO模型实例
+
+# 检测设备类型
+try:
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"推理设备: {device}")
+except ImportError:
+    device = 'cpu'
+    logger.info("无法导入torch，使用CPU设备")
 
 @app.route('/video_feed')
 def video_feed():
     """视频流路由，用于提供摄像头实时流"""
     return Response(gen_frames(), 
+                   mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/video_feed2')
+def video_feed2():
+    """视频流路由，用于提供第二个摄像头实时流"""
+    return Response(gen_frames2(), 
                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def gen_frames():
@@ -2539,6 +2859,34 @@ def gen_frames():
         camera.release()
         camera = None
 
+def gen_frames2():
+    """生成第二个摄像头帧的生成器函数"""
+    global camera2, camera2_active
+    
+    # 初始化摄像头
+    if camera2 is None:
+        camera2 = cv2.VideoCapture(1)  # 1表示第二个摄像头
+        camera2_active = True
+        
+    while camera2_active:
+        success, frame = camera2.read()
+        if not success:
+            break
+        else:
+            # 可选：在这里添加实时分析逻辑
+            # 例如：frame = process_frame(frame)
+            
+            # 将帧转换为JPEG格式
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                  b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    
+    # 如果退出循环，释放摄像头资源
+    if camera2 is not None:
+        camera2.release()
+        camera2 = None
+
 @app.route('/start_camera')
 def start_camera():
     """启动摄像头"""
@@ -2555,6 +2903,23 @@ def stop_camera():
         camera.release()
         camera = None
     return jsonify({"status": "success", "message": "摄像头已停止"})
+
+@app.route('/start_camera2')
+def start_camera2():
+    """启动第二个摄像头"""
+    global camera2_active
+    camera2_active = True
+    return jsonify({"status": "success", "message": "第二个摄像头已启动"})
+
+@app.route('/stop_camera2')
+def stop_camera2():
+    """停止第二个摄像头"""
+    global camera2_active, camera2
+    camera2_active = False
+    if camera2 is not None:
+        camera2.release()
+        camera2 = None
+    return jsonify({"status": "success", "message": "第二个摄像头已停止"})
 
 @app.route('/process_camera_frame', methods=['POST'])
 def process_camera_frame():
@@ -2583,7 +2948,13 @@ def process_camera_frame():
         
         # 使用YOLO模型进行推理
         logger.info(f"开始分析图像: {filepath}")
-        results = model(image_cv, conf=0.25)
+        # 从全局获取模型
+        model = get_model()
+        if model is None:
+            return jsonify({"status": "error", "message": "模型加载失败"}), 400
+            
+        # 使用YOLOv8类的预测接口
+        results = model.predict(img=image_cv, conf_threshold=0.25)
         
         if results is None or len(results) == 0:
             return jsonify({"status": "error", "message": "No detection results"}), 400
@@ -2606,28 +2977,45 @@ def process_camera_frame():
         
         # 根据绘制结果判断检测类型
         # 默认检测类型为固定摊位(zdjy_gd)
-        detect_type = 'zdjy_gd'
+        detect_type = None
         
         for i in range(len(boxes)):
             box = boxes[i]
             cls_id = int(classes[i])
             conf = float(confs[i])
             
-            # 修正检测类型逻辑，根据训练顺序调整
-            # 训练模型时的标签顺序：0-zdjy_gd（固定摊位），1-zdjy_ld（流动摊位）
-            if cls_id == 0:  # 类别0对应固定摊位(zdjy_gd)
-                name = "固定摊位"
-                cls_type = 'zdjy_gd'
-                # 确保总体类型也是正确的
-                detect_type = 'zdjy_gd'
-            elif cls_id == 1:  # 类别1对应流动摊位(zdjy_ld)
-                name = "流动摊位"
-                cls_type = 'zdjy_ld'
-                # 如果检测到流动摊位，则整体类型设为流动摊位
-                detect_type = 'zdjy_ld'
+            # 获取类别名称，优先使用自定义名称
+            if hasattr(result, 'custom_names') and cls_id in result.custom_names:
+                name = result.custom_names[cls_id]
+                # 检查是否为占道经营类别
+                if '占道经营' not in name:
+                    continue
+                
+                # 提取类型
+                if '固定' in name:
+                    cls_type = 'zdjy_gd'
+                    detect_type = 'zdjy_gd'
+                elif '流动' in name:
+                    cls_type = 'zdjy_ld'
+                    detect_type = 'zdjy_ld'
+                else:
+                    # 跳过非占道经营类别
+                    continue
             else:
-                name = f"未知类别-{cls_id}"
-                cls_type = 'other'
+                # 确保只处理占道经营相关的类别（类别0和1）
+                if cls_id == 0:  # 类别0对应固定摊位(zdjy_gd)
+                    name = "占道经营-固定摊位"
+                    cls_type = 'zdjy_gd'
+                    # 确保总体类型也是正确的
+                    detect_type = 'zdjy_gd'
+                elif cls_id == 1:  # 类别1对应流动摊位(zdjy_ld)
+                    name = "占道经营-流动摊位"
+                    cls_type = 'zdjy_ld'
+                    # 如果检测到流动摊位，则整体类型设为流动摊位
+                    detect_type = 'zdjy_ld'
+                else:
+                    # 跳过非占道经营类别
+                    continue
             
             detections.append({
                 "box": [float(x) for x in box],
@@ -2683,10 +3071,8 @@ def process_camera_frame():
             "status": "success",
             "message": "摄像头图像分析完成",
             "result_image": url_for('get_result', filename=result_filename),
-            "uploaded_image": url_for('get_upload', filename=unique_filename),
             "detections": detections,
-            "detection_count": len(detections),
-            "detect_type": detect_type
+            "detect_type": detect_type if detections else "none"
         })
         
     except Exception as e:
@@ -3290,3 +3676,21 @@ accesslog = "access.log"
 errorlog = "error.log"
 loglevel = "warning"
 """
+
+@app.route('/api/available_cameras', methods=['GET'])
+def get_available_cameras():
+    try:
+        cameras = detect_available_cameras()
+        return jsonify({
+            "status": "success",
+            "camera_count": len(cameras),
+            "cameras": cameras
+        })
+    except Exception as e:
+        logging.error(f"获取可用摄像头列表时出错: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "camera_count": 0,
+            "cameras": []
+        })

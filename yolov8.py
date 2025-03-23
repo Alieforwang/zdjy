@@ -10,6 +10,7 @@ import queue
 import logging
 import traceback
 import torch
+import argparse
 
 # 配置日志
 logging.basicConfig(
@@ -348,10 +349,52 @@ def predict_image(model, file_path):
 
 # 使用示例
 if __name__ == "__main__":
-    weights_path = "weights/best.pt"  # 替换为实际的模型路径
-    image_path = "tiaozhanbei/ceshitu/7.jpg"    # 替换为实际的图片路径
-    model = YOLO(weights_path)
-    predict_image(model, image_path)
+    # 这部分代码只在直接运行yolov8.py时执行，被导入时不会执行
+    
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='YOLOv8模型推理测试')
+    parser.add_argument('--weights', type=str, default="models/best.pt", help='模型权重文件路径')
+    parser.add_argument('--image', type=str, default=None, help='要预测的图像文件路径')
+    args = parser.parse_args()
+    
+    weights_path = args.weights
+    image_path = args.image
+    
+    # 确认模型文件是否存在
+    if not os.path.exists(weights_path):
+        print(f"错误：模型文件不存在: {weights_path}")
+        print(f"当前工作目录: {os.getcwd()}")
+        print(f"尝试绝对路径: {os.path.abspath(weights_path)}")
+        
+        # 尝试查找models目录下的其他pt文件
+        if os.path.exists("models"):
+            print("models目录存在，查找其中的模型文件:")
+            for file in os.listdir("models"):
+                if file.endswith(".pt"):
+                    print(f"找到模型文件: models/{file}")
+                    weights_path = os.path.join("models", file)
+                    break
+    
+    # 仅在提供了图像路径时才进行预测
+    if image_path and os.path.exists(image_path):
+        try:
+            print(f"尝试加载模型: {weights_path}")
+            model = YOLO(weights_path)
+            print(f"开始预测图像: {image_path}")
+            predict_image(model, image_path)
+            print("预测完成")
+        except Exception as e:
+            print(f"加载模型或预测时出错: {str(e)}")
+            traceback.print_exc()
+    else:
+        # 如果没有提供图像路径，只测试模型加载
+        try:
+            print(f"尝试加载模型: {weights_path}")
+            model = YOLO(weights_path)
+            print(f"模型加载成功。模型类别: {model.names}")
+        except Exception as e:
+            print(f"加载模型时出错: {str(e)}")
+            traceback.print_exc()
 
 class YOLOv8:
     def __init__(self, weights, device='cpu', load_params=None):
@@ -395,11 +438,28 @@ class YOLOv8:
             else:
                 logger.info("模型已加载到CPU设备")
             
+            # 记录模型原始类别映射
+            self.original_names = self.model.names.copy() if hasattr(self.model, 'names') else {}
+            logger.info(f"模型原始类别映射: {self.original_names}")
+            
+            # 创建自定义类别名称映射，但不修改原始模型的属性
+            self.custom_names = {}
+            
+            # 针对占道经营检测的模型，定义自定义类别名称
+            if len(self.original_names) == 2:
+                # 默认的占道经营类别映射
+                self.custom_names = {
+                    0: '占道经营-固定摊位',
+                    1: '占道经营-流动摊位'
+                }
+                logger.info(f"已创建自定义类别映射: {self.custom_names}")
+            
             # 记录模型加载完成
             logger.info(f"YOLOv8模型加载完成")
             
         except Exception as e:
             logger.error(f"YOLOv8模型加载失败: {str(e)}")
+            traceback.print_exc()
             raise
 
     def predict(self, img, conf_threshold=0.25):
@@ -423,12 +483,41 @@ class YOLOv8:
                     logger.error(f"无法读取图像文件: {img}")
                     return None
             
+            # 验证图像数据
+            if img is None:
+                logger.error("输入图像数据为空")
+                return None
+                
+            if not isinstance(img, np.ndarray):
+                logger.error(f"图像数据类型不正确: {type(img)}")
+                return None
+                
+            # 检查图像维度
+            if len(img.shape) != 3:
+                logger.error(f"图像维度不正确: {img.shape}")
+                return None
+                
+            logger.info(f"开始预测，图像尺寸: {img.shape}, 置信度阈值: {conf_threshold}")
+            
             # 进行预测
             results = self.model(img, conf=conf_threshold, verbose=False)
             
             # 计算处理时间
             process_time = (cv2.getTickCount() - start_time) / cv2.getTickFrequency()
             logger.info(f"YOLOv8处理时间: {process_time:.4f}秒")
+            
+            # 检查结果
+            if results is None or len(results) == 0:
+                logger.warning("模型未返回任何检测结果")
+            else:
+                logger.info(f"检测到 {len(results)} 个结果")
+                
+                # 如果有自定义类别名称，应用到结果中
+                if self.custom_names:
+                    for result in results:
+                        # 创建结果的names属性副本
+                        if not hasattr(result, 'custom_names'):
+                            result.custom_names = self.custom_names
             
             # 返回结果
             return results
