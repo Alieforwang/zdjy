@@ -383,6 +383,109 @@
             border-color: #1890ff;
             color: white;
         }
+        
+        /* 开关按钮样式 */
+        .camera-switch-container {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-right: 10px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+        
+        input:checked + .slider {
+            background-color: #52c41a;
+        }
+        
+        input:focus + .slider {
+            box-shadow: 0 0 1px #52c41a;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .slider.round {
+            border-radius: 24px;
+        }
+        
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        
+        .switch-label {
+            font-size: 0.9rem;
+            color: #e6e6e6;
+        }
+        
+        /* 全屏模式下的样式 */
+        .fullscreen-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .fullscreen-video video,
+        .fullscreen-video canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+        
+        .exit-fullscreen {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 77, 79, 0.8);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            z-index: 10000;
+        }
 </style>
 </head>
 <body class="monitor-page">
@@ -472,6 +575,14 @@
                                     disabled>停止</button>
                                 <button type="button" id="snapBtn1" class="btn btn-primary" onclick="logFaceDetection()">智能分析</button>
                             </div>
+                            <!-- 添加开关按钮 -->
+                            <div class="camera-switch-container mt-2">
+                                <label class="switch">
+                                    <input type="checkbox" id="cameraSwitch1" onchange="toggleCamera(1, this.checked)">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="switch-label">摄像头开关</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -539,6 +650,14 @@
                                 <button type="button" id="stopBtn2" class="btn btn-danger" onclick="stopCamera('video2')"
                                     disabled>停止</button>
                                 <button type="button" id="snapBtn2" class="btn btn-primary" onclick="logFaceDetection()">智能分析</button>
+                            </div>
+                            <!-- 添加开关按钮 -->
+                            <div class="camera-switch-container mt-2">
+                                <label class="switch">
+                                    <input type="checkbox" id="cameraSwitch2" onchange="toggleCamera(2, this.checked)">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="switch-label">摄像头开关</span>
                             </div>
                         </div>
                     </div>
@@ -666,6 +785,158 @@
         let lastAnalysisTime = Date.now();
         let analysisInterval1 = null;
         let analysisInterval2 = null;
+        
+        // 摄像头开关控制函数
+        function toggleCamera(cameraId, isOn) {
+            console.log(`摄像头${cameraId}开关状态: ${isOn}`);
+            
+            if (isOn) {
+                // 启动摄像头
+                if (cameraId === 1) {
+                    startCamera1();
+                    // 更新启动按钮状态
+                    document.getElementById('startBtn1').disabled = true;
+                    document.getElementById('stopBtn1').disabled = false;
+                } else if (cameraId === 2) {
+                    startCamera2();
+                    // 更新启动按钮状态
+                    document.getElementById('startBtn2').disabled = true;
+                    document.getElementById('stopBtn2').disabled = false;
+                }
+            } else {
+                // 停止摄像头
+                if (cameraId === 1) {
+                    stopCamera('video1');
+                    // 更新启动按钮状态
+                    document.getElementById('startBtn1').disabled = false;
+                    document.getElementById('stopBtn1').disabled = true;
+                } else if (cameraId === 2) {
+                    stopCamera('video2');
+                    // 更新启动按钮状态
+                    document.getElementById('startBtn2').disabled = false;
+                    document.getElementById('stopBtn2').disabled = true;
+                }
+            }
+        }
+        
+        // 改进的全屏切换函数
+        function toggleFullscreen(elementId) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            // 检查当前是否已经是全屏状态
+            const isFullscreen = document.fullscreenElement || 
+                              document.webkitFullscreenElement || 
+                              document.mozFullScreenElement || 
+                              document.msFullscreenElement;
+            
+            if (!isFullscreen) {
+                // 创建全屏容器
+                const fullscreenContainer = document.createElement('div');
+                fullscreenContainer.className = 'fullscreen-video';
+                fullscreenContainer.id = 'fullscreenContainer';
+                
+                // 克隆视频或画布元素
+                const clonedElement = element.cloneNode(true);
+                clonedElement.id = elementId + 'Fullscreen';
+                
+                // 添加退出全屏按钮
+                const exitButton = document.createElement('button');
+                exitButton.className = 'exit-fullscreen';
+                exitButton.innerHTML = '退出全屏';
+                exitButton.onclick = exitFullscreen;
+                
+                // 添加到容器
+                fullscreenContainer.appendChild(clonedElement);
+                fullscreenContainer.appendChild(exitButton);
+                
+                // 添加到body
+                document.body.appendChild(fullscreenContainer);
+                
+                // 如果是canvas，绘制内容
+                if (element.tagName.toLowerCase() === 'canvas') {
+                    const srcCtx = element.getContext('2d');
+                    const dstCtx = clonedElement.getContext('2d');
+                    clonedElement.width = element.width;
+                    clonedElement.height = element.height;
+                    dstCtx.drawImage(element, 0, 0);
+                    
+                    // 如果是分析结果，持续更新画布内容
+                    if (elementId === 'canvas1' || elementId === 'canvas3') {
+                        window.fullscreenUpdateInterval = setInterval(() => {
+                            dstCtx.clearRect(0, 0, clonedElement.width, clonedElement.height);
+                            dstCtx.drawImage(element, 0, 0);
+                        }, 100);
+                    }
+                }
+                
+                // 请求浏览器全屏
+                if (fullscreenContainer.requestFullscreen) {
+                    fullscreenContainer.requestFullscreen();
+                } else if (fullscreenContainer.webkitRequestFullscreen) {
+                    fullscreenContainer.webkitRequestFullscreen();
+                } else if (fullscreenContainer.mozRequestFullScreen) {
+                    fullscreenContainer.mozRequestFullScreen();
+                } else if (fullscreenContainer.msRequestFullscreen) {
+                    fullscreenContainer.msRequestFullscreen();
+                }
+            } else {
+                exitFullscreen();
+            }
+        }
+        
+        // 退出全屏函数
+        function exitFullscreen() {
+            // 清除更新间隔
+            if (window.fullscreenUpdateInterval) {
+                clearInterval(window.fullscreenUpdateInterval);
+                window.fullscreenUpdateInterval = null;
+            }
+            
+            // 退出浏览器全屏模式
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            
+            // 移除全屏容器
+            const container = document.getElementById('fullscreenContainer');
+            if (container) {
+                container.remove();
+            }
+        }
+        
+        // 全屏改变事件监听
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+        
+        // 处理全屏状态变化
+        function handleFullscreenChange() {
+            const isFullscreen = document.fullscreenElement || 
+                              document.webkitFullscreenElement || 
+                              document.mozFullScreenElement || 
+                              document.msFullscreenElement;
+            
+            if (!isFullscreen) {
+                // 如果不是全屏状态，但容器还在，则移除它
+                const container = document.getElementById('fullscreenContainer');
+                if (container) {
+                    // 清除更新间隔
+                    if (window.fullscreenUpdateInterval) {
+                        clearInterval(window.fullscreenUpdateInterval);
+                        window.fullscreenUpdateInterval = null;
+                    }
+                    container.remove();
+                }
+            }
+        }
         
         // 确保startMonitorCamera函数在全局范围可用
         window.startMonitorCamera = function(cameraIndex, videoElementId) {
@@ -868,6 +1139,9 @@
         // 启动摄像头1
         function startCamera1() {
             window.startMonitorCamera(0, 'video1');
+            // 启用开关
+            const cameraSwitch = document.getElementById('cameraSwitch1');
+            if (cameraSwitch) cameraSwitch.checked = true;
         }
         
         // 启动摄像头2
@@ -875,6 +1149,9 @@
             // 只有存在第二个物理摄像头时才启动
             if (availableCameras.length > 1) {
                 window.startMonitorCamera(1, 'video2');
+                // 启用开关
+                const cameraSwitch = document.getElementById('cameraSwitch2');
+                if (cameraSwitch) cameraSwitch.checked = true;
             } else {
                 console.warn("没有第二个物理摄像头可用");
             }
@@ -885,6 +1162,12 @@
             stopCamera('video1');
             stopCamera('video2');
             stopAllAnalysis();
+            
+            // 更新开关状态
+            const cameraSwitch1 = document.getElementById('cameraSwitch1');
+            const cameraSwitch2 = document.getElementById('cameraSwitch2');
+            if (cameraSwitch1) cameraSwitch1.checked = false;
+            if (cameraSwitch2) cameraSwitch2.checked = false;
         }
         
         // 停止所有分析
@@ -912,9 +1195,15 @@
                     if (videoElementId === 'video1') {
                         videoStream1 = null;
                         stopAnalysis(1);
+                        // 更新开关状态
+                        const cameraSwitch = document.getElementById('cameraSwitch1');
+                        if (cameraSwitch) cameraSwitch.checked = false;
                     } else if (videoElementId === 'video2') {
                         videoStream2 = null;
                         stopAnalysis(2);
+                        // 更新开关状态
+                        const cameraSwitch = document.getElementById('cameraSwitch2');
+                        if (cameraSwitch) cameraSwitch.checked = false;
                     }
                 }
             } catch (error) {
