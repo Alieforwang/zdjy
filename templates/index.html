@@ -422,10 +422,7 @@
                 ],
                 typeDistribution: [
                     Math.floor(baseValue * 20 + 70),
-                    Math.floor(baseValue * 15 + 60),
-                    Math.floor(baseValue * 25 + 75),
-                    Math.floor(baseValue * 10 + 65),
-                    Math.floor(baseValue * 15 + 80)
+                    Math.floor(baseValue * 15 + 60)
                 ],
                 weather: {
                     type: currentWeather,
@@ -812,48 +809,49 @@
                 title: {
                     textStyle: { color: '#fff' }
                 },
-                radar: {
-                    indicator: [
-                        { name: '流动摊贩', max: 100 },
-                        { name: '店外', max: 100 },
-                        { name: '固定摊位', max: 100 },
-                        { name: '广告牌匾', max: 100 },
-                        { name: '其他', max: 100 }
-                    ],
-                    splitArea: {
-                        areaStyle: {
-                            color: ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
-                        }
-                    },
-                    axisLine: {
-                        lineStyle: {
-                            color: 'rgba(255,255,255,0.2)'
-                        }
-                    },
-                    splitLine: {
-                        lineStyle: {
-                            color: 'rgba(255,255,255,0.2)'
-                        }
+                tooltip: {
+                    trigger: 'item',
+                    formatter: '{a} <br/>{b}: {c} ({d}%)'
+                },
+                legend: {
+                    orient: 'vertical',
+                    right: 10,
+                    top: 'center',
+                    data: ['zdjy_ld 占道经营流动', '固定摊位摊位摊位摊位摊位'],
+                    textStyle: {
+                        color: '#fff',
+                        fontSize: 10
                     }
                 },
                 series: [{
-                    type: 'radar',
-                    data: [{
-                        value: [80, 65, 90, 70, 85],
-                        name: '违法分布',
-                        areaStyle: {
-                            color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-                                {
-                                    color: 'rgba(0, 255, 255, 0.5)',
-                                    offset: 0
-                                },
-                                {
-                                    color: 'rgba(0, 255, 255, 0)',
-                                    offset: 1
-                                }
-                            ])
+                    name: '违法分布',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: false,
+                        position: 'center'
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: 20,
+                            fontWeight: 'bold',
+                            color: '#fff'
                         }
-                    }]
+                    },
+                    labelLine: {
+                        show: false
+                    },
+                    data: [
+                        { value: 80, name: 'zdjy_ld 占道经营流动' },
+                        { value: 65, name: '固定摊位摊位摊位摊位摊位' }
+                    ]
                 }]
             });
 
@@ -936,10 +934,10 @@
             if (chart) {
                 chart.setOption({
                     series: [{
-                        data: [{
-                            value: data,
-                            name: '违法分布'
-                        }]
+                        data: [
+                            { value: data[0], name: 'zdjy_ld 占道经营流动' },
+                            { value: data[1], name: '固定摊位摊位摊位摊位摊位' }
+                        ]
                     }]
                 });
             }
@@ -1387,7 +1385,7 @@
                 },
                 yAxis: {
                     type: 'category',
-                    data: ['流动摊贩', '店外经营', '违规停车', '广告牌匾', '建筑材料'],
+                    data: ['zdjy_ld 占道经营流动', '固定摊位摊位摊位摊位'],
                     axisLabel: { 
                         color: '#fff',
                         fontSize: 10
@@ -1397,10 +1395,10 @@
                     {
                         name: '准确率',
                         type: 'bar',
-                        data: [95, 92, 88, 93, 90],
+                        data: [95, 92],
                         itemStyle: {
                             color: function(params) {
-                                const colors = ['#7cffb2', '#58d5ff', '#2b8cfe', '#188df0', '#1e9fff'];
+                                const colors = ['#7cffb2', '#58d5ff'];
                                 return colors[params.dataIndex];
                             }
                         }
