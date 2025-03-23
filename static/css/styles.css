@@ -200,7 +200,7 @@
 /* 装饰图片样式 */
 .left-decoration,
 .right-decoration {
-    width: 100px;
+    width: 266px;
     height: 75px;
     object-fit: contain;
     position: relative;
@@ -215,6 +215,7 @@
 
 .right-decoration {
     right: 120px;
+    margin-right: 20px;
 }
 
 /* .left-decoration:hover,

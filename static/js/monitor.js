@@ -19,34 +19,34 @@ let currentCameraIndex2 = 3;
     window.cameraSupported = false; // 默认假设不支持摄像头
     
     try {
-        // 确保老旧浏览器也能支持navigator.mediaDevices
-        if (navigator.mediaDevices === undefined) {
-            navigator.mediaDevices = {};
-            console.log('初始化mediaDevices对象');
-        }
-    
-        // 一些浏览器实现了部分mediaDevices，我们不能只分配getUserMedia
-        // 因为这会覆盖已有的属性
-        if (navigator.mediaDevices.getUserMedia === undefined) {
+    // 确保老旧浏览器也能支持navigator.mediaDevices
+    if (navigator.mediaDevices === undefined) {
+        navigator.mediaDevices = {};
+        console.log('初始化mediaDevices对象');
+    }
+
+    // 一些浏览器实现了部分mediaDevices，我们不能只分配getUserMedia
+    // 因为这会覆盖已有的属性
+    if (navigator.mediaDevices.getUserMedia === undefined) {
             // 首先获取老版本的getUserMedia
             var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia ||
-                               navigator.msGetUserMedia;
-    
+                              navigator.msGetUserMedia;
+
             if (!getUserMedia) {
                 console.error('浏览器不支持getUserMedia');
                 navigator.mediaDevices.getUserMedia = function(constraints) {
-                    return Promise.reject(new Error('浏览器不支持getUserMedia'));
+                return Promise.reject(new Error('浏览器不支持getUserMedia'));
                 };
             } else {
-                // 包装老版本API为Promise
+            // 包装老版本API为Promise
                 navigator.mediaDevices.getUserMedia = function(constraints) {
-                    return new Promise(function(resolve, reject) {
-                        getUserMedia.call(navigator, constraints, resolve, reject);
-                    });
+            return new Promise(function(resolve, reject) {
+                getUserMedia.call(navigator, constraints, resolve, reject);
+            });
                 };
                 window.cameraSupported = true;
-            }
-            console.log('添加getUserMedia polyfill');
+        }
+        console.log('添加getUserMedia polyfill');
         } else {
             window.cameraSupported = true;
         }

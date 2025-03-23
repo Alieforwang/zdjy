@@ -327,11 +327,15 @@ input:checked + .slider:before {
 /* 装饰图片样式 */
 .left-decoration,
 .right-decoration {
-    width: 100px;
+    width: 266px;
     height: 75px;
     object-fit: contain;
     margin: 0;
     transition: transform 0.3s ease;
+}
+
+.right-decoration {
+    margin-right: 20px;
 }
 
 .left-decoration:hover,
