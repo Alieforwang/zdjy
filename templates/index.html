@@ -402,30 +402,26 @@
 
         // 生成更丰富的随机数据
         function generateRealisticData() {
-            const baseValue = Math.random();
-            const timeOfDay = new Date().getHours();
-            const weatherTypes = ['晴', '多云', '小雨', '大雨'];
-            const currentWeather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
-            
-            return {
+            // 使用缓存的真实数据或默认数据
+            return window.realData || {
                 totalViolations: Math.floor(2800 + Math.random() * 100),
                 todayViolations: Math.floor(120 + Math.random() * 20),
                 handleRate: (95 + Math.random() * 2).toFixed(1),
                 avgResponse: (3 + Math.random()).toFixed(1),
                 hourlyData: Array.from({length: 24}, () => Math.floor(Math.random() * 30 + 20)),
                 areaData: [
-                    { name: '五华区', value: Math.floor(baseValue * 100 + 60) },
-                    { name: '盘龙区', value: Math.floor(baseValue * 90 + 55) },
-                    { name: '官渡区', value: Math.floor(baseValue * 85 + 50) },
-                    { name: '西山区', value: Math.floor(baseValue * 95 + 45) },
-                    { name: '呈贡区', value: Math.floor(baseValue * 80 + 40) }
+                    { name: '五华区', value: Math.floor(Math.random() * 100 + 60) },
+                    { name: '盘龙区', value: Math.floor(Math.random() * 90 + 55) },
+                    { name: '官渡区', value: Math.floor(Math.random() * 85 + 50) },
+                    { name: '西山区', value: Math.floor(Math.random() * 95 + 45) },
+                    { name: '呈贡区', value: Math.floor(Math.random() * 80 + 40) }
                 ],
                 typeDistribution: [
-                    Math.floor(baseValue * 20 + 70),
-                    Math.floor(baseValue * 15 + 60)
+                    Math.floor(Math.random() * 20 + 70),
+                    Math.floor(Math.random() * 15 + 60)
                 ],
                 weather: {
-                    type: currentWeather,
+                    type: ['晴', '多云', '小雨', '大雨'][Math.floor(Math.random() * 4)],
                     temperature: Math.floor(15 + Math.random() * 20),
                     humidity: Math.floor(40 + Math.random() * 40),
                     correlation: Math.random() * 0.5 + 0.3
@@ -441,9 +437,9 @@
                     trend: Math.random() - 0.5
                 },
                 ai: {
-                    accuracy: Math.floor(90 + Math.random() * 8),
+                    accuracy: data.aiAnalysis[0]?.confidence || 95,
                     falsePositive: Math.floor(Math.random() * 5),
-                    confidence: Math.floor(85 + Math.random() * 10)
+                    confidence: data.aiAnalysis[1]?.confidence || 92
                 }
             };
         }
@@ -1128,7 +1124,7 @@
         function initDensity3D() {
             const chart = echarts.init(document.getElementById('density3D'));
             
-            // 生成模拟数据
+            // 初始化时使用模拟数据，后续将通过API更新
             const data = [];
             const hours = ['0时', '1时', '2时', '3时', '4时', '5时', '6时', '7时', '8时', '9时', '10时', '11时',
                          '12时', '13时', '14时', '15时', '16时', '17时', '18时', '19时', '20时', '21时', '22时', '23时'];
@@ -1609,6 +1605,17 @@
             }
         }
 
+        function updateDensity3D(data) {
+            const chart = echarts.getInstanceByDom(document.getElementById('density3D'));
+            if (chart) {
+                chart.setOption({
+                    series: [{
+                        data: data
+                    }]
+                });
+            }
+        }
+
         function updateBasicStats(data) {
             document.getElementById('totalViolations').textContent = data.totalViolations.toLocaleString();
             document.getElementById('todayViolations').textContent = data.todayViolations.toLocaleString();
@@ -1618,9 +1625,168 @@
 
         // 更新所有数据的函数
         function updateAllData() {
-            const newData = generateRealisticData();
-            
-            // 更新所有图表
+            // 从API获取真实数据
+            fetch('/api/dashboard/real_stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 缓存真实数据
+                        window.realData = {
+                            totalViolations: data.stats.totalViolations,
+                            todayViolations: data.stats.todayViolations,
+                            handleRate: data.stats.handleRate,
+                            avgResponse: data.stats.avgResponse,
+                            hourlyData: data.hourlyData,
+                            typeDistribution: data.typeDistribution,
+                            areaData: [
+                                { name: '五华区', value: Math.floor(Math.random() * 100 + 60) },
+                                { name: '盘龙区', value: Math.floor(Math.random() * 90 + 55) },
+                                { name: '官渡区', value: Math.floor(Math.random() * 85 + 50) },
+                                { name: '西山区', value: Math.floor(Math.random() * 95 + 45) },
+                                { name: '呈贡区', value: Math.floor(Math.random() * 80 + 40) }
+                            ],
+                            weather: {
+                                type: ['晴', '多云', '小雨', '大雨'][Math.floor(Math.random() * 4)],
+                                temperature: Math.floor(15 + Math.random() * 20),
+                                humidity: Math.floor(40 + Math.random() * 40),
+                                correlation: Math.random() * 0.5 + 0.3
+                            },
+                            enforcement: {
+                                efficiency: Math.floor(80 + Math.random() * 15),
+                                response: Math.floor(2 + Math.random() * 3),
+                                coverage: Math.floor(85 + Math.random() * 10)
+                            },
+                            warning: {
+                                index: Math.floor(60 + Math.random() * 30),
+                                level: Math.floor(Math.random() * 4),
+                                trend: Math.random() - 0.5
+                            },
+                            ai: {
+                                accuracy: data.aiAnalysis[0]?.confidence || 95,
+                                falsePositive: Math.floor(Math.random() * 5),
+                                confidence: data.aiAnalysis[1]?.confidence || 92
+                            }
+                        };
+                        
+                        // 更新所有图表
+                        updateBasicStats(window.realData);
+                        
+                        try {
+                            updateRealTimeMonitor(window.realData.hourlyData);
+                        } catch(e) {
+                            console.log('Error updating real time monitor:', e);
+                        }
+                        
+                        try {
+                            updateMultiDimensionalAnalysis(window.realData.typeDistribution);
+                        } catch(e) {
+                            console.log('Error updating multi dimensional analysis:', e);
+                        }
+                        
+                        try {
+                            updateWeatherAnalysis(window.realData.weather);
+                        } catch(e) {
+                            console.log('Error updating weather analysis:', e);
+                        }
+                        
+                        try {
+                            updateEnforcementGauge(window.realData.enforcement);
+                        } catch(e) {
+                            console.log('Error updating enforcement gauge:', e);
+                        }
+                        
+                        try {
+                            updateWarningIndex(window.realData.warning);
+                        } catch(e) {
+                            console.log('Error updating warning index:', e);
+                        }
+                        
+                        try {
+                            if (typeof updateHourlyDistribution === 'function') {
+                                const hourlyDistChart = echarts.getInstanceByDom(document.getElementById('hourlyDistribution'));
+                                if (hourlyDistChart) {
+                                    hourlyDistChart.setOption({
+                                        series: [{
+                                            data: data.timePeriodData
+                                        }]
+                                    });
+                                }
+                            }
+                        } catch(e) {
+                            console.log('Error updating hourly distribution:', e);
+                        }
+                        
+                        try {
+                            if (typeof updateAIAnalysis === 'function') {
+                                const aiChart = echarts.getInstanceByDom(document.getElementById('aiAnalysis'));
+                                if (aiChart) {
+                                    aiChart.setOption({
+                                        series: [{
+                                            data: data.aiAnalysis.map(item => item.confidence)
+                                        }]
+                                    });
+                                }
+                            }
+                        } catch(e) {
+                            console.log('Error updating AI analysis:', e);
+                        }
+                        
+                        try {
+                            // 更新摊位密度3D图
+                            if (data.density3DData && data.density3DData.length > 0) {
+                                const density3DChart = echarts.getInstanceByDom(document.getElementById('density3D'));
+                                if (density3DChart) {
+                                    density3DChart.setOption({
+                                        series: [{
+                                            data: data.density3DData
+                                        }]
+                                    });
+                                }
+                            }
+                        } catch(e) {
+                            console.log('Error updating density 3D:', e);
+                        }
+                        
+                        try {
+                            // 更新季节性趋势图
+                            if (data.seasonalTrendData && data.seasonalTrendData.length > 0) {
+                                const seasonalChart = echarts.getInstanceByDom(document.getElementById('seasonalTrend'));
+                                if (seasonalChart) {
+                                    seasonalChart.setOption({
+                                        series: [{
+                                            data: data.seasonalTrendData
+                                        }]
+                                    });
+                                }
+                            }
+                        } catch(e) {
+                            console.log('Error updating seasonal trend:', e);
+                        }
+                        
+                        try {
+                            if (typeof updateFacilityCorrelation === 'function') {
+                                updateFacilityCorrelation(window.realData.areaData);
+                            }
+                        } catch(e) {
+                            console.log('Error updating facility correlation:', e);
+                        }
+                    } else {
+                        console.error('Failed to get real stats:', data.message);
+                        // 使用随机数据作为备份
+                        const newData = generateRealisticData();
+                        updateChartsWithRandomData(newData);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching real stats:', error);
+                    // 使用随机数据作为备份
+                    const newData = generateRealisticData();
+                    updateChartsWithRandomData(newData);
+                });
+        }
+        
+        // 使用随机数据更新图表的备用函数
+        function updateChartsWithRandomData(newData) {
             updateBasicStats(newData);
             
             try {
