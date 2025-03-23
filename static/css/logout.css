@@ -1,7 +1,5 @@
 .logout-btn {
-    position: fixed;
-    top: 20px;
-    right: 20px;
+    position: relative;
     padding: 8px 16px;
     background-color: #ff4d4f;
     color: white;
@@ -14,6 +12,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    text-decoration: none;
+    margin-left: 15px;
 }
 
 .logout-btn:hover {

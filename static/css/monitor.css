@@ -20,7 +20,7 @@ body {
     overflow-x: hidden;
 }
 
-/* 顶部标题区域 */
+/* 顶部标题区域 - 统一所有页面导航栏样式 */
 .nav-bar {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -29,6 +29,8 @@ body {
     padding: 1rem 2rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     z-index: 100;
+    position: relative;
+    overflow: hidden;
 }
 
 .nav-left, .nav-right {
@@ -36,8 +38,14 @@ body {
     align-items: center;
 }
 
+.nav-left {
+    justify-content: flex-start;
+    padding-left: 15px;
+}
+
 .nav-right {
     justify-content: flex-end;
+    padding-right: 15px;
 }
 
 .logo {
@@ -45,11 +53,24 @@ body {
     font-size: 1.5rem;
     color: #1890ff;
     font-weight: bold;
+    z-index: 2;
+    position: relative;
 }
 
 .left-decoration, .right-decoration {
-    height: 40px;
+    height: 75px;
+    width: 100px;
     opacity: 0.8;
+    object-fit: contain;
+}
+
+.left-decoration {
+    margin-left: 0;
+}
+
+.right-decoration {
+    margin-right: 0;
+    margin-left: auto;
 }
 
 /* 主容器样式 */
@@ -960,6 +981,213 @@ body {
     font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.6);
     margin-top: 4px;
+}
+
+/* 摄像头监控页面样式 */
+
+/* 摄像头不可用时的回退提示样式 */
+.camera-fallback {
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    color: white;
+    text-align: center;
+}
+
+.fallback-message h3 {
+    color: #ff4d4f;
+    margin-top: 0;
+}
+
+.fallback-message ul {
+    text-align: left;
+    display: inline-block;
+}
+
+.fallback-upload {
+    margin-top: 20px;
+}
+
+.fallback-upload-btn {
+    background: #1890ff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.fallback-upload-btn:hover {
+    background: #40a9ff;
+    box-shadow: 0 0 10px rgba(24, 144, 255, 0.5);
+}
+
+#fallbackUploadStatus {
+    margin-top: 10px;
+    font-style: italic;
+}
+
+/* 浏览器警告样式 */
+.browser-alert {
+    background-color: #fffbe6;
+    border: 1px solid #ffe58f;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    color: #876800;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+/* 分析结果显示区域 */
+#analysisResult {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(0, 21, 41, 0.6);
+    border-radius: 8px;
+    text-align: center;
+    position: relative;
+}
+
+#analysisResult img {
+    max-width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.detection-info {
+    margin-top: 10px;
+    padding: 8px;
+    background: rgba(24, 144, 255, 0.1);
+    border-radius: 4px;
+    border-left: 4px solid #1890ff;
+    color: white;
+    text-align: left;
+}
+
+.detection-info p {
+    margin: 3px 0;
+}
+
+/* 空结果提示 */
+.empty-result {
+    color: #8c8c8c;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* 分析中状态 */
+.analysing {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.analysing span {
+    color: white;
+    background: rgba(24, 144, 255, 0.8);
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
+/* 状态指示器样式优化 */
+.status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    color: white;
+    background-color: #8c8c8c;
+}
+
+.status.online {
+    background-color: #52c41a;
+}
+
+.status.processing {
+    background-color: #1890ff;
+}
+
+.status.error, .status.offline {
+    background-color: #ff4d4f;
+}
+
+/* 视频容器 */
+.video-container {
+    position: relative;
+    width: 100%;
+    background-color: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* 摄像头控制按钮 */
+.camera-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.camera-control-btn {
+    background: rgba(24, 144, 255, 0.2);
+    border: none;
+    color: #1890ff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.camera-control-btn:hover {
+    background: rgba(24, 144, 255, 0.4);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .camera-fallback {
+        padding: 15px;
+    }
+    
+    .fallback-message ul {
+        padding-left: 20px;
+    }
+    
+    .fallback-upload-btn {
+        padding: 8px 15px;
+        font-size: 14px;
+    }
+}
+
+/* 检测框和标签样式优化 */
+.detection-box {
+    position: absolute;
+    border: 2px solid;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.detection-label {
+    position: absolute;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: white;
+    white-space: nowrap;
+    border-radius: 0 0 4px 4px;
+    pointer-events: none;
 }
 
 

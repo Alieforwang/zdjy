@@ -200,14 +200,13 @@
 /* 装饰图片样式 */
 .left-decoration,
 .right-decoration {
-    width: 450px;
-    height: 20px;
+    width: 100px;
+    height: 75px;
     object-fit: contain;
-    position: absolute;
+    position: relative;
     transition: transform 0.3s ease;
     z-index: 1;
     pointer-events: none;
-    top: 5px;
 }
 
 .left-decoration {

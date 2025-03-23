@@ -14,33 +14,45 @@ let currentCameraId = 0;  // 当前选中的摄像头ID，默认为内置摄像�
 let currentCameraIndex = 0;
 let currentCameraIndex2 = 3;
 
-// 添加浏览器兼容性检查和polyfill
+// 添加浏览器兼容性检测和polyfill
 (function() {
-    // 确保老旧浏览器也能支持navigator.mediaDevices
-    if (navigator.mediaDevices === undefined) {
-        navigator.mediaDevices = {};
-        console.log('初始化mediaDevices对象');
-    }
-
-    // 一些浏览器实现了部分mediaDevices，我们不能只分配getUserMedia
-    // 因为这会覆盖已有的属性
-    if (navigator.mediaDevices.getUserMedia === undefined) {
-        navigator.mediaDevices.getUserMedia = function(constraints) {
+    window.cameraSupported = false; // 默认假设不支持摄像头
+    
+    try {
+        // 确保老旧浏览器也能支持navigator.mediaDevices
+        if (navigator.mediaDevices === undefined) {
+            navigator.mediaDevices = {};
+            console.log('初始化mediaDevices对象');
+        }
+    
+        // 一些浏览器实现了部分mediaDevices，我们不能只分配getUserMedia
+        // 因为这会覆盖已有的属性
+        if (navigator.mediaDevices.getUserMedia === undefined) {
             // 首先获取老版本的getUserMedia
             var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia ||
-                              navigator.msGetUserMedia;
-
+                               navigator.msGetUserMedia;
+    
             if (!getUserMedia) {
                 console.error('浏览器不支持getUserMedia');
-                return Promise.reject(new Error('浏览器不支持getUserMedia'));
+                navigator.mediaDevices.getUserMedia = function(constraints) {
+                    return Promise.reject(new Error('浏览器不支持getUserMedia'));
+                };
+            } else {
+                // 包装老版本API为Promise
+                navigator.mediaDevices.getUserMedia = function(constraints) {
+                    return new Promise(function(resolve, reject) {
+                        getUserMedia.call(navigator, constraints, resolve, reject);
+                    });
+                };
+                window.cameraSupported = true;
             }
-
-            // 包装老版本API为Promise
-            return new Promise(function(resolve, reject) {
-                getUserMedia.call(navigator, constraints, resolve, reject);
-            });
+            console.log('添加getUserMedia polyfill');
+        } else {
+            window.cameraSupported = true;
         }
-        console.log('添加getUserMedia polyfill');
+    } catch (e) {
+        console.error('设置摄像头API时出错:', e);
+        window.cameraSupported = false;
     }
 })();
 
@@ -273,16 +285,17 @@ function drawDetectionBoxes(canvas, detections) {
         ctx.fillStyle = boxColor.replace(')', ', 0.2)').replace('rgb', 'rgba');
         ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
         
-        // 绘制标签背景
+        // 绘制标签背景 - 将标签放在框的下方而不是上方
         ctx.fillStyle = boxColor.replace(')', ', 0.8)').replace('rgb', 'rgba');
         const label = `${className} ${(confidence * 100).toFixed(1)}%`;
         ctx.font = '12px Arial';
         const labelWidth = ctx.measureText(label).width + 10;
-        ctx.fillRect(x1, y1 - 20, labelWidth, 20);
+        // 修改标签位置到框的下方
+        ctx.fillRect(x1, y2, labelWidth, 20);
         
-        // 绘制标签文本
+        // 绘制标签文本 - 同样修改到框的下方
         ctx.fillStyle = 'white';
-        ctx.fillText(label, x1 + 5, y1 - 5);
+        ctx.fillText(label, x1 + 5, y2 + 15);
     });
 }
 
@@ -1170,34 +1183,282 @@ function saveDetectionResult(data, cameraId = 1) {
     });
 }
 
-// 更新检测率
-function updateDetectionRate() {
-    const now = Date.now();
-    // 移除超过一分钟的检测记录
-    lastMinuteDetections = lastMinuteDetections.filter(detection => {
-        return (now - detection.time.getTime()) <= 60000;
-    });
+// 添加图像上传回退方案
+function enableImageUploadFallback() {
+    // 如果已存在回退界面，则不重复创建
+    if (document.querySelector('.camera-fallback')) {
+        return;
+    }
     
-    const rate = lastMinuteDetections.reduce((sum, detection) => sum + detection.count, 0);
+    const fallbackDiv = document.createElement('div');
+    fallbackDiv.className = 'camera-fallback';
+    fallbackDiv.innerHTML = `
+        <div class="fallback-message">
+            <h3>摄像头不可用</h3>
+            <p>您的浏览器不支持摄像头功能或摄像头访问被禁止。</p>
+            <p>您可以：</p>
+            <ul>
+                <li>使用Chrome、Firefox或Edge浏览器</li>
+                <li>检查浏览器摄像头权限设置</li>
+                <li>使用下方的图片上传功能进行分析</li>
+            </ul>
+        </div>
+        <div class="fallback-upload">
+            <input type="file" id="fallbackImageUpload" accept="image/*" style="display:none">
+            <button class="fallback-upload-btn" onclick="document.getElementById('fallbackImageUpload').click()">
+                上传图片进行分析
+            </button>
+            <div id="fallbackUploadStatus"></div>
+        </div>
+    `;
     
-    const detectionRateEl = safeGetElement('detectionRate');
-    if (detectionRateEl) {
-        detectionRateEl.textContent = `${rate}次/分钟`;
+    // 添加到页面
+    const videoContainers = document.querySelectorAll('.video-container');
+    if (videoContainers.length > 0) {
+        videoContainers.forEach(container => {
+            const clonedFallback = fallbackDiv.cloneNode(true);
+            container.appendChild(clonedFallback);
+        });
+        
+        // 添加样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .camera-fallback {
+                background: rgba(0, 0, 0, 0.7);
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                color: white;
+                text-align: center;
+            }
+            .fallback-message h3 {
+                color: #ff4d4f;
+                margin-top: 0;
+            }
+            .fallback-message ul {
+                text-align: left;
+                display: inline-block;
+            }
+            .fallback-upload {
+                margin-top: 20px;
+            }
+            .fallback-upload-btn {
+                background: #1890ff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+            .fallback-upload-btn:hover {
+                background: #40a9ff;
+                box-shadow: 0 0 10px rgba(24, 144, 255, 0.5);
+            }
+            #fallbackUploadStatus {
+                margin-top: 10px;
+                font-style: italic;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // 添加上传图片事件监听
+        document.querySelectorAll('#fallbackImageUpload').forEach(input => {
+            input.addEventListener('change', function(e) {
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    const statusElements = document.querySelectorAll('#fallbackUploadStatus');
+                    statusElements.forEach(el => {
+                        el.textContent = '正在上传并分析...';
+                    });
+                    
+                    fetch('/api/analyze', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            statusElements.forEach(el => {
+                                el.textContent = '分析完成';
+                            });
+                            
+                            // 显示分析结果
+                            if (data.result_image) {
+                                const resultImg = new Image();
+                                resultImg.src = data.result_image;
+                                resultImg.style.maxWidth = '100%';
+                                const resultContainer = document.querySelector('#analysisResult');
+                                if (resultContainer) {
+                                    resultContainer.innerHTML = '';
+                                    resultContainer.appendChild(resultImg);
+                                    
+                                    // 添加检测信息
+                                    if (data.detection_count > 0) {
+                                        const infoDiv = document.createElement('div');
+                                        infoDiv.className = 'detection-info';
+                                        infoDiv.innerHTML = `
+                                            <p>检测到${data.detection_count}个目标</p>
+                                            <p>类型: ${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</p>
+                                            <p>置信度: ${Math.round((data.detections[0]?.confidence || 0) * 100)}%</p>
+                                        `;
+                                        resultContainer.appendChild(infoDiv);
+                                    } else {
+                                        const infoDiv = document.createElement('div');
+                                        infoDiv.className = 'detection-info';
+                                        infoDiv.innerHTML = '<p>未检测到目标</p>';
+                                        resultContainer.appendChild(infoDiv);
+                                    }
+                                }
+                            }
+                        } else {
+                            statusElements.forEach(el => {
+                                el.textContent = '分析失败: ' + (data.message || '未知错误');
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        statusElements.forEach(el => {
+                            el.textContent = '上传错误: ' + error.message;
+                        });
+                    });
+                }
+            });
+        });
     }
 }
 
-// 更新检测率
-function updateDetectionRate() {
-    const now = Date.now();
-    // 移除超过一分钟的检测记录
-    lastMinuteDetections = lastMinuteDetections.filter(detection => {
-        return (now - detection.time.getTime()) <= 60000;
-    });
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM加载完成，准备初始化摄像头...');
     
-    const rate = lastMinuteDetections.reduce((sum, detection) => sum + detection.count, 0);
+    // 检测浏览器是否支持摄像头
+    if (!window.cameraSupported) {
+        console.warn('此浏览器不支持摄像头功能，启用回退方案');
+        
+        // 添加页面提示
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'browser-alert';
+        alertDiv.innerHTML = `
+            <strong>提示:</strong> 您的浏览器不支持摄像头功能。
+            请使用最新版本的Chrome、Firefox或Edge浏览器以获得最佳体验。
+        `;
+        document.body.insertBefore(alertDiv, document.body.firstChild);
+        
+        // 添加样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .browser-alert {
+                background-color: #fffbe6;
+                border: 1px solid #ffe58f;
+                padding: 10px 15px;
+                margin-bottom: 15px;
+                border-radius: 4px;
+                color: #876800;
+                text-align: center;
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+            }
+        `;
+        document.head.appendChild(style);
+    }
     
-    const detectionRateEl = safeGetElement('detectionRate');
-    if (detectionRateEl) {
-        detectionRateEl.textContent = `${rate}次/分钟`;
+    // 其他初始化代码...
+});
+
+// 在startMonitorCamera函数中添加兼容性检测
+async function startMonitorCamera(videoElement, constraints, cameraIndex, statusElement) {
+    if (!window.cameraSupported) {
+        console.error('此浏览器不支持摄像头API');
+        if (statusElement) {
+            statusElement.textContent = "摄像头API不可用";
+            statusElement.className = "status offline";
+        }
+        return null;
+    }
+    
+    try {
+        console.log('请求摄像头访问权限:', JSON.stringify(constraints));
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (videoElement) {
+            videoElement.srcObject = stream;
+            try {
+                await videoElement.play();
+            } catch (playError) {
+                console.error('视频播放失败:', playError);
+            }
+        }
+        
+        // 更新界面状态
+        if (statusElement) {
+            statusElement.textContent = "在线";
+            statusElement.className = "status online";
+        }
+        
+        // 存储流信息
+        streams[cameraIndex] = stream;
+        return stream;
+    } catch (error) {
+        console.error(`获取摄像头${cameraIndex}失败:`, error);
+        if (statusElement) {
+            statusElement.textContent = "离线";
+            statusElement.className = "status offline";
+        }
+        
+        // 尝试不指定deviceId获取摄像头
+        console.log('尝试不指定deviceId获取摄像头...');
+        return tryFallbackAccess(videoElement, cameraIndex, statusElement);
+    }
+}
+
+// 添加回退访问摄像头的方法
+async function tryFallbackAccess(videoElement, cameraIndex, statusElement) {
+    if (!window.cameraSupported) {
+        return null;
+    }
+    
+    try {
+        // 尝试用最简单的参数请求任意摄像头
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+        });
+        
+        if (videoElement) {
+            videoElement.srcObject = fallbackStream;
+            try {
+                await videoElement.play();
+            } catch (playError) {
+                console.error('视频播放失败:', playError);
+                throw playError;
+            }
+        }
+        
+        // 更新界面状态
+        if (statusElement) {
+            statusElement.textContent = "在线(回退模式)";
+            statusElement.className = "status online";
+        }
+        
+        // 存储流信息
+        streams[cameraIndex] = fallbackStream;
+        return fallbackStream;
+    } catch (error) {
+        console.error(`回退方法获取摄像头失败:`, error);
+        
+        if (statusElement) {
+            statusElement.textContent = "不可用";
+            statusElement.className = "status offline";
+        }
+        
+        // 启用图片上传回退方案
+        enableImageUploadFallback();
+        
+        return null;
     }
 } 

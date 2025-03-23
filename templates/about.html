@@ -22,10 +22,10 @@
         <div class="logo">关于系统</div>
         <div class="nav-right">
             <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
-            <button class="logout-btn" onclick="(function() { window.location.href='{{ url_for('logout') }}'; })();">
+            <a href="{{ url_for('logout') }}" class="logout-btn">
                 <span class="logout-icon">↩</span>
                 退出登录
-            </button>
+            </a>
         </div>
     </nav>
 
