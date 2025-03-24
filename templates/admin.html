@@ -4,6 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理后台 - 智能检测系统</title>
+    
+    <!-- 阻止某些问题脚本的执行 -->
+    <script>
+    // 阻止特定的第三方库错误
+    (function() {
+        // 拦截可能导致错误的请求
+        const originalFetch = window.fetch;
+        if (originalFetch) {
+            window.fetch = function(resource, options) {
+                // 检查是否是导致错误的请求
+                if (typeof resource === 'string' && 
+                    resource.includes('zybTrackerStatisticsAction')) {
+                    console.log('拦截到错误请求:', resource);
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ status: 'success', data: {} })
+                    });
+                }
+                return originalFetch.apply(this, arguments);
+            };
+        }
+        
+        // 防止minified脚本中的v[w]错误
+        window.addEventListener('error', function(e) {
+            if (e && e.message && e.message.includes("v[w] is not a function")) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('已阻止已知错误:', e.message);
+                return false;
+            }
+        }, true);
+    })();
+    </script>
+    
     <link rel="stylesheet" href="/static/css/admin.css">
     
     <!-- 加载ECharts相关脚本（本地文件） -->
@@ -12,6 +46,15 @@
     <script src="{{ url_for('static', filename='js/libs/echarts-liquidfill.min.js') }}"></script>
 </head>
 <body>
+    <!-- 顶部导航 -->
+    <div class="admin-header">
+        <h1>管理后台</h1>
+        <div class="nav-buttons">
+            <a href="{{ url_for('index') }}" class="nav-btn" id="homeButton">返回首页</a>
+            <a href="{{ url_for('logout') }}" class="nav-btn" id="logoutButton">退出登录</a>
+        </div>
+    </div>
+
     <!-- 图表容器 -->
     <div class="charts-container">
         <div class="chart-row">
@@ -192,14 +235,40 @@
                     
                     // 添加响应式调整
                     window.addEventListener('resize', function() {
-                        detectionTrendChart.resize();
-                        typeDistributionChart.resize();
-                        detection3DChart.resize();
-                        completionLiquidChart.resize();
-                        typeRadarChart.resize();
-                        accuracyTrendChart.resize();
+                        try {
+                            if (detectionTrendChart) detectionTrendChart.resize();
+                            if (typeDistributionChart) typeDistributionChart.resize();
+                            if (detection3DChart) detection3DChart.resize();
+                            if (completionLiquidChart) completionLiquidChart.resize();
+                            if (typeRadarChart) typeRadarChart.resize();
+                            if (accuracyTrendChart) accuracyTrendChart.resize();
+                        } catch (e) {
+                            console.log('Error resizing charts:', e);
+                        }
                     });
                 }
+                
+                // 添加导航按钮事件
+                document.addEventListener('DOMContentLoaded', function() {
+                    // 安全地添加事件监听器
+                    const addSafeEventListener = function(id, event, handler) {
+                        const element = document.getElementById(id);
+                        if (element) {
+                            element.addEventListener(event, handler);
+                        } else {
+                            console.warn(`Element with id '${id}' not found for event listener`);
+                        }
+                    };
+                    
+                    // 给导航按钮添加事件
+                    addSafeEventListener('homeButton', 'click', function() {
+                        window.location.href = "{{ url_for('index') }}";
+                    });
+                    
+                    addSafeEventListener('logoutButton', 'click', function() {
+                        window.location.href = "{{ url_for('logout') }}";
+                    });
+                });
             } catch (error) {
                 console.error('图表初始化失败:', error);
             }
@@ -207,6 +276,35 @@
     </script>
 
     <style>
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: rgba(0, 21, 41, 0.5);
+            color: white;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
         .charts-container {
             padding: 20px;
         }

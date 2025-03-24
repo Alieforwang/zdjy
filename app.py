@@ -3694,3 +3694,26 @@ def get_available_cameras():
             "camera_count": 0,
             "cameras": []
         })
+
+@app.route('/hybridaction/zybTrackerStatisticsAction', methods=['GET'])
+def handle_tracker_statistics():
+    """处理跟踪统计请求，这是一个兼容性endpoint"""
+    # 获取请求参数
+    callback = request.args.get('__callback__', '')
+    
+    # 构建标准响应数据
+    response_data = {
+        "status": "success",
+        "data": {},
+        "errCode": 0,
+        "errMsg": ""
+    }
+    
+    # 如果有回调参数，返回JSONP格式
+    if callback:
+        # 将JSON数据转为字符串并包裹在回调函数中
+        jsonp_response = f"{callback}({json.dumps(response_data)});"
+        return Response(jsonp_response, mimetype="application/javascript; charset=utf-8")
+    else:
+        # 普通JSON响应
+        return jsonify(response_data)
