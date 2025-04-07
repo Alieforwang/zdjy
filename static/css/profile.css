@@ -1,0 +1,330 @@
+/* 个人中心样式 */
+.profile-container {
+    display: flex;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    height: calc(100vh - 100px);
+}
+
+/* 侧边栏样式 */
+.sidebar {
+    width: 250px;
+    background-color: rgba(0, 42, 84, 0.7);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.user-info {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: #1890ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 15px auto;
+    float: right;
+}
+
+.avatar-text {
+    font-size: 36px;
+    color: white;
+}
+
+.username {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.role {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.menu-item:hover {
+    background-color: rgba(24, 144, 255, 0.1);
+}
+
+.menu-item.active {
+    background-color: rgba(24, 144, 255, 0.2);
+    border-left: 3px solid #1890ff;
+}
+
+.menu-icon {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+/* 内容区域样式 */
+.content-area {
+    flex: 1;
+    background-color: rgba(0, 42, 84, 0.7);
+    border-radius: 10px;
+    padding: 25px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+}
+
+.panel {
+    display: none;
+}
+
+.panel.active {
+    display: block;
+}
+
+.panel h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 24px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 10px;
+}
+
+/* 基本信息卡片样式 */
+.info-card {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.info-row {
+    display: flex;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.info-label {
+    width: 100px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.info-value {
+    flex: 1;
+    font-weight: 500;
+}
+
+/* 密码修改表单样式 */
+.password-form {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: white;
+}
+
+.password-hint {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 5px;
+}
+
+.form-actions {
+    margin-top: 30px;
+    text-align: right;
+}
+
+.submit-btn {
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.submit-btn:hover {
+    background-color: #40a9ff;
+}
+
+/* 操作日志样式 */
+.filter-bar {
+    display: flex;
+    margin-bottom: 20px;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.filter-group {
+    margin-right: 20px;
+}
+
+.filter-group label {
+    margin-right: 10px;
+}
+
+.filter-group select {
+    padding: 5px 10px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.log-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.log-table th,
+.log-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-table th {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+}
+
+.log-table tbody tr:hover {
+    background-color: rgba(24, 144, 255, 0.1);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.page-btn {
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.page-btn:hover {
+    background-color: rgba(24, 144, 255, 0.2);
+}
+
+.page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#logPageInfo {
+    margin: 0 15px;
+}
+
+/* 添加新的底部导航条样式 */
+.bottom-nav8 {
+    position: fixed;
+    left: 0;
+    width: 60px;
+    height: 60px;
+    background: #011635;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    border-radius: 0 12px 12px 0;
+    transition: all 0.3s ease;
+    top: 15%; /* 位于系统设置之前 */
+}
+
+.bottom-nav8:hover {
+    width: 120px;
+    background: #011635;
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.bottom-nav8:hover .btn-text {
+    opacity: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .profile-container {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    
+    .info-row {
+        flex-direction: column;
+    }
+    
+    .info-label {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .filter-bar {
+        flex-direction: column;
+    }
+    
+    .filter-group {
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+}

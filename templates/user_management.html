@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 占道经营智能监测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/user_management.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nav-bar.css') }}">
+</head>
+<style>
+    body {
+        color: white; /* 确保文本颜色在深色背景上可读 */
+    }
+</style>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-left">
+            <img src="{{ url_for('static', filename='images/view7.png') }}" class="left-decoration" alt="装饰图">
+        </div>
+        <div class="logo">用户管理</div>
+        <div class="nav-right">
+            <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
+            <a href="{{ url_for('logout') }}" class="logout-btn">
+                <span class="logout-icon">↩</span>
+                退出登录
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <h1>用户管理</h1>
+        
+        <!-- 控制区域 -->
+        <div class="controls">
+            <div class="filter-group">
+                <input type="text" id="searchInput" class="search-input" placeholder="搜索用户名...">
+            </div>
+            <div class="action-group">
+                <button id="addUserBtn" class="action-btn add-btn">添加用户</button>
+                <button id="exportBtn" class="action-btn export-btn">导出CSV</button>
+            </div>
+        </div>
+        
+        <!-- 数据表格 -->
+        <div class="data-table">
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户名</th>
+                        <th>权限</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- 表格数据将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页控件 -->
+        <div class="pagination">
+            <button id="prevPage" class="page-btn">&lt; 上一页</button>
+            <span id="pageInfo">1 / 1</span>
+            <button id="nextPage" class="page-btn">下一页 &gt;</button>
+        </div>
+    </div>
+    
+    <!-- 用户表单模态框 -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle" class="modal-title">添加用户</h3>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId" name="userId">
+                    
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    
+                    <div id="passwordGroup" class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" name="password">
+                        <div class="password-hint">密码长度至少为6位</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <label for="isAdmin">
+                                <input type="checkbox" id="isAdmin" name="isAdmin">
+                                管理员权限
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn">取消</button>
+                        <button type="submit" class="submit-btn">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 确认删除模态框 -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-content">
+            <div class="modal-header">
+                <h3 class="modal-title">确认删除</h3>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">确定要删除此用户吗？此操作不可恢复。</p>
+                
+                <div class="confirm-actions">
+                    <button type="button" class="cancel-btn">取消</button>
+                    <button type="button" id="confirmDelete" class="confirm-btn">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 底部导航栏 -->
+    <div class="bottom-nav1">
+        <a href="{{ url_for('admin_home') }}" class="nav-btn">
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">主界面</span>
+        </a>
+    </div>
+    <div class="bottom-nav2">
+        <a href="{{ url_for('analysis') }}" class="nav-btn">
+            <span class="btn-icon">📊</span>
+            <span class="btn-text">数据分析</span>
+        </a>
+    </div>
+    <div class="bottom-nav3">
+        <a href="{{ url_for('monitor') }}" class="nav-btn">
+            <span class="btn-icon">📷</span>
+            <span class="btn-text">实时监控</span>
+        </a>
+    </div>
+    <div class="bottom-nav4">
+        <a href="{{ url_for('history') }}" class="nav-btn">
+            <span class="btn-icon">📝</span>
+            <span class="btn-text">历史记录</span>
+        </a>
+    </div>
+    <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn active">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    <div class="bottom-nav7">
+        <a href="{{ url_for('settings') }}" class="nav-btn">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">系统设置</span>
+        </a>
+    </div>
+    <div class="bottom-nav6">
+        <a href="{{ url_for('about') }}" class="nav-btn">
+            <span class="btn-icon">ℹ️</span>
+            <span class="btn-text">关于系统</span>
+        </a>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/user_management.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 占道经营智能监测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nav-bar.css') }}">
+</head>
+<style>
+    body {
+        background-color: #002a54;
+        color: white; /* 确保文本颜色在深色背景上可读 */
+    }
+</style>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-left">
+            <img src="{{ url_for('static', filename='images/view7.png') }}" class="left-decoration" alt="装饰图">
+        </div>
+        <div class="logo">个人中心</div>
+        <div class="nav-right">
+            <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
+            <a href="{{ url_for('logout') }}" class="logout-btn">
+                <span class="logout-icon">↩</span>
+                退出登录
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <div class="profile-container">
+            <!-- 侧边栏 - 菜单 -->
+            <div class="sidebar">
+                <div class="user-info">
+                    <div class="avatar">
+                        <span class="avatar-text">{{ session.get('username', '')[0].upper() }}</span>
+                    </div>
+                    <div class="username">{{ session.get('username', '') }}</div>
+                    <div class="role">{{ "管理员" if session.get('is_admin', False) else "普通用户" }}</div>
+                </div>
+                <ul class="menu">
+                    <li class="menu-item active" data-target="basic-info">
+                        <span class="menu-icon">👤</span>
+                        <span class="menu-text">基本信息</span>
+                    </li>
+                    <li class="menu-item" data-target="change-password">
+                        <span class="menu-icon">🔑</span>
+                        <span class="menu-text">修改密码</span>
+                    </li>
+                    <li class="menu-item" data-target="operation-log">
+                        <span class="menu-icon">📋</span>
+                        <span class="menu-text">操作日志</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- 内容区域 -->
+            <div class="content-area">
+                <!-- 基本信息面板 -->
+                <div class="panel active" id="basic-info">
+                    <h2>基本信息</h2>
+                    <div class="info-card">
+                        <div class="info-row">
+                            <div class="info-label">用户ID</div>
+                            <div class="info-value">{{ session.get('user_id', '') }}</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">用户名</div>
+                            <div class="info-value">{{ session.get('username', '') }}</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">账户类型</div>
+                            <div class="info-value">{{ "管理员" if session.get('is_admin', False) else "普通用户" }}</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">注册时间</div>
+                            <div class="info-value" id="createdTime">加载中...</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">最后登录</div>
+                            <div class="info-value" id="lastLogin">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 修改密码面板 -->
+                <div class="panel" id="change-password">
+                    <h2>修改密码</h2>
+                    <form id="passwordForm" class="password-form">
+                        <div class="form-group">
+                            <label for="currentPassword">当前密码</label>
+                            <input type="password" id="currentPassword" name="currentPassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">新密码</label>
+                            <input type="password" id="newPassword" name="newPassword" required>
+                            <div class="password-hint">密码长度至少为6位</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmPassword">确认新密码</label>
+                            <input type="password" id="confirmPassword" name="confirmPassword" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="submit-btn">保存</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- 操作日志面板 -->
+                <div class="panel" id="operation-log">
+                    <h2>操作日志</h2>
+                    <div class="filter-bar">
+                        <div class="filter-group">
+                            <label for="dateRange">时间范围</label>
+                            <select id="dateRange">
+                                <option value="7">最近7天</option>
+                                <option value="30">最近30天</option>
+                                <option value="90">最近90天</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="logType">操作类型</label>
+                            <select id="logType">
+                                <option value="all">全部操作</option>
+                                <option value="login">登录</option>
+                                <option value="detection">检测</option>
+                                <option value="analysis">分析</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="log-table-container">
+                        <table class="log-table">
+                            <thead>
+                                <tr>
+                                    <th>操作时间</th>
+                                    <th>操作类型</th>
+                                    <th>详细信息</th>
+                                    <th>IP地址</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody">
+                                <!-- 表格数据将通过JavaScript动态加载 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination">
+                        <button id="prevLogPage" class="page-btn">&lt; 上一页</button>
+                        <span id="logPageInfo">1 / 1</span>
+                        <button id="nextLogPage" class="page-btn">下一页 &gt;</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部导航栏 -->
+    <div class="bottom-nav1">
+        {% if is_admin %}
+        <a href="{{ url_for('admin_home') }}" class="nav-btn">
+        {% else %}
+        <a href="{{ url_for('user_home') }}" class="nav-btn">
+        {% endif %}
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">主界面</span>
+        </a>
+    </div>
+    <div class="bottom-nav2">
+        <a href="{{ url_for('analysis') }}" class="nav-btn">
+            <span class="btn-icon">📊</span>
+            <span class="btn-text">数据分析</span>
+        </a>
+    </div>
+    <div class="bottom-nav3">
+        <a href="{{ url_for('monitor') }}" class="nav-btn">
+            <span class="btn-icon">📷</span>
+            <span class="btn-text">实时监控</span>
+        </a>
+    </div>
+    <div class="bottom-nav4">
+        <a href="{{ url_for('history') }}" class="nav-btn">
+            <span class="btn-icon">📝</span>
+            <span class="btn-text">历史记录</span>
+        </a>
+    </div>
+    {% if is_admin %}
+    <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    {% endif %}
+    <div class="bottom-nav8">
+        <a href="{{ url_for('profile') }}" class="nav-btn active">
+            <span class="btn-icon">👤</span>
+            <span class="btn-text">个人中心</span>
+        </a>
+    </div>
+    <div class="bottom-nav7">
+        <a href="{{ url_for('settings') }}" class="nav-btn">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">系统设置</span>
+        </a>
+    </div>
+    <div class="bottom-nav6">
+        <a href="{{ url_for('about') }}" class="nav-btn">
+            <span class="btn-icon">ℹ️</span>
+            <span class="btn-text">关于系统</span>
+        </a>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/profile.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+/* 导航栏基础样式 */
+.bottom-nav1, .bottom-nav2, .bottom-nav3, .bottom-nav4, .bottom-nav5, .bottom-nav6, .bottom-nav7 {
+    position: fixed;
+    left: 0;
+    width: 60px;
+    height: 60px;
+    background:  #011635;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    border-radius: 0 12px 12px 0;
+    transition: all 0.3s ease;
+}
+
+/* 设置每个导航按钮的位置 */
+.bottom-nav1 { top: 25%; }
+.bottom-nav2 { top: 35%; }
+.bottom-nav3 { top: 45%; }
+.bottom-nav4 { top: 55%; }
+.bottom-nav5 { top: 65%; }
+.bottom-nav8 { top: 75%; }
+.bottom-nav7 { top: 85%; }
+.bottom-nav6 { top: 95%; }
+
+/* 悬停时展开效果 */
+.bottom-nav1:hover, .bottom-nav2:hover, .bottom-nav3:hover,
+.bottom-nav4:hover, .bottom-nav5:hover, .bottom-nav6:hover, .bottom-nav7:hover {
+    width: 120px;
+    background:  #011635;
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 导航按钮样式 */
+.nav-btn {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 15px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.3s;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* 按钮图标样式 */
+.btn-icon {
+    font-size: 1.4rem;
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 按钮文本样式 */
+.btn-text {
+    font-size: 0.9rem;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* 悬停时显示文本 */
+.bottom-nav1:hover .btn-text,
+.bottom-nav2:hover .btn-text,
+.bottom-nav3:hover .btn-text,
+.bottom-nav4:hover .btn-text,
+.bottom-nav5:hover .btn-text,
+.bottom-nav6:hover .btn-text,
+.bottom-nav7:hover .btn-text {
+    opacity: 1;
+}
+
+/* 激活状态样式 */
+.nav-btn.active {
+    color: #1890ff;
+    background: linear-gradient(to right, rgba(24, 144, 255, 0.1), transparent);
+}
+
+.nav-btn.active .btn-icon {
+    transform: scale(1.1);
+}
+
+/* 悬停效果 */
+.nav-btn:hover {
+    color: #1890ff;
+    background: linear-gradient(to right, rgba(24, 144, 255, 0.05), transparent);
+}
+
+/* 添加动画效果 */
+@keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+.bottom-nav1, .bottom-nav2, .bottom-nav3,
+.bottom-nav4, .bottom-nav5, .bottom-nav6, .bottom-nav7 {
+    animation: slideIn 0.5s ease forwards;
+    animation-delay: calc(var(--order) * 0.1s);
+}
+
+.bottom-nav1 { --order: 1; }
+.bottom-nav2 { --order: 2; }
+.bottom-nav3 { --order: 3; }
+.bottom-nav4 { --order: 4; }
+.bottom-nav5 { --order: 5; }
+.bottom-nav6 { --order: 6; }
+.bottom-nav7 { --order: 7; }
+
+/* 添加投影效果 */
+.nav-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, rgba(24, 144, 255, 0.1) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.nav-btn:hover::before {
+    opacity: 1;
+}
+
+/* 顶部导航栏样式 */
+.nav-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    background: #011635;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    width: 100%;
+    height: 60px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    overflow: visible;
+}
+
+.nav-left {
+    width: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.nav-right {
+    width: 50%;
+    position: relative;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.logo {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #40a9ff;
+    font-weight: bold;
+    z-index: 2;
+    position: relative;
+}
+
+.logout-btn {
+    background: #ff4d4f;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    margin-left: 20px;
+    z-index: 2;
+}
+
+.logout-btn:hover {
+    background: #ff7875;
+    transform: translateY(-2px);
+}
+
+.logout-icon {
+    font-size: 1.2rem;
+}
+
+/* 装饰图片样式 */
+.left-decoration,
+.right-decoration {
+    width: 266px;
+    height: 75px;
+    object-fit: contain;
+    position: relative;
+    transition: transform 0.3s ease;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.left-decoration {
+    left: 120px;
+}
+
+.right-decoration {
+    right: 120px;
+    margin-right: 20px;
+}
+
+/* .left-decoration:hover,
+.right-decoration:hover {
+    transform: scale(1.1);
+} */
+
+/* 修改按钮样式以适应新布局 */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    background-color: #40a9ff;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+.btn-icon {
+    font-size: 16px;
+}
+
+/* 主容器通用样式 */
+.main-container {
+    margin-top: 60px;
+    position: relative;
+    z-index: 2;
+    padding-left: 80px;
+    padding-right: 20px;
+}
+
