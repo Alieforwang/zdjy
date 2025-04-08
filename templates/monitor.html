@@ -1772,5 +1772,15 @@
             window.analysisInterval = analysisInterval;
         });
     </script>
+
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
+    
+    <!-- 引入聊天AI组件 -->
+    {% include 'chat_ai.html' %}
+    <!-- 版权信息 -->
+<div class="copyright" style="text-align: center; padding: 10px; color: #666; font-size: 12px; margin-top: 20px;">
+    © 2025 灵瞳-城市治理智能感知终端. 保留所有权利.
+</div>
 </body>
 </html>
