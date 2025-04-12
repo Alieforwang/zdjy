@@ -1,0 +1,353 @@
+/* 底部导航按钮整体容器 */
+.bottom-nav-container {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 70px;
+    z-index: 990;
+    pointer-events: none; /* 容器本身不响应点击事件 */
+}
+
+/* 导航按钮样式 */
+.bottom-nav1, .bottom-nav2, .bottom-nav3, .bottom-nav4, .bottom-nav5, .bottom-nav6, .bottom-nav7, .bottom-nav8 {
+    position: fixed;
+    left: 5px;
+    width: 55px;
+    height: 55px;
+    background: rgba(1, 22, 53, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 999;
+    border-radius: 0 12px 12px 0;
+    transition: all 0.3s ease;
+    pointer-events: auto; /* 按钮本身可以响应点击事件 */
+}
+
+/* 设置每个导航按钮的位置 */
+.bottom-nav1 { top: 150px; }
+.bottom-nav2 { top: 215px; }
+.bottom-nav3 { top: 280px; }
+.bottom-nav4 { top: 345px; }
+.bottom-nav5 { top: 410px; }
+.bottom-nav8 { top: 475px; }
+.bottom-nav7 { top: 540px; }
+.bottom-nav6 { top: 605px; }
+
+/* 悬停时展开效果 */
+.bottom-nav1:hover, .bottom-nav2:hover, .bottom-nav3:hover,
+.bottom-nav4:hover, .bottom-nav5:hover, .bottom-nav6:hover, 
+.bottom-nav7:hover, .bottom-nav8:hover {
+    width: 130px;
+    background: rgba(1, 22, 53, 0.95);
+    box-shadow: 3px 3px 12px rgba(0, 0, 0, 0.25);
+    left: 0;
+}
+
+/* 导航按钮链接 */
+.nav-btn {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.7);
+    transition: all 0.3s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-decoration: none;
+    pointer-events: auto; /* 确保链接可以响应点击事件 */
+}
+
+/* 按钮图标样式 */
+.btn-icon {
+    font-size: 1.3rem;
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 按钮文本样式 */
+.btn-text {
+    font-size: 0.85rem;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* 悬停时显示文本 */
+.bottom-nav1:hover .btn-text,
+.bottom-nav2:hover .btn-text,
+.bottom-nav3:hover .btn-text,
+.bottom-nav4:hover .btn-text,
+.bottom-nav5:hover .btn-text,
+.bottom-nav6:hover .btn-text,
+.bottom-nav7:hover .btn-text,
+.bottom-nav8:hover .btn-text {
+    opacity: 1;
+}
+
+/* 添加投影效果 */
+.nav-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, rgba(24, 144, 255, 0.15) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.nav-btn:hover::before {
+    opacity: 1;
+}
+
+/* 激活状态样式 */
+.nav-btn.active {
+    color: #1890ff;
+    background: linear-gradient(to right, rgba(24, 144, 255, 0.2), transparent);
+}
+
+.nav-btn.active .btn-icon {
+    transform: scale(1.1);
+    text-shadow: 0 0 8px rgba(24, 144, 255, 0.7);
+}
+
+/* 悬停效果 */
+.nav-btn:hover {
+    color: #40a9ff;
+    background: linear-gradient(to right, rgba(24, 144, 255, 0.1), transparent);
+}
+
+/* 添加动画效果 */
+@keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+.bottom-nav1, .bottom-nav2, .bottom-nav3,
+.bottom-nav4, .bottom-nav5, .bottom-nav6, .bottom-nav7, .bottom-nav8 {
+    animation: slideIn 0.5s ease forwards;
+    animation-delay: calc(var(--order) * 0.1s);
+}
+
+.bottom-nav1 { --order: 1; }
+.bottom-nav2 { --order: 2; }
+.bottom-nav3 { --order: 3; }
+.bottom-nav4 { --order: 4; }
+.bottom-nav5 { --order: 5; }
+.bottom-nav6 { --order: 6; }
+.bottom-nav7 { --order: 7; }
+.bottom-nav8 { --order: 8; }
+
+/* 顶部导航栏样式 */
+.nav-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    background: #011635;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    width: 100%;
+    height: 60px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    overflow: visible;
+}
+
+.nav-left {
+    width: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.nav-right {
+    width: 50%;
+    position: relative;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.logo {
+    text-align: center;
+    font-size: 1.5rem;
+    color: #40a9ff;
+    font-weight: bold;
+    z-index: 2;
+    position: relative;
+}
+
+.logout-btn {
+    background: #ff4d4f;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    margin-left: 20px;
+    z-index: 2;
+}
+
+.logout-btn:hover {
+    background: #ff7875;
+    transform: translateY(-2px);
+}
+
+.logout-icon {
+    font-size: 1.2rem;
+}
+
+/* 装饰图片样式 */
+.left-decoration,
+.right-decoration {
+    width: 266px;
+    height: 75px;
+    object-fit: contain;
+    position: relative;
+    transition: transform 0.3s ease;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.left-decoration {
+    left: 120px;
+}
+
+.right-decoration {
+    right: 120px;
+    margin-right: 20px;
+}
+
+/* .left-decoration:hover,
+.right-decoration:hover {
+    transform: scale(1.1);
+} */
+
+/* 修改按钮样式以适应新布局 */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    background-color: #40a9ff;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+.btn-icon {
+    font-size: 16px;
+}
+
+/* 主容器通用样式 */
+.main-container {
+    margin-top: 70px;
+    position: relative;
+    z-index: 5;
+    padding-left: 70px;
+    box-sizing: border-box;
+}
+
+/* 确保monitor页面的主容器也有相同的左侧边距 */
+.monitor-page .main-container {
+    padding-left: 70px;
+}
+
+/* 媒体查询：适应不同屏幕尺寸下的导航键布局 */
+@media screen and (max-height: 800px) {
+    /* 在较短的屏幕上减小导航键之间的距离 */
+    .bottom-nav1 { top: 90px; }
+    .bottom-nav2 { top: 145px; }
+    .bottom-nav3 { top: 200px; }
+    .bottom-nav4 { top: 255px; }
+    .bottom-nav5 { top: 310px; }
+    .bottom-nav8 { top: 365px; }
+    .bottom-nav7 { top: 420px; }
+    .bottom-nav6 { top: 475px; }
+    
+    /* 减小导航键尺寸 */
+    .bottom-nav1, .bottom-nav2, .bottom-nav3, .bottom-nav4, 
+    .bottom-nav5, .bottom-nav6, .bottom-nav7, .bottom-nav8 {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .btn-icon {
+        font-size: 1.2rem;
+    }
+}
+
+@media screen and (max-height: 600px) {
+    /* 在更短的屏幕上进一步减小间距 */
+    .bottom-nav1 { top: 80px; }
+    .bottom-nav2 { top: 130px; }
+    .bottom-nav3 { top: 180px; }
+    .bottom-nav4 { top: 230px; }
+    .bottom-nav5 { top: 280px; }
+    .bottom-nav8 { top: 330px; }
+    .bottom-nav7 { top: 380px; }
+    .bottom-nav6 { top: 430px; }
+    
+    /* 进一步减小导航键尺寸 */
+    .bottom-nav1, .bottom-nav2, .bottom-nav3, .bottom-nav4, 
+    .bottom-nav5, .bottom-nav6, .bottom-nav7, .bottom-nav8 {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .btn-icon {
+        font-size: 1.1rem;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    /* 适应窄屏幕，确保导航按钮不会太过靠左 */
+    .bottom-nav1, .bottom-nav2, .bottom-nav3, .bottom-nav4,
+    .bottom-nav5, .bottom-nav6, .bottom-nav7, .bottom-nav8 {
+        left: 0;
+        border-radius: 0 10px 10px 0;
+    }
+    
+    .bottom-nav1:hover, .bottom-nav2:hover, .bottom-nav3:hover,
+    .bottom-nav4:hover, .bottom-nav5:hover, .bottom-nav6:hover,
+    .bottom-nav7:hover, .bottom-nav8:hover {
+        width: 110px; /* 悬停时宽度减小 */
+    }
+    
+    .btn-text {
+        font-size: 0.8rem;
+    }
+}
+

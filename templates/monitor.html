@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时监控 - 占道经营智能监测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nav-bar.css') }}">
+    <!-- 页面预加载脚本，需要最先加载 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
+<style>
+    body {
+            background: linear-gradient(145deg, #001529, #002a54);
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .page-title {
+            text-align: center;
+            margin: 15px auto 5px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #e6e6e6;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+        
+        .page-title::after {
+            content: "";
+            display: block;
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, #1890ff, #40a9ff);
+            margin: 8px auto;
+            border-radius: 3px;
+        }
+        
+        .page-subtitle {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #8c8c8c;
+            margin-bottom: 15px;
+        }
+        
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .monitor-section {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .status-bar {
+            margin-bottom: 10px;
+            background: rgba(0, 21, 41, 0.6);
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            border-radius: 4px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 10px;
+        }
+        
+        .status-label {
+            color: #8c8c8c;
+            margin-right: 5px;
+        }
+        
+        .status-value {
+            color: #1890ff;
+            font-weight: 500;
+        }
+        
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        /* 单视图模式 */
+        .monitor-grid.single-view {
+            grid-template-columns: 1fr;
+        }
+        
+        .monitor-grid.single-view .monitor-item:first-child {
+            grid-column: 1;
+        }
+        
+        .monitor-grid.single-view .monitor-item:nth-child(2) {
+            grid-column: 1;
+            margin-top: 10px;
+        }
+        
+        .monitor-item {
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        .monitor-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .video-container {
+            padding-top: 65%;
+            position: relative;
+            background: rgba(0, 21, 41, 0.8);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .camera-id {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            z-index: 2;
+        }
+        
+        .timestamp {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            z-index: 2;
+        }
+        
+        .video-status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(82, 196, 26, 0.8);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            z-index: 2;
+        }
+        
+        .monitor-info {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 5px;
+            background: rgba(0, 21, 41, 0.6);
+            border-radius: 0 0 4px 4px;
+        }
+        
+        .location {
+            font-size: 0.9rem;
+            color: #e6e6e6;
+        }
+        
+        .status {
+            font-size: 0.85rem;
+            color: #52c41a;
+        }
+        
+        .alert-section {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .alert-panel {
+            height: 100%;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 10px 15px;
+            background: rgba(255, 77, 79, 0.1);
+        }
+        
+        .alert-list {
+            max-height: calc(100vh - 260px);
+            overflow-y: auto;
+        }
+        
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .action-btn {
+            background: rgba(24, 144, 255, 0.2);
+            border: 1px solid rgba(24, 144, 255, 0.5);
+            color: #1890ff;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .action-btn:hover {
+            background: rgba(24, 144, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .btn-icon {
+            margin-right: 5px;
+        }
+        
+        .control-btn-big {
+            margin: 0;
+        }
+        
+        /* 扫描线效果 */
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(24, 144, 255, 0.8), transparent);
+            animation: scan 2.5s linear infinite;
+            z-index: 1;
+        }
+        
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+            100% {
+                top: 100%;
+            }
+        }
+        
+        /* 分析结果样式 */
+        .analysis-result {
+            padding: 15px;
+            color: #e6e6e6;
+        }
+        
+        .empty-result {
+            text-align: center;
+            color: #8c8c8c;
+            font-style: italic;
+        }
+        
+        .analysis-result ul {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        
+        .analysis-result li {
+            margin-bottom: 5px;
+            color: #1890ff;
+        }
+        
+        @media (max-width: 992px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .monitor-grid.single-view {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* 文件上传区域样式 */
+        .upload-container {
+            background: #001529;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(24, 144, 255, 0.3);
+        }
+        
+        .upload-container h3 {
+            color: #1890ff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .upload-icon {
+            margin-right: 10px;
+        }
+        
+        .file-input-container {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            background: rgba(24, 144, 255, 0.2);
+            border: 1px solid rgba(24, 144, 255, 0.5);
+            color: #1890ff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        
+        .file-input-label:hover {
+            background: rgba(24, 144, 255, 0.3);
+        }
+        
+        #selectedFileName {
+            color: #a0a0a0;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(90deg, #1890ff, #40a9ff);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(24, 144, 255, 0.5);
+        }
+        
+        .upload-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .upload-status.uploading {
+            color: #faad14;
+        }
+        
+        .upload-status.success {
+            color: #52c41a;
+        }
+        
+        .upload-status.error {
+            color: #ff4d4f;
+        }
+        
+        /* 视频列表样式 */
+        .video-list-container {
+            background: #001529;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .video-list-container h3 {
+            color: #1890ff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .list-icon {
+            margin-right: 10px;
+        }
+        
+        .video-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+        }
+        
+        .video-item {
+            background: rgba(0, 21, 41, 0.8);
+            border: 1px solid rgba(24, 144, 255, 0.2);
+            border-radius: 4px;
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        
+        .video-item:hover {
+            background: rgba(24, 144, 255, 0.1);
+            border-color: rgba(24, 144, 255, 0.5);
+        }
+        
+        .video-name {
+            color: #e6e6e6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150px;
+        }
+        
+        .video-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .video-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: all 0.2s;
+        }
+        
+        .video-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .play-btn {
+            color: #52c41a;
+        }
+        
+        .delete-btn {
+            color: #ff4d4f;
+        }
+        
+        .empty-video-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 5px;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        
+        .empty-video-list .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: rgba(24, 144, 255, 0.5);
+        }
+        
+        .empty-video-list .empty-text {
+            font-size: 0.9rem;
+        }
+        
+        /* AI推理样式 */
+        .ai-inference {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(24, 144, 255, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+        
+        .detection-box {
+            position: absolute;
+            border: 2px solid #ff4d4f;
+            background-color: rgba(255, 77, 79, 0.2);
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        .detection-label {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            background-color: rgba(255, 77, 79, 0.8);
+            color: white;
+            padding: 2px 6px;
+            font-size: 12px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+        
+        /* 摄像头选择按钮样式 */
+        .camera-select-container {
+            margin: 8px 0;
+            padding: 5px 0;
+            border-top: 1px solid rgba(24, 144, 255, 0.2);
+            border-bottom: 1px solid rgba(24, 144, 255, 0.2);
+        }
+        
+        .camera-select-title {
+            font-size: 0.85rem;
+            color: #8c8c8c;
+            margin-bottom: 5px;
+        }
+        
+        .camera-select-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .camera-btn {
+            background: rgba(0, 21, 41, 0.6);
+            border: 1px solid rgba(24, 144, 255, 0.3);
+            color: #1890ff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .camera-btn:hover {
+            background: rgba(24, 144, 255, 0.1);
+            border-color: rgba(24, 144, 255, 0.5);
+        }
+        
+        .camera-btn.active {
+            background: rgba(24, 144, 255, 0.2);
+            border-color: #1890ff;
+            color: white;
+        }
+        
+        /* 开关按钮样式 */
+        .camera-switch-container {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            margin-right: 10px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+        
+        input:checked + .slider {
+            background-color: #52c41a;
+        }
+        
+        input:focus + .slider {
+            box-shadow: 0 0 1px #52c41a;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .slider.round {
+            border-radius: 24px;
+        }
+        
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        
+        .switch-label {
+            font-size: 0.9rem;
+            color: #e6e6e6;
+        }
+        
+        /* 全屏模式下的样式 */
+        .fullscreen-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .fullscreen-video video,
+        .fullscreen-video canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+        
+        .exit-fullscreen {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 77, 79, 0.8);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            z-index: 10000;
+        }
+</style>
+</head>
+<body class="monitor-page">
+    <!-- 顶部导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-left">
+            <img src="{{ url_for('static', filename='images/view7.png') }}" class="left-decoration" alt="装饰图">
+        </div>
+        <div class="logo">实时监控中心</div>
+        <div class="nav-right">
+            <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
+            <a href="{{ url_for('logout') }}" class="logout-btn">
+                <span class="logout-icon">↩</span>
+                退出登录
+            </a>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 仪表盘布局 -->
+        <div class="dashboard-layout">
+            <!-- 监控区域 -->
+            <div class="monitor-section">
+                <!-- 状态栏 -->
+                <div class="status-bar">
+                    <div class="status-item">
+                        <span class="status-label">在线摄像头：</span>
+                        <span class="status-value" id="onlineCameras">0/{{ camera_count }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">检测率：</span>
+                        <span class="status-value" id="detectionRate">0次/分钟</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">系统状态：</span>
+                        <span class="status-value" id="systemStatus">运行中</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">可用摄像头：</span>
+                        <span class="status-value">{{ camera_count }}个</span>
+                    </div>
+                </div>
+
+                <!-- 监控视频网格 -->
+                <div class="monitor-grid" id="monitorGrid">
+                    <!-- 摄像头原始视频区域 -->
+                    <div class="monitor-item">
+                        <div class="video-container">
+                            <div class="camera-id" id="camera1Label">实时摄像头 1</div>
+                            <div class="timestamp" id="timestamp1">--:--:--</div>
+                            <div class="video-status-badge" id="videoStatus1">准备中</div>
+                            <div class="scanline"></div>
+                            <!-- 添加视频流显示元素 -->
+                            <img id="videoStream1" src="{{ url_for('video_feed') }}" alt="实时视频流" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                        <div class="monitor-info">
+                            <span class="location" id="videoName1">本地摄像头 1</span>
+                            <span class="status" id="status1">正在播放</span>
+                        </div>
+                    </div>
+                    
+                    <!-- AI分析视频区域 -->
+                    <div class="monitor-item">
+                        <div class="video-container">
+                            <div class="camera-id">AI分析结果 1</div>
+                            <div class="timestamp" id="timestamp2">--:--:--</div>
+                            <div class="video-status-badge" id="videoStatus2">准备中</div>
+                            <div class="ai-inference" id="aiStatus">AI分析中</div>
+                            <div class="scanline"></div>
+                            <!-- 添加AI分析视频流显示元素 -->
+                            <img id="aiVideoStream" src="{{ url_for('video_feed_processed') }}" alt="AI分析视频流" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                        <div class="monitor-info">
+                            <span class="location" id="videoName2">实时分析 1</span>
+                            <span class="status" id="status2">正在分析</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 摄像头原始视频区域 2
+                    <div class="monitor-item">
+                        <div class="video-container">
+                            <div class="camera-id" id="camera2Label">实时摄像头 2</div>
+                            <div class="timestamp" id="timestamp3">--:--:--</div>
+                            <div class="video-status-badge" id="videoStatus3">准备中</div>
+                            <div class="scanline"></div>
+                        </div>
+                        <div class="monitor-info">
+                            <span class="location" id="videoName3">本地摄像头 2</span>
+                            <span class="status" id="status3">未播放</span>
+                        </div>
+                    </div>
+                    
+                    AI分析视频区域 2
+                    <div class="monitor-item">
+                        <div class="video-container">
+                            <div class="camera-id">AI分析结果 2</div>
+                            <div class="timestamp" id="timestamp4">--:--:--</div>
+                            <div class="video-status-badge" id="videoStatus4">准备中</div>
+                            <div class="ai-inference" id="aiStatus2">AI分析中</div>
+                            <div class="scanline"></div>
+                        </div>
+                        <div class="monitor-info">
+                            <span class="location" id="videoName4">实时分析 2</span>
+                            <span class="status" id="status4">准备中</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 控制面板 -->
+                <div class="control-panel">
+                    <div class="control-item">
+                        <button id="startCameraBtn" class="action-btn">
+                            <span class="btn-icon">▶️</span>启动摄像头
+                        </button>
+                        <button id="stopCameraBtn" class="action-btn">
+                            <span class="btn-icon">⏹️</span>停止摄像头
+                        </button>
+                    </div>
+                    <div class="control-item">
+                        <button id="layoutBtn" class="action-btn">
+                            <span class="btn-icon">🔄</span>切换布局
+                        </button>
+                        <button id="fullscreenBtn" class="action-btn">
+                            <span class="btn-icon">📺</span>全屏模式
+                        </button>
+                    </div>
+                    <div class="control-item">
+                        <button id="captureBtn" class="action-btn">
+                            <span class="btn-icon">📸</span>拍照分析
+                        </button>
+                        <button id="refreshBtn" class="action-btn">
+                            <span class="btn-icon">🔄</span>刷新视频
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 警报区域 -->
+            <div class="alert-section">
+                <div class="alert-panel" id="alertPanel">
+                    <div class="panel-header">
+                        <h3><span class="alert-icon">🚨</span>实时警报</h3>
+                        <button class="minimize-btn" id="minimizeAlerts">−</button>
+                    </div>
+                    <div class="alert-list" id="alertList">
+                        <!-- 警报会通过 JavaScript 动态添加 -->
+                        <div class="empty-alerts" id="emptyAlerts">
+                            <div class="empty-icon">🔔</div>
+                            <div class="empty-text">暂无警报，系统正在监测中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加分析结果显示区域 -->
+        <div class="panel card-shadow" style="margin-top: 20px;">
+            <div class="panel-header">
+                <h3 class="panel-title">分析结果</h3>
+            </div>
+            <div class="panel-body">
+                <div id="analysisResult" class="analysis-result">
+                    <p class="empty-result">尚未进行分析</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="bottom-nav1">
+        {% if is_admin %}
+        <a href="{{ url_for('admin_home') }}" class="nav-btn">
+        {% else %}
+        <a href="{{ url_for('user_home') }}" class="nav-btn">
+        {% endif %}
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">主界面</span>
+        </a>
+    </div>
+    <div class="bottom-nav2">
+        <a href="{{ url_for('analysis') }}" class="nav-btn">
+            <span class="btn-icon">📊</span>
+            <span class="btn-text">数据分析</span>
+        </a>
+    </div>
+    <div class="bottom-nav3">
+        <a href="{{ url_for('monitor') }}" class="nav-btn active">
+            <span class="btn-icon">📷</span>
+            <span class="btn-text">实时监控</span>
+        </a>
+    </div>
+    <div class="bottom-nav4">
+        <a href="{{ url_for('history') }}" class="nav-btn">
+            <span class="btn-icon">📝</span>
+            <span class="btn-text">历史记录</span>
+        </a>
+    </div>
+
+    <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    
+    <div class="bottom-nav8">
+        <a href="{{ url_for('profile') }}" class="nav-btn">
+            <span class="btn-icon">👤</span>
+            <span class="btn-text">个人中心</span>
+        </a>
+    </div>
+    <div class="bottom-nav7">
+        <a href="{{ url_for('settings') }}" class="nav-btn">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">系统设置</span>
+        </a>
+    </div>
+    <div class="bottom-nav6">
+        <a href="{{ url_for('about') }}" class="nav-btn">
+            <span class="btn-icon">ℹ️</span>
+            <span class="btn-text">关于系统</span>
+        </a>
+    </div>
+
+    <!-- JS 文件 -->
+    <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+    <script>
+        // 简单更新时间戳的功能
+        function updateTimestamps() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                
+                const timestampElements = document.querySelectorAll('[id^="timestamp"]');
+                timestampElements.forEach(function(element) {
+                    element.textContent = timeString;
+                });
+        }
+        
+        // 更新视频状态
+        function updateVideoStatus(running = true) {
+            if (running) {
+                // 更新原始视频状态
+                document.getElementById('videoStatus1').textContent = '正在播放';
+                document.getElementById('status1').textContent = '正在播放';
+                
+                // 更新AI分析视频状态
+                document.getElementById('videoStatus2').textContent = '正在分析';
+                document.getElementById('status2').textContent = '正在分析';
+                
+                // 更新在线摄像头数量
+                document.getElementById('onlineCameras').textContent = '1/{{ camera_count }}';
+                
+                // 更新检测率（模拟数据）
+                document.getElementById('detectionRate').textContent = '15次/分钟';
+                
+                // 更新系统状态
+                document.getElementById('systemStatus').textContent = '运行中';
+            } else {
+                // 更新为停止状态
+                document.getElementById('videoStatus1').textContent = '已停止';
+                document.getElementById('status1').textContent = '已停止';
+                document.getElementById('videoStatus2').textContent = '已停止';
+                document.getElementById('status2').textContent = '已停止';
+                document.getElementById('onlineCameras').textContent = '0/{{ camera_count }}';
+                document.getElementById('systemStatus').textContent = '已暂停';
+            }
+        }
+        
+        // 刷新视频流
+        function refreshVideoStreams() {
+            const timestamp = new Date().getTime();
+            document.getElementById('videoStream1').src = "{{ url_for('video_feed') }}?" + timestamp;
+            document.getElementById('aiVideoStream').src = "{{ url_for('video_feed_processed') }}?" + timestamp;
+            updateVideoStatus(true);
+        }
+        
+        // 启动/停止摄像头
+        function startCamera() {
+            fetch('/start_camera', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        refreshVideoStreams();
+                    } else {
+                        alert('启动摄像头失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('启动摄像头错误:', error);
+                    alert('启动摄像头请求失败');
+                });
+        }
+        
+        function stopCamera() {
+            fetch('/stop_camera', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateVideoStatus(false);
+                    } else {
+                        alert('停止摄像头失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('停止摄像头错误:', error);
+                    alert('停止摄像头请求失败');
+                });
+        }
+        
+        // 拍照分析
+        function captureFrame() {
+            fetch('/capture_frame', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 显示分析结果
+                        document.getElementById('analysisResult').innerHTML = 
+                            `<p>分析时间: ${data.timestamp}</p>
+                             <p>检测目标: ${data.detections.length}</p>
+                             <ul>
+                                 ${data.detections.map(det => `<li>${det.class_name} (置信度: ${det.confidence.toFixed(2)})</li>`).join('')}
+                             </ul>`;
+                    } else {
+                        alert('拍照分析失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('拍照分析错误:', error);
+                    alert('拍照分析请求失败');
+                });
+        }
+        
+        // 切换布局
+        function toggleLayout() {
+            const monitorGrid = document.getElementById('monitorGrid');
+            monitorGrid.classList.toggle('single-view');
+        }
+        
+        // 全屏模式
+        function toggleFullscreen() {
+            const videoElement = document.getElementById('videoStream1');
+            
+            if (!document.fullscreenElement) {
+                // 进入全屏
+                if (videoElement.requestFullscreen) {
+                    videoElement.requestFullscreen();
+                } else if (videoElement.webkitRequestFullscreen) {
+                    videoElement.webkitRequestFullscreen();
+                } else if (videoElement.msRequestFullscreen) {
+                    videoElement.msRequestFullscreen();
+                }
+            } else {
+                // 退出全屏
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        }
+        
+        // 页面加载完成后更新时间戳和视频状态
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化UI更新计时器
+            setInterval(updateTimestamps, 1000);
+            
+            // 更新视频状态
+            updateVideoStatus();
+            
+            // 检查视频流是否加载成功
+            const videoStream1 = document.getElementById('videoStream1');
+            const aiVideoStream = document.getElementById('aiVideoStream');
+            
+            videoStream1.onload = function() {
+                document.getElementById('videoStatus1').textContent = '正在播放';
+            };
+            
+            videoStream1.onerror = function() {
+                document.getElementById('videoStatus1').textContent = '连接错误';
+                document.getElementById('status1').textContent = '连接失败';
+            };
+            
+            aiVideoStream.onload = function() {
+                document.getElementById('videoStatus2').textContent = '正在分析';
+            };
+            
+            aiVideoStream.onerror = function() {
+                document.getElementById('videoStatus2').textContent = '分析失败';
+                document.getElementById('status2').textContent = '连接失败';
+            };
+            
+            // 添加按钮事件监听器
+            document.getElementById('startCameraBtn').addEventListener('click', startCamera);
+            document.getElementById('stopCameraBtn').addEventListener('click', stopCamera);
+            document.getElementById('layoutBtn').addEventListener('click', toggleLayout);
+            document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+            document.getElementById('captureBtn').addEventListener('click', captureFrame);
+            document.getElementById('refreshBtn').addEventListener('click', refreshVideoStreams);
+        });
+    </script>
+
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
+    
+    <!-- 引入聊天AI组件 -->
+    {% include 'chat_ai.html' %}
+    <!-- 版权信息 -->
+<div class="copyright" style="text-align: center; padding: 10px; color: #666; font-size: 12px; margin-top: 20px;">
+    © 2025 灵瞳-城市治理智能感知终端. 保留所有权利.
+</div>
+</body>
+</html>

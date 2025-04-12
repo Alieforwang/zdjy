@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史记录 - 占道经营智能监测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/logout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/nav-bar.css') }}">
+</head>
+<style>
+    body {
+        background-color: #002a54;
+        color: white; /* 确保文本颜色在深色背景上可读 */
+    }
+</style>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="nav-bar">
+        <div class="nav-left">
+            <img src="{{ url_for('static', filename='images/view7.png') }}" class="left-decoration" alt="装饰图">
+        </div>
+        <div class="logo">历史记录</div>
+        <div class="nav-right">
+            <img src="{{ url_for('static', filename='images/view8.png') }}" class="right-decoration" alt="装饰图">
+            <a href="{{ url_for('logout') }}" class="logout-btn">
+                <span class="logout-icon">↩</span>
+                退出登录
+            </a>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="filters">
+            <div class="filter-group">
+                <label>时间范围：</label>
+                <select id="dateFilter">
+                    <option value="7">最近7天</option>
+                    <option value="30">最近30天</option>
+                    <option value="90">最近90天</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>类型：</label>
+                <select id="typeFilter">
+                    <option value="all">所有类型</option>
+                    <option value="zdjy_ld">流动摊位</option>
+                    <option value="zdjy_gd">固定摊位</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <button id="exportBtn" class="export-btn">导出CSV</button>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>检测时间</th>
+                        <th>类型</th>
+                        <th>位置</th>
+                        <th>准确度</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <!-- 数据将通过JavaScript动态添加 -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination">
+            <button id="prevPage" class="page-btn">上一页</button>
+            <span id="pageInfo">第 1 页</span>
+            <button id="nextPage" class="page-btn">下一页</button>
+        </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">检测详情</div>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="detailContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="bottom-nav1">
+        {% if is_admin %}
+        <a href="{{ url_for('admin_home') }}" class="nav-btn active">
+        {% else %}
+        <a href="{{ url_for('user_home') }}" class="nav-btn active">
+        {% endif %}
+            <span class="btn-icon">🏠</span>
+            <span class="btn-text">主界面</span>
+        </a>
+    </div>
+    <div class="bottom-nav2">
+        <a href="{{ url_for('analysis') }}" class="nav-btn">
+            <span class="btn-icon">📊</span>
+            <span class="btn-text">数据分析</span>
+        </a>
+    </div>
+    <div class="bottom-nav3">
+        <a href="{{ url_for('monitor') }}" class="nav-btn">
+            <span class="btn-icon">📷</span>
+            <span class="btn-text">实时监控</span>
+        </a>
+    </div>
+    <div class="bottom-nav4">
+        <a href="{{ url_for('history') }}" class="nav-btn">
+            <span class="btn-icon">📝</span>
+            <span class="btn-text">历史记录</span>
+        </a>
+    </div>
+    {% if is_admin %}
+    <div class="bottom-nav5">
+        <a href="{{ url_for('user_management') }}" class="nav-btn">
+            <span class="btn-icon">👥</span>
+            <span class="btn-text">用户管理</span>
+        </a>
+    </div>
+    {% endif %}
+    <div class="bottom-nav8">
+        <a href="{{ url_for('profile') }}" class="nav-btn">
+            <span class="btn-icon">👤</span>
+            <span class="btn-text">个人中心</span>
+        </a>
+    </div>
+    <div class="bottom-nav7">
+        <a href="{{ url_for('settings') }}" class="nav-btn">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">系统设置</span>
+        </a>
+    </div>
+    <div class="bottom-nav6">
+        <a href="{{ url_for('about') }}" class="nav-btn">
+            <span class="btn-icon">ℹ️</span>
+            <span class="btn-text">关于系统</span>
+        </a>
+    </div>
+    
+ 
+
+    <script src="{{ url_for('static', filename='js/history.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
+    <!-- 页面过渡动画脚本 -->
+    <script src="{{ url_for('static', filename='js/page-transition.js') }}"></script>
+    
+    <!-- 引入聊天AI组件 -->
+    {% include 'chat_ai.html' %}
+    <!-- 版权信息 -->
+<div class="copyright" style="text-align: center; padding: 10px; color: #666; font-size: 12px; margin-top: 20px;">
+    © 2025 灵瞳-城市治理智能感知终端. 保留所有权利.
+</div>
+</body>
+</html>

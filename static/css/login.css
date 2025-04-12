@@ -1,0 +1,412 @@
+@font-face {
+    font-family: 'CustomFont';
+    src: url('../zit/biaot.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'TextFont';
+    src: url('../zit/shuf.ttf') format('truetype');
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'TextFont', sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    color: #fff;
+    background: url('../images/background.jpg') no-repeat center center fixed;
+    background-size: cover;
+    display: flex;
+    flex-direction: column;
+}
+
+#particleCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.main-content {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 10%;
+    gap: 40px;
+}
+
+.left-content {
+    flex: 1;
+    max-width: 600px;
+    padding: 20px;
+}
+
+.content-separator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    padding: 20px;
+    height: 300px;
+}
+
+.separator-line {
+    width: 2px;
+    height: 100px;
+    background: linear-gradient(180deg, 
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.3) 50%,
+        rgba(255,255,255,0) 100%);
+}
+
+.separator-circle {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    animation: pulse 2s infinite;
+}
+
+.separator-icon {
+    font-size: 1.2em;
+    transform: translateY(-1px);
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 4px 25px rgba(30, 144, 255, 0.2);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        transform: scale(1);
+    }
+}
+
+.login-container {
+    flex: 1;
+    max-width: 380px;
+    display: flex;
+    justify-content: flex-start;
+}
+
+h1 {
+    font-family: 'CustomFont', sans-serif;
+    font-size: 3.5em;
+    margin-bottom: 20px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.subtitle {
+    font-size: 1.4em;
+    margin-bottom: 60px;
+    opacity: 0.9;
+}
+
+.feature-list {
+    margin-top: 40px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 25px;
+    font-size: 1.1em;
+}
+
+.feature-item .icon {
+    margin-right: 15px;
+    font-size: 1.2em;
+}
+
+.login-box {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 30px;
+    border-radius: 15px;
+    width: 380px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    transform: translateZ(0);
+    will-change: transform, box-shadow;
+}
+
+.login-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.login-box h2 {
+    color: #fff;
+    font-size: 1.8em;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.login-desc {
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 0.9em;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 1em;
+    color: #fff;
+    transition: all 0.4s cubic-bezier(0.33, 1, 0.68, 1);
+    will-change: transform, border-color, background;
+    transform: translateZ(0);
+}
+
+.input-group input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background: #1E90FF;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+    will-change: transform, background-color, box-shadow;
+}
+
+button:hover {
+    background: #0066CC;
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 6px 20px rgba(30, 144, 255, 0.25);
+}
+
+button:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 10px rgba(30, 144, 255, 0.15);
+    transition-duration: 0.1s;
+}
+
+.footer {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 15px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9em;
+}
+
+.footer .separator {
+    margin: 0 10px;
+    opacity: 0.5;
+}
+
+.login-tabs, .user-tabs {
+    display: flex;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.tab-btn, .user-tab-btn {
+    flex: 1;
+    padding: 12px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transform: translateZ(0);
+}
+
+.tab-btn::after, .user-tab-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: #1E90FF;
+    transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    transform: translateX(-50%);
+    will-change: width;
+}
+
+.tab-btn.active::after, .user-tab-btn.active::after {
+    width: 100%;
+}
+
+.tab-btn.active, .user-tab-btn.active {
+    color: #fff;
+}
+
+.tab-btn:hover::after, .user-tab-btn:hover::after {
+    width: 70%;
+}
+
+.login-form, .user-panel {
+    display: block;
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+    width: 100%;
+    transform: translateY(15px);
+    transition: opacity 0.5s cubic-bezier(0.33, 1, 0.68, 1),
+                visibility 0.5s cubic-bezier(0.33, 1, 0.68, 1),
+                transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+.login-form.active, .user-panel.active {
+    opacity: 1;
+    visibility: visible;
+    position: relative;
+    transform: translateY(0);
+}
+
+.user-tabs {
+    margin: -10px 0 20px;
+}
+
+#userLogin .login-desc {
+    margin-bottom: 20px;
+    transition: opacity 0.3s ease;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+    .main-content {
+        flex-direction: column;
+        padding: 20px;
+        gap: 20px;
+    }
+
+    .content-separator {
+        flex-direction: row;
+        height: auto;
+        padding: 10px;
+    }
+
+    .separator-line {
+        width: 100px;
+        height: 2px;
+        background: linear-gradient(90deg, 
+            rgba(255,255,255,0) 0%,
+            rgba(255,255,255,0.3) 50%,
+            rgba(255,255,255,0) 100%);
+    }
+
+    .left-content {
+        text-align: center;
+        margin-bottom: 0;
+    }
+
+    .login-container {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
+
+    h1 {
+        font-size: 2.8em;
+    }
+}
+
+@media (max-width: 480px) {
+    .content-separator {
+        display: none;
+    }
+    
+    .main-content {
+        gap: 30px;
+    }
+
+    .login-box {
+        width: 100%;
+        max-width: 340px;
+    }
+
+    h1 {
+        font-size: 2.2em;
+    }
+
+    .subtitle {
+        font-size: 1.2em;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-form.active > *, .user-panel.active > * {
+    animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.login-form.active > *:nth-child(2) {
+    animation-delay: 0.05s;
+}
+
+.login-form.active > *:nth-child(3) {
+    animation-delay: 0.1s;
+} 
