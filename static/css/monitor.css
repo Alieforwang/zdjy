@@ -21,108 +21,6 @@ body {
     position: relative; /* 为定位导航按钮提供参考 */
 }
 
-/* 底部导航按钮整体容器 - 与styles.css统一，但不再需要容器元素 */
-/* 为了保持样式一致性，我们保留这些类的定义，但不再需要实际的容器元素 */
-.bottom-nav-container {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 70px;
-    z-index: 990;
-    pointer-events: none; /* 容器本身不响应点击事件 */
-}
-
-/* 导航按钮样式 - 与styles.css统一 */
-.bottom-nav1, .bottom-nav2, .bottom-nav3, .bottom-nav4, .bottom-nav5, .bottom-nav6, .bottom-nav7, .bottom-nav8 {
-    position: fixed;
-    left: 5px;
-    width: 55px;
-    height: 55px;
-    background: rgba(1, 22, 53, 0.9);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
-    z-index: 999;
-    border-radius: 0 12px 12px 0;
-    transition: all 0.3s ease;
-    pointer-events: auto; /* 按钮本身可以响应点击事件 */
-}
-
-/* 设置每个导航按钮的位置 - 与styles.css统一 */
-.bottom-nav1 { top: 150px; }
-.bottom-nav2 { top: 215px; }
-.bottom-nav3 { top: 280px; }
-.bottom-nav4 { top: 345px; }
-.bottom-nav5 { top: 410px; }
-.bottom-nav8 { top: 475px; }
-.bottom-nav7 { top: 540px; }
-.bottom-nav6 { top: 605px; }
-
-/* 悬停时展开效果 - 与styles.css统一 */
-.bottom-nav1:hover, .bottom-nav2:hover, .bottom-nav3:hover,
-.bottom-nav4:hover, .bottom-nav5:hover, .bottom-nav6:hover, 
-.bottom-nav7:hover, .bottom-nav8:hover {
-    width: 130px;
-    background: rgba(1, 22, 53, 0.95);
-    box-shadow: 3px 3px 12px rgba(0, 0, 0, 0.25);
-    left: 0;
-}
-
-/* 顶部标题区域 - 统一所有页面导航栏样式 */
-.nav-bar {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    background: #011635;
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    z-index: 100;
-    position: relative;
-    overflow: hidden;
-}
-
-.nav-left, .nav-right {
-    display: flex;
-    align-items: center;
-}
-
-.nav-left {
-    justify-content: flex-start;
-    padding-left: 15px;
-}
-
-.nav-right {
-    justify-content: flex-end;
-    padding-right: 15px;
-}
-
-.logo {
-    text-align: center;
-    font-size: 1.5rem;
-    color: #1890ff;
-    font-weight: bold;
-    z-index: 2;
-    position: relative;
-}
-
-.left-decoration, .right-decoration {
-    height: 75px;
-    width: 266px;
-    opacity: 0.8;
-    object-fit: contain;
-}
-
-.left-decoration {
-    margin-left: 0;
-}
-
-.right-decoration {
-    margin-right: 20px;
-    margin-left: auto;
-}
-
 /* 主容器样式 */
 .main-container {
     margin-top: 0;
@@ -139,15 +37,11 @@ body {
 /* 仪表盘布局 */
 .dashboard-layout {
     display: grid;
-    grid-template-columns: 3.4fr 0.6fr;
-    gap: 0;
+    grid-template-columns: 1fr 320px;  /* 修改为两列布局，监控区域占1份，警报区域固定宽度 */
+    gap: 15px;
     width: 100%;
     margin-bottom: 15px;
-}
-
-.monitor-section, .alert-section {
-    display: flex;
-    flex-direction: column;
+    align-items: start;
 }
 
 /* 监控区域样式 */
@@ -155,9 +49,19 @@ body {
     display: flex;
     flex-direction: column;
     padding-left: 45px;
-    padding-right: 0;
+    padding-right: 15px;
     flex: 1;
-    margin-right: -5px;
+}
+
+/* 警报区域样式 */
+.alert-section {
+    display: flex;
+    flex-direction: column;
+    width: 320px;  /* 固定宽度 */
+    position: sticky;
+    top: 20px;
+    height: calc(100vh - 220px);  /* 减小高度 */
+    margin-top: 0;
 }
 
 /* 状态栏样式 */
@@ -243,21 +147,22 @@ body {
 /* 视频容器样式 */
 .video-container {
     position: relative;
-    padding-top: 60%;
-    background: #000;
+    padding-top: 65%;
+    background: rgba(0, 21, 41, 0.8);
     border-radius: 4px;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     max-width: 100%;
 }
 
-.video-container video {
+.video-container video,
+.video-container img {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     z-index: 1;
 }
 
@@ -462,10 +367,10 @@ body {
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(24, 144, 255, 0.3);
     transition: all 0.3s ease;
-    height: 100%;
+    height: 100%;  /* 使用父容器高度 */
     width: 100%;
-    margin-left: auto;
     min-width: 0;
+    position: relative;  /* 修改为相对定位 */
 }
 
 .alert-panel:hover {
@@ -516,6 +421,7 @@ body {
     color: #ff7875;
 }
 
+/* 警报列表样式 */
 .alert-list {
     flex: 1;
     overflow-y: auto;
@@ -523,7 +429,8 @@ body {
     scrollbar-color: rgba(255, 77, 79, 0.5) rgba(0, 21, 41, 0.3);
     padding: 5px;
     background: rgba(0, 21, 41, 0.6);
-    max-height: calc(100vh - 260px);
+    height: calc(100vh - 200px);  /* 调整高度 */
+    max-height: none;  /* 移除最大高度限制 */
 }
 
 .alert-item {
@@ -585,7 +492,8 @@ body {
 
 /* 控制面板样式 */
 .control-panel {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-top: 10px;
     padding: 10px;
@@ -596,55 +504,30 @@ body {
 
 .control-item {
     display: flex;
-    gap: 10px;
-}
-
-.action-btn {
-    background: rgba(0, 21, 41, 0.8);
-    border: 1px solid rgba(24, 144, 255, 0.4);
-    color: #1890ff;
-    padding: 8px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 5px;
 }
 
+.action-btn {
+    background: rgba(24, 144, 255, 0.2);
+    border: 1px solid rgba(24, 144, 255, 0.5);
+    color: #1890ff;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .action-btn:hover {
-    background: rgba(24, 144, 255, 0.2);
-    border-color: rgba(24, 144, 255, 0.7);
-}
-
-.action-btn.primary {
-    background: rgba(24, 144, 255, 0.2);
-    border-color: rgba(24, 144, 255, 0.6);
-}
-
-.action-btn.primary:hover {
     background: rgba(24, 144, 255, 0.3);
-    border-color: rgba(24, 144, 255, 0.8);
-}
-
-.action-btn.danger {
-    background: rgba(255, 77, 79, 0.2);
-    border-color: rgba(255, 77, 79, 0.6);
-    color: #ff4d4f;
-}
-
-.action-btn.danger:hover {
-    background: rgba(255, 77, 79, 0.3);
-    border-color: rgba(255, 77, 79, 0.8);
-}
-
-.action-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    transform: translateY(-2px);
 }
 
 .action-btn .btn-icon {
-    font-size: 16px;
+    margin-right: 5px;
 }
 
 /* 页面标题样式 */
@@ -673,7 +556,6 @@ body {
     color: #8c8c8c;
     margin-bottom: 15px;
 }
-
 
 /* 摄像头权限提示 */
 .camera-permission-tip {
@@ -755,40 +637,39 @@ body {
 /* 响应式调整 */
 @media (max-width: 1200px) {
     .dashboard-layout {
-        grid-template-columns: 3.4fr 0.6fr;
+        grid-template-columns: 1fr 300px;  /* 稍微减小警报区域宽度 */
     }
     
-    .monitor-grid {
-        margin-bottom: 15px;
-    }
-    
-    .alert-panel {
-        max-height: 400px;
+    .alert-section {
+        height: calc(100vh - 160px);  /* 在小屏幕上进一步减小高度 */
     }
     
     .alert-list {
-        max-height: 350px;
+        height: calc(100vh - 210px);
     }
 }
 
 @media (max-width: 992px) {
     .dashboard-layout {
-        grid-template-columns: 1fr;
-    }
-    
-    .monitor-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;  /* 在小屏幕上恢复单列布局 */
     }
     
     .monitor-section {
         padding-left: 35px;
-        margin-right: 0;
+        padding-right: 35px;
     }
     
     .alert-section {
-        max-width: 100%;
-        padding-left: 35px;
-        padding-right: 35px;
+        height: auto;  /* 在移动设备上恢复自动高度 */
+        position: static;
+    }
+    
+    .alert-list {
+        height: 500px;  /* 设置固定高度 */
+    }
+    
+    .alert-panel {
+        height: 500px;
     }
 }
 
@@ -1047,25 +928,52 @@ body {
     opacity: 0.7;
 }
 
-/* AI分析状态显示 */
+/* AI推理样式 */
 .ai-inference {
     position: absolute;
-    bottom: 30px;
-    right: 8px;
-    background: rgba(0, 21, 41, 0.7);
-    color: #1890ff;
-    padding: 3px 8px;
-    border-radius: 2px;
-    font-size: 0.7rem;
-    z-index: 5;
-    border: 1px solid rgba(24, 144, 255, 0.5);
+    top: 10px;
+    right: 10px;
+    background: rgba(24, 144, 255, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    z-index: 10;
 }
 
-/* 警报详情 */
-.alert-detail {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.6);
-    margin-top: 4px;
+/* 扫描线效果 */
+.scanline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(24, 144, 255, 0.8), transparent);
+    animation: scan 2.5s linear infinite;
+    z-index: 1;
+}
+
+@keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+}
+
+/* 检测框和标签样式 */
+.detection-box {
+    position: absolute;
+    border: 2px solid;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.detection-label {
+    position: absolute;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: white;
+    white-space: nowrap;
+    border-radius: 0 0 4px 4px;
+    pointer-events: none;
 }
 
 /* 摄像头监控页面样式 */
@@ -1257,35 +1165,6 @@ body {
     }
 }
 
-/* 检测框和标签样式优化 */
-.detection-box {
-    position: absolute;
-    border: 2px solid;
-    box-sizing: border-box;
-    pointer-events: none;
-}
-
-.detection-label {
-    position: absolute;
-    padding: 3px 6px;
-    font-size: 12px;
-    color: white;
-    white-space: nowrap;
-    border-radius: 0 0 4px 4px;
-    pointer-events: none;
-}
-
-/* 警报区域样式 */
-.alert-section {
-    display: flex;
-    flex-direction: column;
-    max-width: 320px;
-    width: 100%;
-    margin-left: auto;
-    padding-right: 15px;
-    padding-left: 0;
-}
-
 /* 导航按钮链接 - 与styles.css统一 */
 .nav-btn {
     width: 100%;
@@ -1389,6 +1268,42 @@ body {
 .bottom-nav6 { --order: 6; }
 .bottom-nav7 { --order: 7; }
 .bottom-nav8 { --order: 8; }
+
+/* 全屏模式下的样式 */
+.fullscreen-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.fullscreen-video video,
+.fullscreen-video canvas,
+.fullscreen-video img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+}
+
+.exit-fullscreen {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 77, 79, 0.8);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    z-index: 10000;
+}
 
 
 

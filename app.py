@@ -4051,3 +4051,70 @@ def capture_frame():
             'success': False,
             'message': f'拍照分析出错: {str(e)}'
         })
+
+# 全局模型实例
+yolo_model = None
+
+@app.route('/init_model', methods=['POST'])
+def init_model():
+    global yolo_model
+    try:
+        if yolo_model is None:
+            yolo_model = YOLOv8(weights='models/best.pt', device='cpu')
+            return jsonify({'success': True, 'message': '模型初始化成功'})
+        return jsonify({'success': True, 'message': '模型已初始化'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/analyze_frame', methods=['POST'])
+def analyze_frame():
+    try:
+        if 'frame' not in request.files:
+            return jsonify({'success': False, 'message': '未收到图像数据'})
+        
+        # 获取图像数据
+        frame = request.files['frame']
+        img = Image.open(frame.stream)
+        
+        # 转换为OpenCV格式
+        img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        
+        # 使用模型进行预测
+        results = yolo_model.predict(img_cv)
+        
+        if results and len(results) > 0:
+            # 获取第一个结果
+            result = results[0]
+            
+            # 绘制检测框
+            annotated_frame = result.plot()
+            
+            # 转换为base64
+            _, buffer = cv2.imencode('.jpg', annotated_frame)
+            annotated_frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            
+            # 提取检测结果
+            detections = []
+            for box in result.boxes:
+                cls_id = int(box.cls[0].item())
+                conf = box.conf[0].item()
+                cls_name = result.names[cls_id]
+                detections.append({
+                    'class': cls_name,
+                    'confidence': conf,
+                    'bbox': box.xyxy[0].tolist()
+                })
+            
+            return jsonify({
+                'success': True,
+                'annotated_frame': annotated_frame_base64,
+                'detections': detections
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'annotated_frame': None,
+                'detections': []
+            })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})

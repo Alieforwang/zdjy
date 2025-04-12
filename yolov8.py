@@ -639,7 +639,7 @@ class YOLOv8:
         初始化YOLOv8检测器
         :param weights: 模型权重文件路径
         :param device: 使用的设备(cuda 或 cpu)
-        :param load_params: 模型加载的额外参数，例如 {'weights_only': True}
+        :param load_params: 模型加载的额外参数
         """
         try:
             # 设置默认加载参数
@@ -654,7 +654,7 @@ class YOLOv8:
                 logger.error(f"模型文件不存在: {weights}")
                 raise FileNotFoundError(f"模型文件不存在: {weights}")
             
-            # 检查CUDA是否可用，如果请求CUDA但不可用，则回退到CPU
+            # 检查CUDA是否可用
             if device == 'cuda' and not torch.cuda.is_available():
                 logger.warning("CUDA请求但不可用，回退到CPU设备")
                 device = 'cpu'
@@ -670,28 +670,25 @@ class YOLOv8:
                 except Exception as e:
                     logger.warning(f"无法将模型加载到 {device}，回退到CPU: {str(e)}")
                     device = 'cpu'
-                    # 如果移动到GPU失败，确保模型在CPU上
                     self.model.to('cpu')
             else:
                 logger.info("模型已加载到CPU设备")
             
-            # 记录模型原始类别映射
+            # 记录模型类别映射
             self.original_names = self.model.names.copy() if hasattr(self.model, 'names') else {}
-            logger.info(f"模型原始类别映射: {self.original_names}")
+            logger.info(f"模型类别映射: {self.original_names}")
             
-            # 创建自定义类别名称映射，但不修改原始模型的属性
+            # 创建自定义类别名称映射
             self.custom_names = {}
             
             # 针对占道经营检测的模型，定义自定义类别名称
             if len(self.original_names) == 2:
-                # 默认的占道经营类别映射
                 self.custom_names = {
                     0: '占道经营-固定摊位',
                     1: '占道经营-流动摊位'
                 }
                 logger.info(f"已创建自定义类别映射: {self.custom_names}")
             
-            # 记录模型加载完成
             logger.info(f"YOLOv8模型加载完成")
             
         except Exception as e:
@@ -752,7 +749,6 @@ class YOLOv8:
                 # 如果有自定义类别名称，应用到结果中
                 if self.custom_names:
                     for result in results:
-                        # 创建结果的names属性副本
                         if not hasattr(result, 'custom_names'):
                             result.custom_names = self.custom_names
             
