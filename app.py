@@ -1014,6 +1014,7 @@ def get_history():
                 file_path = row[3]  # 原始文件路径
                 result_path = row[4]  # 结果文件路径
                 result_folder = row[5]  # 结果文件所在文件夹
+                detect_type = row[6]  # 检测类型
                 
                 # 确保原始文件路径正确
                 if not file_path.startswith('/static/'):
@@ -1032,10 +1033,21 @@ def get_history():
                         clean_path = result_path.replace('static/', '')
                         result_url = f'/{result_folder}{clean_path}'
                 
+                # 将检测类型代码转换为中文显示名称
+                type_display = '未知'
+                if detect_type:
+                    if detect_type == 'zdjy_gd':
+                        type_display = '固定摊位'
+                    elif detect_type == 'zdjy_ld':
+                        type_display = '流动摊位'
+                    else:
+                        # 保留原始值，以防有其他类型
+                        type_display = detect_type
+                
                 records.append({
                     'id': int(row[0]),
                     'detect_time': row[8].strftime('%Y-%m-%d %H:%M:%S'),  # created_at在索引8
-                    'type': row[6] or '未知',  # detect_type在索引6
+                    'type': type_display,  # 使用转换后的类型名称
                     'location': '未指定',  # 没有location字段，使用默认值
                     'confidence': float(row[7]) if row[7] else None,  # confidence在索引7
                     'file_path': file_path,
@@ -1159,7 +1171,8 @@ def get_latest_result():
                 'file_type': 'image',
                 'file_path': '/static/@results/default_result.jpg',
                 'result_image': '/static/@results/default_result.jpg',
-                'detect_type': 'zdjy_gd',
+                'detect_type': '固定摊位', # 修改为中文显示
+                'detect_type_code': 'zdjy_gd', # 保留原始代码，以防前端需要
                 'confidence': 0.0,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'detections': [
@@ -1203,7 +1216,8 @@ def get_latest_result():
                     'file_type': 'image',
                     'file_path': '/static/@results/default_result.jpg',
                     'result_image': '/static/@results/default_result.jpg',
-                    'detect_type': 'zdjy_gd',
+                    'detect_type': '固定摊位', # 修改为中文显示
+                    'detect_type_code': 'zdjy_gd', # 保留原始代码，以防前端需要
                     'confidence': 0.0,
                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'detections': [
@@ -1222,6 +1236,19 @@ def get_latest_result():
         
         # 构建响应数据
         record = result[0]
+        detect_type = record[6]  # 获取检测类型代码
+        
+        # 将检测类型代码转换为中文显示名称
+        type_display = '未知'
+        if detect_type:
+            if detect_type == 'zdjy_gd':
+                type_display = '固定摊位'
+            elif detect_type == 'zdjy_ld':
+                type_display = '流动摊位'
+            else:
+                # 保留原始值，以防有其他类型
+                type_display = detect_type
+        
         response_data = {
             'success': True,
             'data': {
@@ -1230,7 +1257,8 @@ def get_latest_result():
                 'file_type': record[2],
                 'file_path': '/static/@results/default_result.jpg',  # 默认图片
                 'result_image': '/static/@results/default_result.jpg',  # 默认图片
-                'detect_type': record[6],
+                'detect_type': type_display,  # 使用中文显示
+                'detect_type_code': detect_type,  # 保留原始代码，以防前端需要
                 'confidence': float(record[7]),
                 'created_at': record[8].strftime('%Y-%m-%d %H:%M:%S'),
                 'detections': [
@@ -1282,7 +1310,8 @@ def get_latest_result():
                 'file_type': 'image',
                 'file_path': '/static/@results/default_result.jpg',
                 'result_image': '/static/@results/default_result.jpg',
-                'detect_type': 'zdjy_gd',
+                'detect_type': '固定摊位', # 修改为中文显示
+                'detect_type_code': 'zdjy_gd', # 保留原始代码，以防前端需要
                 'confidence': 0.0,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'detections': [
@@ -2849,7 +2878,7 @@ def gen_frames():
 
 def gen_frames_processed():
     """生成AI处理后的摄像头帧的生成器函数"""
-    global camera, camera_active
+    global camera, camera_active, latest_detections, last_detection_time, DETECTION_CONFIDENCE_THRESHOLD
     
     # 初始化摄像头（与gen_frames共享同一个摄像头实例）
     if camera is None:
@@ -2861,7 +2890,7 @@ def gen_frames_processed():
     if model is None:
         # 如果模型加载失败，返回错误信息图像
         error_img = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(error_img, "AI模型加载失败", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(error_img, "AI Model Failed", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         ret, buffer = cv2.imencode('.jpg', error_img)
         error_frame = buffer.tobytes()
         while True:
@@ -2872,6 +2901,7 @@ def gen_frames_processed():
     frame_count = 0
     last_time = time.time()
     fps_display = 0
+    last_save_time = time.time()  # 添加上次保存数据库的时间
     
     while camera_active:
         success, frame = camera.read()
@@ -2885,7 +2915,7 @@ def gen_frames_processed():
             # 每隔一定帧数进行一次完整的AI分析（提高性能）
             if frame_count % 3 == 0:  # 每3帧分析一次
                 # 执行目标检测
-                results = model.predict(img=frame, conf_threshold=0.25)
+                results = model.predict(img=frame, conf_threshold=DETECTION_CONFIDENCE_THRESHOLD)  # 使用全局置信度阈值
                 
                 # 获取当前FPS
                 current_time = time.time()
@@ -2903,15 +2933,115 @@ def gen_frames_processed():
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                     
                     # 检测到的目标数量
-                    num_detections = len(results[0].boxes)
-                    cv2.putText(processed_frame, f"检测目标: {num_detections}", (10, 60), 
+                    cv2.putText(processed_frame, f"Objects: {len(results[0].boxes)}", (10, 60), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    
+                    # 显示当前置信度阈值
+                    cv2.putText(processed_frame, f"Threshold: {DETECTION_CONFIDENCE_THRESHOLD:.2f}", (10, 90), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    
+                    # 更新最新检测结果，用于实时警报
+                    if len(results[0].boxes) > 0:
+                        current_detections = []
+                        
+                        # 保存当前帧并生成检测结果图像路径，每15秒最多保存一次
+                        current_time = time.time()
+                        if current_time - last_save_time >= 15 and len(results[0].boxes) > 0:
+                            try:
+                                # 生成唯一文件名
+                                timestamp = int(time.time())
+                                random_suffix = random.randint(1000, 9999)
+                                file_name = f"camera_{timestamp}_{random_suffix}.jpg"
+                                result_filename = f"result_{file_name}"
+                                
+                                # 保存原始帧和检测结果帧
+                                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name)
+                                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+                                
+                                # 保存原始图像
+                                cv2.imwrite(file_path, frame)
+                                # 保存检测结果图像
+                                cv2.imwrite(result_path, processed_frame)
+                                
+                                # 初始化检测类型变量 - 默认为固定摊位
+                                detect_type = 'zdjy_gd'
+                                
+                                # 提取检测结果的详细信息
+                                for i in range(len(results[0].boxes)):
+                                    box = results[0].boxes[i]
+                                    cls_id = int(box.cls[0].item())
+                                    conf = float(box.conf[0].item())
+                                    
+                                    # 获取类别名称 - 只使用zdjy_gd和zdjy_ld作为可能的类型
+                                    if cls_id == 1:  # 类别1对应流动摊位，优先级更高
+                                        # 如果检测到流动摊位，则整体类型设为流动摊位
+                                        detect_type = 'zdjy_ld'
+                                        name = "占道经营-流动摊位"
+                                        cls_type = 'zdjy_ld'
+                                    elif cls_id == 0:  # 类别0对应固定摊位
+                                        name = "占道经营-固定摊位"
+                                        cls_type = 'zdjy_gd'
+                                    else:
+                                        # 其他类别也默认为固定摊位
+                                        name = results[0].names.get(cls_id, "未知类别")
+                                        cls_type = 'zdjy_gd'
+                                    
+                                    current_detections.append({
+                                        "class": cls_id,
+                                        "class_name": name,
+                                        "class_type": cls_type,
+                                        "confidence": conf,
+                                        "time": datetime.now().strftime('%H:%M:%S')
+                                    })
+                                
+                                # 计算平均置信度
+                                avg_confidence = sum(d["confidence"] for d in current_detections) / len(current_detections)
+                                
+                                # 保存到数据库 - 修复请求上下文问题
+                                try:
+                                    db = DBM.DatabaseManager()
+                                    db.connect()
+                                    
+                                    # 使用默认用户ID 1 代替session中的用户ID
+                                    # 避免在请求上下文外使用session
+                                    user_id = 1  # 使用默认用户ID
+                                    
+                                    # 使用与分析页面相同的SQL插入语句
+                                    insert_query = """
+                                    INSERT INTO analysis_records 
+                                    (user_id, file_type, file_path, result_path, result_folder, detect_type, confidence, created_at) 
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                                    """
+                                    
+                                    # 执行插入
+                                    db.update_data(
+                                        insert_query, 
+                                        (user_id, 'camera', file_path, result_filename, app.config['RESULT_FOLDER'], detect_type, avg_confidence)
+                                    )
+                                    
+                                    logger.info(f"摄像头检测结果已保存至数据库，检测类型：{detect_type}，置信度：{avg_confidence:.4f}")
+                                    db.disconnect()
+                                    
+                                    # 更新上次保存时间
+                                    last_save_time = current_time
+                                    
+                                except Exception as e:
+                                    logger.error(f"保存摄像头检测结果到数据库时出错: {str(e)}")
+                            
+                            except Exception as e:
+                                logger.error(f"保存摄像头检测图像时出错: {str(e)}")
+                        
+                        # 更新全局检测结果
+                        latest_detections = current_detections
+                        last_detection_time = datetime.now()
                 else:
                     # 没有检测结果，只显示原始帧和FPS
                     processed_frame = frame.copy()
                     cv2.putText(processed_frame, f"FPS: {fps_display:.1f}", (10, 30), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                    cv2.putText(processed_frame, "无检测目标", (10, 60), 
+                    cv2.putText(processed_frame, "No Objects", (10, 60), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    cv2.putText(processed_frame, f"Threshold: {DETECTION_CONFIDENCE_THRESHOLD:.2f}", (10, 90), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             else:
                 # 非分析帧，使用上一帧的处理结果或原始帧
@@ -2934,7 +3064,7 @@ def gen_frames_processed():
             
             # 在出错时显示错误信息
             error_img = frame.copy() if frame is not None else np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(error_img, "AI处理错误", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.putText(error_img, "AI Processing Error", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             ret, buffer = cv2.imencode('.jpg', error_img)
             error_frame = buffer.tobytes()
             yield (b'--frame\r\n'
@@ -3722,6 +3852,200 @@ def export_history():
     except Exception as e:
         print(f"导出历史记录错误: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
+# 在适当的位置导入必要的模块
+import json
+from datetime import datetime
+
+# 添加一个全局变量来存储最新的检测结果
+latest_detections = []
+last_detection_time = None
+
+# 添加API端点用于获取最新的检测结果
+@app.route('/api/latest_detections', methods=['GET'])
+def get_latest_detections():
+    """获取最新的检测结果，用于实时警报显示"""
+    global latest_detections, last_detection_time
+    
+    # 检查是否有新的检测结果
+    if not latest_detections or last_detection_time is None:
+        return jsonify({
+            "status": "success",
+            "has_new_detections": False,
+            "detections": []
+        })
+    
+    # 检查是否是最近30秒内的检测结果
+    time_diff = (datetime.now() - last_detection_time).total_seconds()
+    if time_diff > 30:  # 超过30秒的结果不显示为"新"
+        return jsonify({
+            "status": "success",
+            "has_new_detections": False,
+            "detections": latest_detections
+        })
+    
+    return jsonify({
+        "status": "success",
+        "has_new_detections": True,
+        "detections": latest_detections
+    })
+
+# 添加一个新的API路由，用于手动保存当前摄像头检测结果
+@app.route('/api/save_camera_detection', methods=['POST'])
+def save_camera_detection():
+    """保存当前摄像头检测"""
+    try:
+        # 检查是否有检测结果
+        if not latest_detections or len(latest_detections) == 0:
+            return jsonify({
+                'success': False,
+                'message': '当前没有检测结果可保存'
+            }), 400
+        
+        # 生成唯一文件名
+        timestamp = int(time.time())
+        random_suffix = random.randint(1000, 9999)
+        file_name = f"camera_{timestamp}_{random_suffix}.jpg"
+        result_filename = f"result_{file_name}"
+        
+        # 获取当前摄像头帧
+        camera_frame = None
+        if camera is not None and camera.isOpened():
+            ret, camera_frame = camera.read()
+        
+        if camera_frame is None:
+            return jsonify({
+                'success': False,
+                'message': '获取摄像头帧失败'
+            }), 500
+        
+        # 保存路径
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name)
+        result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+        
+        # 获取模型实例
+        model = get_model()
+        if model is None:
+            return jsonify({
+                'success': False,
+                'message': 'AI模型加载失败'
+            }), 500
+        
+        # 执行目标检测
+        results = model.predict(img=camera_frame, conf_threshold=DETECTION_CONFIDENCE_THRESHOLD)
+        
+        if results and len(results) > 0 and len(results[0].boxes) > 0:
+            # 绘制检测结果
+            processed_frame = results[0].plot()
+            
+            # 添加置信度阈值显示
+            cv2.putText(processed_frame, f"Threshold: {DETECTION_CONFIDENCE_THRESHOLD:.2f}", (10, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            # 保存原始图像和结果图像
+            cv2.imwrite(file_path, camera_frame)
+            cv2.imwrite(result_path, processed_frame)
+            
+            # 初始化检测类型变量 - 默认为固定摊位
+            detect_type = 'zdjy_gd'
+            
+            # 计算平均置信度
+            avg_confidence = sum(d["confidence"] for d in latest_detections) / len(latest_detections)
+            
+            # 检查是否有流动摊位检测结果，有则整体类型设为流动摊位
+            for detection in latest_detections:
+                if detection["class"] == 1:  # 类别1对应流动摊位
+                    detect_type = 'zdjy_ld'
+                    break
+            
+            # 保存到数据库
+            try:
+                user_id = session.get('user_id')
+                if not user_id:
+                    return jsonify({
+                        'success': False,
+                        'message': '用户未登录'
+                    }), 401
+                
+                db = DBM.DatabaseManager()
+                db.connect()
+                
+                # 插入分析记录
+                insert_query = """
+                INSERT INTO analysis_records 
+                (user_id, file_type, file_path, result_path, result_folder, detect_type, confidence, created_at) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                """
+                
+                db.update_data(
+                    insert_query, 
+                    (user_id, 'camera', file_path, result_filename, app.config['RESULT_FOLDER'], detect_type, avg_confidence)
+                )
+                
+                db.disconnect()
+                
+                # 返回成功消息
+                return jsonify({
+                    'success': True,
+                    'message': '检测结果已保存',
+                    'file_path': file_path,
+                    'result_path': result_path
+                })
+                
+            except Exception as e:
+                logger.error(f"保存摄像头检测结果到数据库时出错: {str(e)}")
+                return jsonify({
+                    'success': False,
+                    'message': f'保存到数据库失败: {str(e)}'
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'message': '未检测到有效目标'
+            }), 400
+    
+    except Exception as e:
+        logger.error(f"保存摄像头检测时出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'保存失败: {str(e)}'
+        }), 500
+
+# 添加全局变量存储当前的置信度阈值
+DETECTION_CONFIDENCE_THRESHOLD = 0.25  # 默认置信度阈值
+
+# 添加一个API端点用于设置置信度阈值
+@app.route('/api/set_confidence_threshold', methods=['POST'])
+def set_confidence_threshold():
+    """设置检测的置信度阈值"""
+    global DETECTION_CONFIDENCE_THRESHOLD
+    
+    try:
+        # 获取请求数据
+        data = request.get_json()
+        if not data or 'threshold' not in data:
+            return jsonify({"status": "error", "message": "未提供置信度阈值"}), 400
+        
+        # 获取新的阈值
+        new_threshold = float(data['threshold'])
+        
+        # 验证阈值是否在有效范围内
+        if new_threshold < 0.1 or new_threshold > 0.9:
+            return jsonify({"status": "error", "message": "置信度阈值必须在0.1到0.9之间"}), 400
+        
+        # 更新阈值
+        DETECTION_CONFIDENCE_THRESHOLD = new_threshold
+        logger.info(f"置信度阈值已更新为: {DETECTION_CONFIDENCE_THRESHOLD}")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"置信度阈值已设置为: {DETECTION_CONFIDENCE_THRESHOLD}",
+            "threshold": DETECTION_CONFIDENCE_THRESHOLD
+        })
+        
+    except Exception as e:
+        logger.error(f"设置置信度阈值时出错: {str(e)}")
+        return jsonify({"status": "error", "message": f"设置置信度阈值时出错: {str(e)}"}), 500
 
 if __name__ == '__main__':
     try:

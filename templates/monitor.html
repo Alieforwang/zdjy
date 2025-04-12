@@ -115,6 +115,14 @@
                             <span class="btn-icon">🔄</span>刷新视频
                         </button>
                     </div>
+                    <!-- 添加置信度阈值调整 -->
+                    <div class="control-item confidence-control">
+                        <label for="confidenceSlider">置信度阈值: <span id="confidenceValue">0.25</span></label>
+                        <input type="range" id="confidenceSlider" min="10" max="90" value="25" class="slider">
+                        <button id="applyConfidenceBtn" class="small-action-btn">
+                            应用
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -201,6 +209,7 @@
         let isAnalyzing = false;
         let frameInterval = null;
         const ANALYSIS_INTERVAL = 1000; // 分析间隔(ms)
+        let detectionPollingInterval = null; // 添加轮询间隔变量
 
         // 更新时间戳
         function updateTimestamps() {
@@ -221,12 +230,18 @@
                 aiStatus.textContent = 'AI分析中';
                 document.getElementById('status1').textContent = '正在播放';
                 document.getElementById('status2').textContent = '正在分析';
+                
+                // 启动摄像头时开始轮询检测结果
+                startDetectionPolling();
             } else {
                 status1.textContent = '已停止';
                 status2.textContent = '已停止';
                 aiStatus.textContent = '分析已停止';
                 document.getElementById('status1').textContent = '已停止';
                 document.getElementById('status2').textContent = '已停止';
+                
+                // 停止摄像头时停止轮询
+                stopDetectionPolling();
             }
         }
 
@@ -293,6 +308,45 @@
             }
         }
 
+        // 开始轮询检测结果
+        function startDetectionPolling() {
+            // 如果已经在轮询中，先停止
+            if (detectionPollingInterval) {
+                clearInterval(detectionPollingInterval);
+            }
+            
+            // 立即获取一次检测结果
+            fetchLatestDetections();
+            
+            // 每3秒获取一次最新检测结果
+            detectionPollingInterval = setInterval(fetchLatestDetections, 3000);
+            console.log('开始轮询检测结果');
+        }
+        
+        // 停止轮询检测结果
+        function stopDetectionPolling() {
+            if (detectionPollingInterval) {
+                clearInterval(detectionPollingInterval);
+                detectionPollingInterval = null;
+                console.log('停止轮询检测结果');
+            }
+        }
+        
+        // 获取最新检测结果
+        async function fetchLatestDetections() {
+            try {
+                const response = await fetch('/api/latest_detections');
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.has_new_detections) {
+                    // 更新警报列表
+                    updateAlertList(data.detections);
+                }
+            } catch (error) {
+                console.error('获取检测结果失败:', error);
+            }
+        }
+
         // 更新警报列表函数
         function updateAlertList(detections) {
             const alertList = document.getElementById('alertList');
@@ -301,11 +355,26 @@
             if (detections && detections.length > 0) {
                 emptyAlerts.style.display = 'none';
                 
-                detections.forEach(detection => {
+                // 保存当前已经显示的警报数量
+                const currentAlerts = alertList.querySelectorAll('.alert-item').length;
+                
+                // 添加新的警报
+                detections.forEach((detection, index) => {
+                    // 创建新的警报项
                     const alertItem = document.createElement('div');
                     alertItem.className = 'alert-item';
+                    
+                    // 如果是最新的3个检测结果，添加动画效果
+                    if (index < 3) {
+                        alertItem.classList.add('new-alert');
+                        // 3秒后移除动画效果
+                        setTimeout(() => {
+                            alertItem.classList.remove('new-alert');
+                        }, 3000);
+                    }
+                    
                     alertItem.innerHTML = `
-                        <div class="alert-time">${new Date().toLocaleTimeString()}</div>
+                        <div class="alert-time">${detection.time || new Date().toLocaleTimeString()}</div>
                         <div class="alert-content">
                             <span class="alert-type">${detection.class_name || detection.class}</span>
                             <span class="alert-confidence">置信度: ${(detection.confidence * 100).toFixed(1)}%</span>
@@ -318,6 +387,14 @@
                 const detectionRate = document.getElementById('detectionRate');
                 const currentRate = parseInt(detectionRate.textContent) || 0;
                 detectionRate.textContent = `${currentRate + detections.length}次/分钟`;
+                
+                // 限制警报列表最多显示20条
+                const allAlerts = alertList.querySelectorAll('.alert-item');
+                if (allAlerts.length > 20) {
+                    for (let i = 20; i < allAlerts.length; i++) {
+                        alertList.removeChild(allAlerts[i]);
+                    }
+                }
             }
         }
 
@@ -428,20 +505,58 @@
             }
         }
 
-        // 拍照分析函数
+        // 修改拍照分析函数，使其调用新的API保存检测结果到数据库
         async function captureFrame() {
             try {
-                const response = await fetch('/capture_frame', {
+                // 先检查摄像头状态
+                if (!document.getElementById('videoStream1').src || !document.getElementById('aiVideoStream').src) {
+                    alert('请先启动摄像头');
+                    return;
+                }
+                
+                // 显示正在处理的提示
+                const captureBtn = document.getElementById('captureBtn');
+                const originalText = captureBtn.innerHTML;
+                captureBtn.innerHTML = '<span class="btn-icon">⏳</span>处理中...';
+                captureBtn.disabled = true;
+                
+                // 发送请求保存当前检测结果
+                const response = await fetch('/api/save_camera_detection', {
                     method: 'POST'
                 });
+                
+                // 恢复按钮状态
+                captureBtn.innerHTML = originalText;
+                captureBtn.disabled = false;
+                
                 const data = await response.json();
                 
-                if (data.success) {
+                if (response.ok && data.status === 'success') {
                     // 更新警报列表
                     if (data.detections && data.detections.length > 0) {
                         updateAlertList(data.detections);
                     }
-                    alert('拍照分析完成');
+                    
+                    // 显示成功消息
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'detection-saved-alert';
+                    alertDiv.innerHTML = `
+                        <div class="alert-content">
+                            <span class="alert-title">检测结果已保存!</span>
+                            <span class="alert-info">检测类型: ${data.detect_type}</span>
+                            <span class="alert-info">置信度: ${(data.confidence * 100).toFixed(1)}%</span>
+                        </div>
+                    `;
+                    document.body.appendChild(alertDiv);
+                    
+                    // 设置自动消失
+                    setTimeout(() => {
+                        alertDiv.style.opacity = '0';
+                        setTimeout(() => {
+                            document.body.removeChild(alertDiv);
+                        }, 500);
+                    }, 3000);
+                    
                 } else {
                     throw new Error(data.message || '拍照分析失败');
                 }
@@ -461,6 +576,65 @@
             videoStream1.src = `/video_feed?t=${timestamp}`;
             aiVideoStream.src = `/video_feed_processed?t=${timestamp}`;
         }
+
+        // 添加置信度滑块处理逻辑
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取滑块和显示值的元素
+            const confidenceSlider = document.getElementById('confidenceSlider');
+            const confidenceValue = document.getElementById('confidenceValue');
+            const applyConfidenceBtn = document.getElementById('applyConfidenceBtn');
+            
+            // 监听滑块值变化
+            confidenceSlider.addEventListener('input', function() {
+                // 将0-100的值转换为0.1-0.9
+                let value = parseInt(this.value) / 100;
+                confidenceValue.textContent = value.toFixed(2);
+            });
+            
+            // 监听应用按钮点击
+            applyConfidenceBtn.addEventListener('click', async function() {
+                try {
+                    const threshold = parseFloat(confidenceValue.textContent);
+                    
+                    // 发送到服务器更新置信度阈值
+                    const response = await fetch('/api/set_confidence_threshold', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ threshold: threshold })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.status === 'success') {
+                        // 显示成功消息
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'detection-saved-alert';
+                        alertDiv.innerHTML = `
+                            <div class="alert-content">
+                                <span class="alert-title">置信度阈值已更新!</span>
+                                <span class="alert-info">新阈值: ${data.threshold.toFixed(2)}</span>
+                            </div>
+                        `;
+                        document.body.appendChild(alertDiv);
+                        
+                        // 设置自动消失
+                        setTimeout(() => {
+                            alertDiv.style.opacity = '0';
+                            setTimeout(() => {
+                                document.body.removeChild(alertDiv);
+                            }, 500);
+                        }, 3000);
+                    } else {
+                        throw new Error(data.message || '更新置信度阈值失败');
+                    }
+                } catch (error) {
+                    console.error('更新置信度阈值失败:', error);
+                    alert('更新置信度阈值失败: ' + error.message);
+                }
+            });
+        });
     </script>
 
     <!-- 页面过渡动画脚本 -->
@@ -472,5 +646,111 @@
     <div class="copyright" style="text-align: center; padding: 10px; color: #666; font-size: 12px; margin-top: 20px;">
         © 2025 灵瞳-城市治理智能感知终端. 保留所有权利.
     </div>
+
+    <!-- 添加样式用于警报动画 -->
+    <style>
+        .new-alert {
+            animation: fadeInAlert 0.5s ease-in-out;
+            background-color: rgba(255, 165, 0, 0.2); /* 添加背景色突出显示 */
+        }
+        
+        @keyframes fadeInAlert {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .alert-item {
+            transition: background-color 1s ease;
+        }
+
+        .detection-saved-alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(39, 174, 96, 0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+            opacity: 1;
+        }
+        
+        .alert-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .alert-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .alert-info {
+            font-size: 14px;
+            margin-top: 2px;
+        }
+
+        /* 添加置信度滑块样式 */
+        .confidence-control {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            width: 100%;
+        }
+
+        .confidence-control label {
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .slider {
+            width: 100%;
+            height: 10px;
+            background: #2c3e50;
+            outline: none;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+        }
+
+        .small-action-btn {
+            padding: 5px 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+            font-size: 12px;
+            align-self: flex-end;
+        }
+
+        .small-action-btn:hover {
+            background-color: #2980b9;
+        }
+    </style>
 </body>
 </html>

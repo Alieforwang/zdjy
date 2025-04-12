@@ -145,7 +145,7 @@ def predict_image(model, file_path):
                             frame_results = model.predict(
                                 source=frame,
                                 save=False,
-                                conf=0.25
+                                conf=0.5
                             )[0]
                             
                             # 在帧上绘制检测结果
