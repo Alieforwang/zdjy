@@ -676,7 +676,6 @@ def monitor():
                 }]
         except Exception as cam_err:
             logging.error(f"摄像头检测失败: {str(cam_err)}")
-            # 提供默认摄像头信息以确保页面可以加载
             cameras = [{
                 "index": 0,
                 "resolution": "640x480",
@@ -687,42 +686,26 @@ def monitor():
             
         camera_count = len(cameras)
         logging.info(f"传递给前端的摄像头数量: {camera_count}")
-        for i, cam in enumerate(cameras):
-            logging.info(f"摄像头 {i}: 索引={cam['index']}, 名称={cam.get('deviceName', '未命名')}")
         
-        # 将摄像头数据转换为安全的JSON字符串
-        import json
-        camera_data = json.dumps(cameras)
+        # 获取当前用户信息
+        is_admin = session.get('is_admin', False)
         
-        # 获取当前用户信息 - 使用MySQL数据库连接而不是SQLite
-        is_admin = False
-        try:
-            db = DBM.DatabaseManager()
-            result = db.execute_query("SELECT is_admin FROM user WHERE id = %s", (session['user_id'],))
-            
-            if result and isinstance(result, list) and len(result) > 0:
-                if isinstance(result[0], (list, tuple)) and len(result[0]) > 0:
-                    is_admin = bool(result[0][0])
-                elif isinstance(result[0], dict) and 'is_admin' in result[0]:
-                    is_admin = bool(result[0]['is_admin'])
-        except Exception as db_err:
-            logging.error(f"获取用户权限信息出错: {str(db_err)}")
-            # 尝试从会话中获取管理员状态
-            is_admin = session.get('is_admin', False)
-        
-        # 记录成功访问日志
-        logging.info(f"用户 {session.get('username')} 访问监控页面")
+        # 初始化YOLOv8模型
+        model = get_model()
+        if model is None:
+            logging.warning("YOLOv8模型初始化失败，将在前端显示提示")
         
         # 渲染监控页面，传递摄像头信息
-        return render_template('monitor.html', is_admin=is_admin, cameras=cameras, camera_count=camera_count, camera_data=camera_data)
+        return render_template('monitor.html', 
+                             is_admin=is_admin, 
+                             cameras=cameras, 
+                             camera_count=camera_count)
+                             
     except Exception as e:
         logging.error(f"访问监控页面时出错: {str(e)}")
         # 即使出错也尝试渲染页面，提供默认值
         try:
-            # 跳过数据库查询，直接使用session中的is_admin信息
             is_admin = session.get('is_admin', False)
-            
-            # 提供默认摄像头信息
             cameras = [{
                 "index": 0,
                 "resolution": "640x480",
@@ -730,10 +713,10 @@ def monitor():
                 "deviceName": "默认摄像头",
                 "isBuiltin": True
             }]
-            camera_data = json.dumps(cameras)
-            
-            # 提供空摄像头列表作为默认值
-            return render_template('monitor.html', is_admin=is_admin, cameras=cameras, camera_count=1, camera_data=camera_data)
+            return render_template('monitor.html', 
+                                 is_admin=is_admin, 
+                                 cameras=cameras, 
+                                 camera_count=1)
         except Exception as e2:
             logging.error(f"尝试渲染监控页面失败: {str(e2)}")
             flash('系统错误，请稍后再试', 'error')
@@ -3817,304 +3800,3 @@ errorlog = "error.log"
 loglevel = "warning"
 """
 
-@app.route('/api/available_cameras', methods=['GET'])
-def get_available_cameras():
-    try:
-        cameras = detect_available_cameras()
-        return jsonify({
-            "status": "success",
-            "camera_count": len(cameras),
-            "cameras": cameras
-        })
-    except Exception as e:
-        logging.error(f"获取可用摄像头列表时出错: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": str(e),
-            "camera_count": 0,
-            "cameras": []
-        })
-
-@app.route('/hybridaction/zybTrackerStatisticsAction', methods=['GET'])
-def handle_tracker_statistics():
-    """处理跟踪统计请求，这是一个兼容性endpoint"""
-    # 获取请求参数
-    callback = request.args.get('__callback__', '')
-    
-    # 构建标准响应数据
-    response_data = {
-        "status": "success",
-        "data": {},
-        "errCode": 0,
-        "errMsg": ""
-    }
-    
-    # 如果有回调参数，返回JSONP格式
-    if callback:
-        # 将JSON数据转为字符串并包裹在回调函数中
-        jsonp_response = f"{callback}({json.dumps(response_data)});"
-        return Response(jsonp_response, mimetype="application/javascript; charset=utf-8")
-    else:
-        # 普通JSON响应
-        return jsonify(response_data)
-
-def get_model():
-    """获取或初始化全局YOLO模型实例"""
-    global global_model
-    
-    if global_model is None:
-        # 尝试加载模型
-        try:
-            logger.info("初始化YOLOv8模型...")
-            # 尝试查找模型文件
-            weights_path = None
-            for path in [
-                'models/best.pt',
-                'runs/detect/zdjy_model_optimized_nano3/weights/best.pt',
-                'yolov8n.pt'  # 回退到预训练模型
-            ]:
-                if os.path.exists(path):
-                    weights_path = path
-                    break
-            
-            if weights_path:
-                logger.info(f"使用模型权重: {weights_path}")
-                from yolov8 import YOLOv8
-                global_model = YOLOv8(weights=weights_path, device=device)
-                logger.info("YOLOv8模型加载成功")
-            else:
-                logger.error("找不到YOLOv8模型文件")
-                return None
-        except Exception as e:
-            logger.error(f"加载YOLOv8模型时出错: {str(e)}")
-            logger.error(traceback.format_exc())
-            return None
-    
-    return global_model
-
-@app.route('/capture_frame', methods=['POST'])
-def capture_frame():
-    """拍照并分析当前帧"""
-    global camera, last_processed_frame, last_analysis_result
-    
-    try:
-        # 检查摄像头是否可用
-        if camera is None or not camera_active:
-            return jsonify({
-                'success': False, 
-                'message': '摄像头未启动'
-            })
-        
-        # 获取当前帧
-        ret, frame = camera.read()
-        if not ret:
-            return jsonify({
-                'success': False, 
-                'message': '无法从摄像头获取图像'
-            })
-        
-        # 获取模型
-        model = get_model()
-        if model is None:
-            return jsonify({
-                'success': False, 
-                'message': '无法加载AI模型'
-            })
-        
-        # 执行目标检测
-        results = model.predict(img=frame, conf_threshold=0.25)
-        
-        # 处理结果
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        if results and len(results) > 0:
-            result = results[0]
-            
-            # 获取边界框、类别和置信度
-            if hasattr(result, 'boxes') and len(result.boxes) > 0:
-                boxes = result.boxes.xyxy.cpu().numpy() if hasattr(result.boxes, 'xyxy') else []
-                classes = result.boxes.cls.cpu().numpy() if hasattr(result.boxes, 'cls') else []
-                confs = result.boxes.conf.cpu().numpy() if hasattr(result.boxes, 'conf') else []
-                
-                # 准备检测结果
-                detections = []
-                for i in range(len(boxes)):
-                    cls_id = int(classes[i])
-                    conf = float(confs[i])
-                    
-                    # 获取类别名称 (优先使用自定义名称)
-                    class_name = result.custom_names.get(cls_id, '') if hasattr(result, 'custom_names') else ''
-                    if not class_name and hasattr(result, 'names'):
-                        class_name = result.names.get(cls_id, f'未知类别 {cls_id}')
-                    
-                    x1, y1, x2, y2 = boxes[i].astype(int)
-                    
-                    detections.append({
-                        'class_id': cls_id,
-                        'class_name': class_name,
-                        'confidence': conf,
-                        'box': [int(x1), int(y1), int(x2), int(y2)]
-                    })
-                
-                # 保存检测结果
-                last_analysis_result = {
-                    'timestamp': timestamp,
-                    'detections': detections
-                }
-                
-                # 保存标注后的图像
-                output_filename = f"capture_{int(time.time())}.jpg"
-                output_path = os.path.join('static/results', output_filename)
-                annotated_frame = result.plot()
-                cv2.imwrite(output_path, annotated_frame)
-                
-                # 添加分析记录到数据库（可选）
-                try:
-                    db = DBM.DatabaseManager()
-                    db.connect()
-                    
-                    # 生成记录ID
-                    record_id = str(uuid.uuid4())
-                    
-                    # 保存分析记录
-                    query = """
-                    INSERT INTO analysis_records 
-                    (id, user_id, source_type, source_path, result_path, result_folder, analysis_time, detection_count, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """
-                    
-                    db.update_data(query, (
-                        record_id,
-                        session.get('user_id', 'guest'),
-                        'camera',
-                        'live_camera',
-                        output_filename,
-                        'static/results',
-                        timestamp,
-                        len(detections),
-                        'success'
-                    ))
-                    
-                    # 为每个检测结果保存详细信息
-                    for det in detections:
-                        det_query = """
-                        INSERT INTO detection_results
-                        (record_id, class_id, class_name, confidence, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """
-                        
-                        db.update_data(det_query, (
-                            record_id,
-                            det['class_id'],
-                            det['class_name'],
-                            det['confidence'],
-                            det['box'][0],
-                            det['box'][1],
-                            det['box'][2],
-                            det['box'][3]
-                        ))
-                    
-                    db.disconnect()
-                    logger.info(f"已保存分析记录，ID: {record_id}")
-                    
-                except Exception as db_err:
-                    logger.error(f"保存分析记录时出错: {str(db_err)}")
-                
-                return jsonify({
-                    'success': True,
-                    'message': '分析完成',
-                    'timestamp': timestamp,
-                    'detections': detections,
-                    'image_path': url_for('static', filename=f'results/{output_filename}')
-                })
-            
-            else:
-                return jsonify({
-                    'success': True,
-                    'message': '未检测到目标',
-                    'timestamp': timestamp,
-                    'detections': []
-                })
-        
-        else:
-            return jsonify({
-                'success': True,
-                'message': '未检测到目标',
-                'timestamp': timestamp,
-                'detections': []
-            })
-    
-    except Exception as e:
-        logger.error(f"拍照分析出错: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({
-            'success': False,
-            'message': f'拍照分析出错: {str(e)}'
-        })
-
-# 全局模型实例
-yolo_model = None
-
-@app.route('/init_model', methods=['POST'])
-def init_model():
-    global yolo_model
-    try:
-        if yolo_model is None:
-            yolo_model = YOLOv8(weights='models/best.pt', device='cpu')
-            return jsonify({'success': True, 'message': '模型初始化成功'})
-        return jsonify({'success': True, 'message': '模型已初始化'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/analyze_frame', methods=['POST'])
-def analyze_frame():
-    try:
-        if 'frame' not in request.files:
-            return jsonify({'success': False, 'message': '未收到图像数据'})
-        
-        # 获取图像数据
-        frame = request.files['frame']
-        img = Image.open(frame.stream)
-        
-        # 转换为OpenCV格式
-        img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        
-        # 使用模型进行预测
-        results = yolo_model.predict(img_cv)
-        
-        if results and len(results) > 0:
-            # 获取第一个结果
-            result = results[0]
-            
-            # 绘制检测框
-            annotated_frame = result.plot()
-            
-            # 转换为base64
-            _, buffer = cv2.imencode('.jpg', annotated_frame)
-            annotated_frame_base64 = base64.b64encode(buffer).decode('utf-8')
-            
-            # 提取检测结果
-            detections = []
-            for box in result.boxes:
-                cls_id = int(box.cls[0].item())
-                conf = box.conf[0].item()
-                cls_name = result.names[cls_id]
-                detections.append({
-                    'class': cls_name,
-                    'confidence': conf,
-                    'bbox': box.xyxy[0].tolist()
-                })
-            
-            return jsonify({
-                'success': True,
-                'annotated_frame': annotated_frame_base64,
-                'detections': detections
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'annotated_frame': None,
-                'detections': []
-            })
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})

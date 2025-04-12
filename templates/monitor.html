@@ -62,8 +62,8 @@
                             <div class="timestamp" id="timestamp1">--:--:--</div>
                             <div class="video-status-badge" id="videoStatus1">准备中</div>
                             <div class="scanline"></div>
-                            <!-- 添加视频流显示元素 -->
-                            <video id="videoStream1" autoplay playsinline muted style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"></video>
+                            <!-- 使用img标签替代video标签 -->
+                            <img id="videoStream1" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
                         </div>
                         <div class="monitor-info">
                             <span class="location" id="videoName1">本地摄像头 1</span>
@@ -79,8 +79,8 @@
                             <div class="video-status-badge" id="videoStatus2">准备中</div>
                             <div class="ai-inference" id="aiStatus">AI分析中</div>
                             <div class="scanline"></div>
-                            <!-- 添加AI分析视频流显示元素 -->
-                            <video id="aiVideoStream" autoplay playsinline muted style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"></video>
+                            <!-- 使用img标签替代video标签 -->
+                            <img id="aiVideoStream" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
                         </div>
                         <div class="monitor-info">
                             <span class="location" id="videoName2">实时分析 1</span>
@@ -198,104 +198,107 @@
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script>
         // 全局变量
-        let model = null;
         let isAnalyzing = false;
         let frameInterval = null;
         const ANALYSIS_INTERVAL = 1000; // 分析间隔(ms)
 
-        // 初始化模型
-        async function initModel() {
+        // 更新时间戳
+        function updateTimestamps() {
+            const now = new Date();
+            document.getElementById('timestamp1').textContent = now.toLocaleTimeString();
+            document.getElementById('timestamp2').textContent = now.toLocaleTimeString();
+        }
+
+        // 更新视频状态
+        function updateVideoStatus(isActive) {
+            const status1 = document.getElementById('videoStatus1');
+            const status2 = document.getElementById('videoStatus2');
+            const aiStatus = document.getElementById('aiStatus');
+            
+            if (isActive) {
+                status1.textContent = '正在播放';
+                status2.textContent = '正在分析';
+                aiStatus.textContent = 'AI分析中';
+                document.getElementById('status1').textContent = '正在播放';
+                document.getElementById('status2').textContent = '正在分析';
+            } else {
+                status1.textContent = '已停止';
+                status2.textContent = '已停止';
+                aiStatus.textContent = '分析已停止';
+                document.getElementById('status1').textContent = '已停止';
+                document.getElementById('status2').textContent = '已停止';
+            }
+        }
+
+        // 修改现有的startCamera函数
+        async function startCamera() {
             try {
-                const response = await fetch('/init_model', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                // 发送请求到后端启动摄像头
+                const response = await fetch('/start_camera', {
+                    method: 'POST'
                 });
                 const data = await response.json();
+                
                 if (data.success) {
-                    console.log('模型初始化成功');
-                    return true;
+                    // 设置视频源为后端提供的视频流
+                    const videoStream1 = document.getElementById('videoStream1');
+                    const aiVideoStream = document.getElementById('aiVideoStream');
+                    
+                    videoStream1.src = '/video_feed';
+                    aiVideoStream.src = '/video_feed_processed';
+                    
+                    updateVideoStatus(true);
+                    // 移除对 startAnalysis 的调用，因为分析现在在后端进行
+                    document.getElementById('aiStatus').textContent = 'AI分析中';
+                    document.getElementById('onlineCameras').textContent = '1/{{ camera_count }}';
+                    document.getElementById('systemStatus').textContent = '运行中';
                 } else {
-                    console.error('模型初始化失败:', data.message);
-                    return false;
+                    throw new Error(data.message || '启动摄像头失败');
                 }
             } catch (error) {
-                console.error('模型初始化错误:', error);
-                return false;
+                console.error('启动摄像头失败:', error);
+                alert('启动摄像头失败: ' + error.message);
             }
         }
 
-        // 分析视频帧
-        async function analyzeFrame(videoElement) {
-            if (!videoElement || !isAnalyzing) return;
-
+        // 修改现有的stopCamera函数
+        async function stopCamera() {
             try {
-                // 创建画布捕获帧
-                const canvas = document.createElement('canvas');
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(videoElement, 0, 0);
-
-                // 将图像数据发送到服务器
-                const formData = new FormData();
-                canvas.toBlob(async (blob) => {
-                    formData.append('frame', blob);
-
-                    const response = await fetch('/analyze_frame', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            // 更新AI分析视频
-                            updateAIVideo(data.annotated_frame);
-                            // 更新检测结果
-                            updateDetectionResults(data.detections);
-                        }
-                    }
-                }, 'image/jpeg');
+                // 发送请求到后端停止摄像头
+                const response = await fetch('/stop_camera', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    const videoStream1 = document.getElementById('videoStream1');
+                    const aiVideoStream = document.getElementById('aiVideoStream');
+                    
+                    // 更新UI状态
+                    document.getElementById('aiStatus').textContent = '分析已停止';
+                    document.getElementById('onlineCameras').textContent = '0/{{ camera_count }}';
+                    document.getElementById('systemStatus').textContent = '已停止';
+                    
+                    // 清除视频源
+                    videoStream1.src = '';
+                    aiVideoStream.src = '';
+                    
+                    updateVideoStatus(false);
+                } else {
+                    throw new Error(data.message || '停止摄像头失败');
+                }
             } catch (error) {
-                console.error('帧分析错误:', error);
+                console.error('停止摄像头失败:', error);
+                alert('停止摄像头失败: ' + error.message);
             }
         }
 
-        // 更新AI分析视频
-        function updateAIVideo(annotatedFrameData) {
-            const aiVideoStream = document.getElementById('aiVideoStream');
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                canvas.width = aiVideoStream.videoWidth;
-                canvas.height = aiVideoStream.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                aiVideoStream.srcObject = canvas.captureStream();
-            };
-            img.src = 'data:image/jpeg;base64,' + annotatedFrameData;
-        }
-
-        // 更新检测结果
-        function updateDetectionResults(detections) {
-            const aiStatus = document.getElementById('aiStatus');
-            if (detections && detections.length > 0) {
-                aiStatus.textContent = `检测到 ${detections.length} 个目标`;
-                // 更新警报列表
-                updateAlertList(detections);
-            } else {
-                aiStatus.textContent = 'AI分析中';
-            }
-        }
-
-        // 更新警报列表
+        // 更新警报列表函数
         function updateAlertList(detections) {
             const alertList = document.getElementById('alertList');
             const emptyAlerts = document.getElementById('emptyAlerts');
             
-            if (detections.length > 0) {
+            if (detections && detections.length > 0) {
                 emptyAlerts.style.display = 'none';
                 
                 detections.forEach(detection => {
@@ -304,131 +307,160 @@
                     alertItem.innerHTML = `
                         <div class="alert-time">${new Date().toLocaleTimeString()}</div>
                         <div class="alert-content">
-                            <span class="alert-type">${detection.class}</span>
+                            <span class="alert-type">${detection.class_name || detection.class}</span>
                             <span class="alert-confidence">置信度: ${(detection.confidence * 100).toFixed(1)}%</span>
                         </div>
                     `;
                     alertList.insertBefore(alertItem, alertList.firstChild);
                 });
-            }
-        }
 
-        // 启动分析
-        async function startAnalysis() {
-            if (isAnalyzing) return;
-            
-            const videoStream1 = document.getElementById('videoStream1');
-            if (!videoStream1.srcObject) {
-                console.error('视频流未初始化');
-                return;
+                // 更新检测率
+                const detectionRate = document.getElementById('detectionRate');
+                const currentRate = parseInt(detectionRate.textContent) || 0;
+                detectionRate.textContent = `${currentRate + detections.length}次/分钟`;
             }
-
-            // 初始化模型
-            const modelInitialized = await initModel();
-            if (!modelInitialized) {
-                alert('模型初始化失败，请检查服务器状态');
-                return;
-            }
-
-            isAnalyzing = true;
-            frameInterval = setInterval(() => {
-                analyzeFrame(videoStream1);
-            }, ANALYSIS_INTERVAL);
-
-            document.getElementById('aiStatus').textContent = 'AI分析中';
-        }
-
-        // 停止分析
-        function stopAnalysis() {
-            if (frameInterval) {
-                clearInterval(frameInterval);
-                frameInterval = null;
-            }
-            isAnalyzing = false;
-            document.getElementById('aiStatus').textContent = '分析已停止';
-        }
-
-        // 修改现有的startCamera函数
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const videoStream1 = document.getElementById('videoStream1');
-                const aiVideoStream = document.getElementById('aiVideoStream');
-                
-                videoStream1.srcObject = stream;
-                aiVideoStream.srcObject = stream;
-                
-                updateVideoStatus(true);
-                // 自动启动分析
-                startAnalysis();
-            } catch (error) {
-                console.error('启动摄像头失败:', error);
-                alert('启动摄像头失败: ' + error.message);
-            }
-        }
-
-        // 修改现有的stopCamera函数
-        function stopCamera() {
-            const videoStream1 = document.getElementById('videoStream1');
-            const aiVideoStream = document.getElementById('aiVideoStream');
-            
-            // 停止分析
-            stopAnalysis();
-            
-            if (videoStream1.srcObject) {
-                videoStream1.srcObject.getTracks().forEach(track => track.stop());
-                videoStream1.srcObject = null;
-            }
-            
-            if (aiVideoStream.srcObject) {
-                aiVideoStream.srcObject.getTracks().forEach(track => track.stop());
-                aiVideoStream.srcObject = null;
-            }
-            
-            updateVideoStatus(false);
         }
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM加载完成，准备初始化...');
+            
             // 初始化UI更新计时器
             setInterval(updateTimestamps, 1000);
             
             // 更新视频状态
-            updateVideoStatus();
+            updateVideoStatus(false);
             
             // 检查视频流是否加载成功
             const videoStream1 = document.getElementById('videoStream1');
             const aiVideoStream = document.getElementById('aiVideoStream');
             
-            videoStream1.onloadedmetadata = function() {
+            // 为图像添加加载事件
+            videoStream1.onload = function() {
                 document.getElementById('videoStatus1').textContent = '正在播放';
+                document.getElementById('status1').textContent = '正在播放';
             };
             
             videoStream1.onerror = function() {
+                console.error('视频流加载失败');
                 document.getElementById('videoStatus1').textContent = '连接错误';
                 document.getElementById('status1').textContent = '连接失败';
+                
+                // 5秒后自动重试
+                setTimeout(() => {
+                    if (videoStream1.src) {
+                        console.log('尝试重新加载视频流...');
+                        refreshVideoStreams();
+                    }
+                }, 5000);
             };
             
-            aiVideoStream.onloadedmetadata = function() {
+            aiVideoStream.onload = function() {
                 document.getElementById('videoStatus2').textContent = '正在分析';
+                document.getElementById('status2').textContent = '正在分析';
             };
             
             aiVideoStream.onerror = function() {
+                console.error('AI视频流加载失败');
                 document.getElementById('videoStatus2').textContent = '分析失败';
                 document.getElementById('status2').textContent = '连接失败';
+                
+                // 5秒后自动重试
+                setTimeout(() => {
+                    if (aiVideoStream.src) {
+                        console.log('尝试重新加载AI视频流...');
+                        refreshVideoStreams();
+                    }
+                }, 5000);
             };
             
             // 添加按钮事件监听器
             document.getElementById('startCameraBtn').addEventListener('click', startCamera);
             document.getElementById('stopCameraBtn').addEventListener('click', stopCamera);
-            document.getElementById('layoutBtn').addEventListener('click', toggleLayout);
-            document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-            document.getElementById('captureBtn').addEventListener('click', captureFrame);
-            document.getElementById('refreshBtn').addEventListener('click', refreshVideoStreams);
             
-            // 自动启动摄像头和分析
-            startCamera();
+            // 布局和全屏按钮
+            const layoutBtn = document.getElementById('layoutBtn');
+            if (layoutBtn) {
+                layoutBtn.addEventListener('click', toggleLayout);
+            }
+            
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', toggleFullscreen);
+            }
+            
+            const captureBtn = document.getElementById('captureBtn');
+            if (captureBtn) {
+                captureBtn.addEventListener('click', captureFrame);
+            }
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', refreshVideoStreams);
+            }
+            
+            // 设置自动刷新视频流的定时器(每60秒刷新一次以确保流畅)
+            setInterval(refreshVideoStreams, 60000);
+            
+            // 自动启动摄像头
+            startCamera().catch(error => {
+                console.error('自动启动摄像头失败:', error);
+                // 显示错误但不显示弹窗以免干扰用户
+                document.getElementById('systemStatus').textContent = '启动失败';
+            });
         });
+
+        // 切换布局函数
+        function toggleLayout() {
+            const monitorGrid = document.getElementById('monitorGrid');
+            monitorGrid.classList.toggle('grid-vertical');
+        }
+
+        // 全屏模式函数
+        function toggleFullscreen() {
+            const monitorSection = document.querySelector('.monitor-section');
+            if (!document.fullscreenElement) {
+                monitorSection.requestFullscreen().catch(err => {
+                    alert(`全屏模式错误: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // 拍照分析函数
+        async function captureFrame() {
+            try {
+                const response = await fetch('/capture_frame', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 更新警报列表
+                    if (data.detections && data.detections.length > 0) {
+                        updateAlertList(data.detections);
+                    }
+                    alert('拍照分析完成');
+                } else {
+                    throw new Error(data.message || '拍照分析失败');
+                }
+            } catch (error) {
+                console.error('拍照分析失败:', error);
+                alert('拍照分析失败: ' + error.message);
+            }
+        }
+
+        // 刷新视频流函数
+        function refreshVideoStreams() {
+            const videoStream1 = document.getElementById('videoStream1');
+            const aiVideoStream = document.getElementById('aiVideoStream');
+            
+            // 添加时间戳参数来强制刷新视频流
+            const timestamp = new Date().getTime();
+            videoStream1.src = `/video_feed?t=${timestamp}`;
+            aiVideoStream.src = `/video_feed_processed?t=${timestamp}`;
+        }
     </script>
 
     <!-- 页面过渡动画脚本 -->
