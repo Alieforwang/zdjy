@@ -3177,19 +3177,30 @@ def stop_camera2():
 @app.route('/process_camera_frame', methods=['POST'])
 def process_camera_frame():
     """处理摄像头当前帧并返回分析结果"""
+    global latest_detections, last_detection_time, camera
+    
     try:
         # 获取请求数据
-        data = request.get_json()
-        if not data or 'image' not in data:
-            return jsonify({"status": "error", "message": "未提供图像数据"})
+        data = request.get_json() or {}
+        force_detection = data.get('force_detection', False)
         
-        # 解码base64图像数据
-        image_data = data['image'].split(',')[1]
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # 转换为OpenCV格式
-        image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        # 检查是否需要处理前端传来的图像
+        if 'image' in data:
+            # 解码base64图像数据
+            image_data = data['image'].split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # 转换为OpenCV格式
+            image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        else:
+            # 如果没有提供图像，直接使用当前摄像头帧（用于强制检测）
+            if force_detection and camera is not None and camera.isOpened():
+                ret, image_cv = camera.read()
+                if not ret:
+                    return jsonify({"status": "error", "message": "获取摄像头帧失败"}), 400
+            else:
+                return jsonify({"status": "error", "message": "未提供图像数据且无法获取摄像头帧"}), 400
         
         # 生成一个唯一的文件名来保存图像
         timestamp = int(time.time())
@@ -3207,7 +3218,7 @@ def process_camera_frame():
             return jsonify({"status": "error", "message": "模型加载失败"}), 400
             
         # 使用YOLOv8类的预测接口
-        results = model.predict(img=image_cv, conf_threshold=0.25)
+        results = model.predict(img=image_cv, conf_threshold=DETECTION_CONFIDENCE_THRESHOLD)
         
         if results is None or len(results) == 0:
             return jsonify({"status": "error", "message": "No detection results"}), 400
@@ -3275,8 +3286,15 @@ def process_camera_frame():
                 "class": cls_id,
                 "class_name": name,
                 "class_type": cls_type,
-                "confidence": conf
+                "confidence": conf,
+                "time": datetime.now().strftime('%H:%M:%S')
             })
+        
+        # 如果是强制检测，更新全局检测结果
+        if force_detection and detections:
+            latest_detections = detections
+            last_detection_time = datetime.now()
+            logger.info(f"强制检测更新了全局变量，检测到 {len(detections)} 个物体")
         
         # 创建数据库连接并保存分析结果 - 仅当检测到占道经营时
         if len(detections) > 0:  # 只有检测到对象时才保存
@@ -3325,7 +3343,8 @@ def process_camera_frame():
             "message": "摄像头图像分析完成",
             "result_image": url_for('get_result', filename=result_filename),
             "detections": detections,
-            "detect_type": detect_type if detections else "none"
+            "detect_type": detect_type if detections else "none",
+            "detection_count": len(detections)
         })
         
     except Exception as e:

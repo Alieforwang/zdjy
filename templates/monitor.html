@@ -267,6 +267,9 @@
                     document.getElementById('aiStatus').textContent = 'AI分析中';
                     document.getElementById('onlineCameras').textContent = '1/{{ camera_count }}';
                     document.getElementById('systemStatus').textContent = '运行中';
+                    
+                    // 开始轮询检测结果
+                    startDetectionPolling();
                 } else {
                     throw new Error(data.message || '启动摄像头失败');
                 }
@@ -489,8 +492,45 @@
 
         // 切换布局函数
         function toggleLayout() {
+            console.log("切换布局按钮被点击");
             const monitorGrid = document.getElementById('monitorGrid');
-            monitorGrid.classList.toggle('grid-vertical');
+            const layoutBtn = document.getElementById('layoutBtn');
+            
+            // 使用直接样式操作方式切换布局
+            if (monitorGrid.classList.contains('grid-vertical')) {
+                // 切换回水平布局
+                console.log("切换到水平布局");
+                monitorGrid.classList.remove('grid-vertical');
+                monitorGrid.style.gridTemplateColumns = "1fr 1fr";
+                monitorGrid.style.gridTemplateRows = "1fr";
+                layoutBtn.innerHTML = '<span class="btn-icon">🔄</span>垂直布局';
+                layoutBtn.classList.remove('active');
+                
+                // 调整视频容器样式
+                const monitorItems = document.querySelectorAll('.monitor-item');
+                monitorItems.forEach(item => {
+                    item.style.height = "100%";
+                });
+                
+            } else {
+                // 切换到垂直布局
+                console.log("切换到垂直布局");
+                monitorGrid.classList.add('grid-vertical');
+                monitorGrid.style.gridTemplateColumns = "1fr";
+                monitorGrid.style.gridTemplateRows = "1fr 1fr";
+                layoutBtn.innerHTML = '<span class="btn-icon">🔄</span>水平布局';
+                layoutBtn.classList.add('active');
+                
+                // 调整视频容器样式
+                const monitorItems = document.querySelectorAll('.monitor-item');
+                monitorItems.forEach(item => {
+                    item.style.height = "auto";
+                    item.style.minHeight = "300px";
+                });
+            }
+            
+            // 为确保布局变化可见，强制刷新视频流
+            setTimeout(refreshVideoStreams, 500);
         }
 
         // 全屏模式函数
@@ -520,6 +560,37 @@
                 captureBtn.innerHTML = '<span class="btn-icon">⏳</span>处理中...';
                 captureBtn.disabled = true;
                 
+                // 显示处理提示
+                const processingAlert = document.createElement('div');
+                processingAlert.className = 'detection-saved-alert';
+                processingAlert.style.backgroundColor = 'rgba(52, 152, 219, 0.9)'; // 蓝色
+                processingAlert.innerHTML = `
+                    <div class="alert-content">
+                        <span class="alert-title">正在进行拍照分析...</span>
+                        <span class="alert-info">请确保画面中有可识别的物体</span>
+                    </div>
+                `;
+                document.body.appendChild(processingAlert);
+                
+                // 在保存前先触发一次强制检测
+                try {
+                    await fetch('/process_camera_frame', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            force_detection: true
+                        })
+                    });
+                    
+                    // 给系统一点时间更新检测结果
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } catch (e) {
+                    console.warn("强制检测请求失败:", e);
+                    // 继续执行，因为保存API可能仍然有效
+                }
+                
                 // 发送请求保存当前检测结果
                 const response = await fetch('/api/save_camera_detection', {
                     method: 'POST'
@@ -529,22 +600,24 @@
                 captureBtn.innerHTML = originalText;
                 captureBtn.disabled = false;
                 
-                const data = await response.json();
+                // 移除处理提示
+                document.body.removeChild(processingAlert);
                 
-                if (response.ok && data.status === 'success') {
-                    // 更新警报列表
-                    if (data.detections && data.detections.length > 0) {
-                        updateAlertList(data.detections);
-                    }
-                    
+                // 解析响应
+                const data = await response.json();
+                console.log('拍照分析响应:', data);
+                
+                if (response.ok && data.success === true) {
+                    // 成功情况
                     // 显示成功消息
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'detection-saved-alert';
+                    alertDiv.style.backgroundColor = 'rgba(39, 174, 96, 0.9)'; // 绿色
                     alertDiv.innerHTML = `
                         <div class="alert-content">
                             <span class="alert-title">检测结果已保存!</span>
-                            <span class="alert-info">检测类型: ${data.detect_type}</span>
-                            <span class="alert-info">置信度: ${(data.confidence * 100).toFixed(1)}%</span>
+                            <span class="alert-info">文件路径: ${data.file_path ? data.file_path.split('/').pop() : '未知'}</span>
+                            <span class="alert-info">消息: ${data.message || '保存成功'}</span>
                         </div>
                     `;
                     document.body.appendChild(alertDiv);
@@ -557,12 +630,62 @@
                         }, 500);
                     }, 3000);
                     
+                    // 刷新一次最新检测结果
+                    fetchLatestDetections();
+                    
                 } else {
-                    throw new Error(data.message || '拍照分析失败');
+                    // 失败情况
+                    let errorMessage = data.message || '拍照分析失败';
+                    
+                    // 特殊错误处理
+                    if (errorMessage.includes('当前没有检测结果可保存') || errorMessage.includes('未检测到有效目标')) {
+                        // 显示帮助提示
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'detection-saved-alert';
+                        alertDiv.style.backgroundColor = 'rgba(243, 156, 18, 0.9)'; // 橙色
+                        alertDiv.innerHTML = `
+                            <div class="alert-content">
+                                <span class="alert-title">未检测到任何物体</span>
+                                <span class="alert-info">请尝试以下操作:</span>
+                                <span class="alert-info">1. 确保摄像头视野中有物体</span>
+                                <span class="alert-info">2. 调低置信度阈值(当前: ${document.getElementById('confidenceValue').textContent})</span>
+                                <span class="alert-info">3. 调整摄像头角度或光线</span>
+                                <span class="alert-info">4. 等待几秒后再试一次</span>
+                            </div>
+                        `;
+                        document.body.appendChild(alertDiv);
+                        
+                        // 设置自动消失
+                        setTimeout(() => {
+                            alertDiv.style.opacity = '0';
+                            setTimeout(() => {
+                                try {
+                                    document.body.removeChild(alertDiv);
+                                } catch (e) {}
+                            }, 500);
+                        }, 5000);
+                        
+                        // 强调置信度滑块
+                        const confidenceControl = document.querySelector('.confidence-control');
+                        confidenceControl.style.boxShadow = '0 0 10px 2px rgba(255, 255, 0, 0.5)';
+                        setTimeout(() => {
+                            confidenceControl.style.boxShadow = 'none';
+                        }, 3000);
+                        
+                        console.log("未检测到物体，请调整置信度或确保视野中有物体");
+                    } else {
+                        // 其他错误
+                        alert('拍照分析失败: ' + errorMessage);
+                    }
                 }
             } catch (error) {
                 console.error('拍照分析失败:', error);
                 alert('拍照分析失败: ' + error.message);
+                
+                // 恢复按钮状态
+                const captureBtn = document.getElementById('captureBtn');
+                captureBtn.innerHTML = '<span class="btn-icon">📸</span>拍照分析';
+                captureBtn.disabled = false;
             }
         }
 
