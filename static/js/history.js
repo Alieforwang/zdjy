@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 类型映射
     const typeMapping = {
         'zdjy_ld': '流动摊位',
-        'zdjy_gd': '固定摊位'
+        'zdjy_gd': '固定摊位',
+        'zdjy_ld_zdjy_gd': '混合摊位'
     };
     
     // 导出历史记录
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     data.data.forEach(record => {
                         const tr = document.createElement('tr');
-                        const displayType = typeMapping[record.type] || '未知';
                         
                         // 修复路径格式，确保使用单引号，避免双引号嵌套问题
                         const filePath = record.file_path.replace(/\\/g, '/');
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         tr.innerHTML = `
                             <td>${new Date(record.detect_time).toLocaleString()}</td>
-                            <td>${displayType}</td>
+                            <td>${record.type}</td>
                             <td>${record.location || '未指定'}</td>
                             <td>${record.confidence ? (record.confidence * 100).toFixed(1) + '%' : '未知'}</td>
                             <td>

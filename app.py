@@ -985,8 +985,9 @@ def get_history():
             conditions.append('detect_type = %s')
             # 根据类型值映射到对应的中文名称
             type_mapping = {
-                'zdjy_ld': 'zdjy_ld',  # 使用与数据库中相同的值
-                'zdjy_gd': 'zdjy_gd'   # 使用与数据库中相同的值
+                'zdjy_ld': 'zdjy_ld',
+                'zdjy_gd': 'zdjy_gd',
+                'zdjy_ld_zdjy_gd': 'zdjy_ld_zdjy_gd'
             }
             params.append(type_mapping.get(type_filter, type_filter))
         
@@ -1040,8 +1041,9 @@ def get_history():
                         type_display = '固定摊位'
                     elif detect_type == 'zdjy_ld':
                         type_display = '流动摊位'
+                    elif detect_type == 'zdjy_ld_zdjy_gd':
+                        type_display = '混合摊位'
                     else:
-                        # 保留原始值，以防有其他类型
                         type_display = detect_type
                 
                 records.append({
@@ -3797,7 +3799,8 @@ def export_history():
             conditions.append('detect_type = %s')
             type_mapping = {
                 'zdjy_ld': 'zdjy_ld',
-                'zdjy_gd': 'zdjy_gd'
+                'zdjy_gd': 'zdjy_gd',
+                'zdjy_ld_zdjy_gd': 'zdjy_ld_zdjy_gd'
             }
             params.append(type_mapping.get(type_filter, type_filter))
         

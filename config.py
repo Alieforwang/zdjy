@@ -2,7 +2,7 @@
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': '123456',
+    'password': '252525zyh',
     'database': 'tiaozhanbei',
     'charset': 'utf8mb4',
     'pool_size': 10,

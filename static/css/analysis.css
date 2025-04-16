@@ -11,6 +11,8 @@ body {
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
+    background-color: #002a54;
+    color: white;
 }
 
 /* 导航栏样式 */
@@ -112,20 +114,15 @@ body {
 }
 
 .upload-area {
-    border: 2px dashed rgba(64, 169, 255, 0.3);
-    padding: 15px;
+    border: 2px dashed #ccc;
+    padding: 20px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-height: 60px;
-    height: auto;
-    margin-bottom: 10px;
-    border-radius: 12px;
-    background-color: rgba(26, 43, 71, 0.4);
+    min-height: 200px;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    overflow: hidden;
 }
 
 .upload-area:hover {
@@ -574,7 +571,8 @@ body {
 
 /* 视频播放器样式 */
 .result-image {
-    max-width: 100%;
+    max-width: 90%;
+    margin-top: 0%;
     height: auto;
     max-height: 250px;
     object-fit: contain;
@@ -651,7 +649,7 @@ video::-webkit-media-controls-panel {
 /* 预览容器样式优化 */
 .preview-container {
     width: 100%;
-    margin: 5px 0;
+    margin-bottom: 10px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -672,11 +670,11 @@ video::-webkit-media-controls-panel {
 /* 图片和视频预览的通用样式 */
 .preview-container img,
 .preview-container video {
-    max-width: 100%;
-    height: auto;
-    max-height: 150px;
-    object-fit: contain;
     margin: 0 auto;
+    max-width: 100%;
+    max-height: 200px;
+    background: transparent;
+    object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -704,14 +702,6 @@ video::-webkit-media-controls-panel {
 }
 
 /* 图片预览和结果样式优化 */
-.preview-container img,
-.preview-container video,
-.result-image {
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-}
-
 .preview-container img:hover,
 .preview-container video:hover,
 .result-image:hover {
@@ -810,4 +800,32 @@ video::-webkit-media-controls-panel {
     position: relative;
     z-index: 2;
     text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+/* 检测类型显示样式 */
+.detection-type-info {
+    margin-bottom: 15px;
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.detection-type-info p {
+    margin: 0 0 5px 0;
+    font-size: 14px;
+    color: #ccc;
+}
+
+.detection-type-display {
+    font-weight: bold;
+    color: #fff;
+}
+
+/* 版权信息样式 */
+.copyright {
+    text-align: center;
+    padding: 10px;
+    color: #666;
+    font-size: 12px;
+    margin-top: 20px;
 } 
