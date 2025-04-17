@@ -355,38 +355,42 @@
             if (detections && detections.length > 0) {
                 emptyAlerts.style.display = 'none';
                 
-                // 保存当前已经显示的警报数量
-                const currentAlerts = alertList.querySelectorAll('.alert-item').length;
-                
                 // 添加新的警报
                 detections.forEach((detection, index) => {
                     // 创建新的警报项
                     const alertItem = document.createElement('div');
                     alertItem.className = 'alert-item';
                     
-                    // 如果是最新的3个检测结果，添加动画效果
-                    if (index < 3) {
-                        alertItem.classList.add('new-alert');
-                        // 3秒后移除动画效果
-                        setTimeout(() => {
-                            alertItem.classList.remove('new-alert');
-                        }, 3000);
-                    }
+                    // 添加动画效果
+                    alertItem.classList.add('new-alert');
+                    
+                    // 3秒后移除动画效果
+                    setTimeout(() => {
+                        alertItem.classList.remove('new-alert');
+                    }, 3000);
+                    
+                    // 获取当前时间
+                    const now = new Date();
+                    const timeString = now.toLocaleTimeString();
                     
                     alertItem.innerHTML = `
-                        <div class="alert-time">${detection.time || new Date().toLocaleTimeString()}</div>
+                        <div class="alert-time">${timeString}</div>
                         <div class="alert-content">
-                            <span class="alert-type">${detection.class_name || detection.class}</span>
+                            <span class="alert-type">${detection.class_name || '未知类型'}</span>
                             <span class="alert-confidence">置信度: ${(detection.confidence * 100).toFixed(1)}%</span>
                         </div>
                     `;
+                    
+                    // 将新警报添加到列表顶部
                     alertList.insertBefore(alertItem, alertList.firstChild);
+                    
+                    // 播放提示音
+                    playAlertSound();
                 });
 
                 // 更新检测率
                 const detectionRate = document.getElementById('detectionRate');
-                const currentRate = parseInt(detectionRate.textContent) || 0;
-                detectionRate.textContent = `${currentRate + detections.length}次/分钟`;
+                detectionRate.textContent = `${detections.length}次/分钟`;
                 
                 // 限制警报列表最多显示20条
                 const allAlerts = alertList.querySelectorAll('.alert-item');
@@ -395,7 +399,18 @@
                         alertList.removeChild(allAlerts[i]);
                     }
                 }
+            } else {
+                // 如果没有检测结果，显示空状态
+                emptyAlerts.style.display = 'flex';
             }
+        }
+        
+        // 添加提示音播放函数
+        function playAlertSound() {
+            const audio = new Audio('/static/sounds/alert.mp3');
+            audio.play().catch(error => {
+                console.log('无法播放提示音:', error);
+            });
         }
 
         // 页面加载完成后初始化

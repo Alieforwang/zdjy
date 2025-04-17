@@ -985,9 +985,9 @@ def get_history():
             conditions.append('detect_type = %s')
             # 根据类型值映射到对应的中文名称
             type_mapping = {
-                'zdjy_ld': 'zdjy_ld',
-                'zdjy_gd': 'zdjy_gd',
-                'zdjy_ld_zdjy_gd': 'zdjy_ld_zdjy_gd'
+                'zdjy_ld': '流动摊位',
+                'zdjy_gd': '固定摊位',
+                'zdjy_ld_zdjy_gd': '混合摊位'
             }
             params.append(type_mapping.get(type_filter, type_filter))
         
@@ -2946,96 +2946,32 @@ def gen_frames_processed():
                     if len(results[0].boxes) > 0:
                         current_detections = []
                         
-                        # 保存当前帧并生成检测结果图像路径，每15秒最多保存一次
-                        current_time = time.time()
-                        if current_time - last_save_time >= 15 and len(results[0].boxes) > 0:
-                            try:
-                                # 生成唯一文件名
-                                timestamp = int(time.time())
-                                random_suffix = random.randint(1000, 9999)
-                                file_name = f"camera_{timestamp}_{random_suffix}.jpg"
-                                result_filename = f"result_{file_name}"
-                                
-                                # 保存原始帧和检测结果帧
-                                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name)
-                                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
-                                
-                                # 保存原始图像
-                                cv2.imwrite(file_path, frame)
-                                # 保存检测结果图像
-                                cv2.imwrite(result_path, processed_frame)
-                                
-                                # 初始化检测类型变量 - 默认为固定摊位
-                                detect_type = 'zdjy_gd'
-                                
-                                # 提取检测结果的详细信息
-                                for i in range(len(results[0].boxes)):
-                                    box = results[0].boxes[i]
-                                    cls_id = int(box.cls[0].item())
-                                    conf = float(box.conf[0].item())
-                                    
-                                    # 获取类别名称 - 只使用zdjy_gd和zdjy_ld作为可能的类型
-                                    if cls_id == 1:  # 类别1对应流动摊位，优先级更高
-                                        # 如果检测到流动摊位，则整体类型设为流动摊位
-                                        detect_type = 'zdjy_ld'
-                                        name = "占道经营-流动摊位"
-                                        cls_type = 'zdjy_ld'
-                                    elif cls_id == 0:  # 类别0对应固定摊位
-                                        name = "占道经营-固定摊位"
-                                        cls_type = 'zdjy_gd'
-                                    else:
-                                        # 其他类别也默认为固定摊位
-                                        name = results[0].names.get(cls_id, "未知类别")
-                                        cls_type = 'zdjy_gd'
-                                    
-                                    current_detections.append({
-                                        "class": cls_id,
-                                        "class_name": name,
-                                        "class_type": cls_type,
-                                        "confidence": conf,
-                                        "time": datetime.now().strftime('%H:%M:%S')
-                                    })
-                                
-                                # 计算平均置信度
-                                avg_confidence = sum(d["confidence"] for d in current_detections) / len(current_detections)
-                                
-                                # 保存到数据库 - 修复请求上下文问题
-                                try:
-                                    db = DBM.DatabaseManager()
-                                    db.connect()
-                                    
-                                    # 使用默认用户ID 1 代替session中的用户ID
-                                    # 避免在请求上下文外使用session
-                                    user_id = 1  # 使用默认用户ID
-                                    
-                                    # 使用与分析页面相同的SQL插入语句
-                                    insert_query = """
-                                    INSERT INTO analysis_records 
-                                    (user_id, file_type, file_path, result_path, result_folder, detect_type, confidence, created_at) 
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                                    """
-                                    
-                                    # 执行插入
-                                    db.update_data(
-                                        insert_query, 
-                                        (user_id, 'camera', file_path, result_filename, app.config['RESULT_FOLDER'], detect_type, avg_confidence)
-                                    )
-                                    
-                                    logger.info(f"摄像头检测结果已保存至数据库，检测类型：{detect_type}，置信度：{avg_confidence:.4f}")
-                                    db.disconnect()
-                                    
-                                    # 更新上次保存时间
-                                    last_save_time = current_time
-                                    
-                                except Exception as e:
-                                    logger.error(f"保存摄像头检测结果到数据库时出错: {str(e)}")
+                        # 处理检测结果
+                        for box in results[0].boxes:
+                            cls = int(box.cls[0].cpu().numpy())
+                            conf = float(box.conf[0].cpu().numpy())
                             
-                            except Exception as e:
-                                logger.error(f"保存摄像头检测图像时出错: {str(e)}")
+                            # 获取类别名称
+                            if cls == 0:
+                                class_name = "占道经营-固定摊位"
+                                class_type = "zdjy_gd"
+                            elif cls == 1:
+                                class_name = "占道经营-流动摊位"
+                                class_type = "zdjy_ld"
+                            else:
+                                continue
+                            
+                            current_detections.append({
+                                "class": cls,
+                                "class_name": class_name,
+                                "class_type": class_type,
+                                "confidence": conf
+                            })
                         
                         # 更新全局检测结果
-                        latest_detections = current_detections
-                        last_detection_time = datetime.now()
+                        if current_detections:
+                            latest_detections = current_detections
+                            last_detection_time = datetime.now()
                 else:
                     # 没有检测结果，只显示原始帧和FPS
                     processed_frame = frame.copy()
