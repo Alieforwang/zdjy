@@ -192,6 +192,109 @@ nohup ./monitor_memory.sh > /dev/null 2>&1 &
    - 系统日志和访问日志分离存储
    - 日志级别设为warning减少I/O和磁盘占用
 
+## 自动化运维脚本
+
+系统提供了一套完整的自动化运维脚本，用于Linux环境下的部署、监控和维护：
+
+### 1. 自动部署脚本 (deploy.sh)
+
+提供了以下功能：
+- 系统依赖检查与安装
+- 数据库备份与恢复
+- 应用更新与部署
+- 日志轮转配置
+- 系统健康检查
+- 临时文件清理
+
+用法：
+```bash
+# 部署或更新应用
+./deploy.sh deploy
+
+# 备份数据库
+./deploy.sh backup
+
+# 检查系统健康状态
+./deploy.sh check
+
+# 清理旧文件和临时数据
+./deploy.sh cleanup
+
+# 查看应用日志
+./deploy.sh logs
+```
+
+### 2. 系统监控脚本 (monitor.sh)
+
+提供了以下功能：
+- 系统资源监控（CPU、内存、磁盘）
+- 应用状态监控
+- 数据库连接监控
+- 异常自动报警
+- 日志文件监控
+- 服务自动恢复
+
+用法：
+```bash
+# 运行监控检查
+./monitor.sh
+
+# 设置为定时任务（推荐）
+*/10 * * * * /路径/monitor.sh > /dev/null 2>&1
+```
+
+### 3. 定时任务脚本 (crontab_setup.sh)
+
+自动配置以下定时任务：
+- 每天数据库备份
+- 定期清理旧文件
+- 定期系统健康检查
+- 定期应用重启
+- 定期记录系统资源使用情况
+- 服务存活检测和自动恢复
+
+用法：
+```bash
+# 设置定时任务
+./crontab_setup.sh
+```
+
+### 4. 全自动安装脚本 (install.sh)
+
+适用于新的Linux服务器，提供一键式安装：
+- 系统依赖自动安装
+- MySQL数据库配置
+- Nginx反向代理配置
+- Supervisor进程管理配置
+- Python环境设置
+- 权限配置
+- 定时任务设置
+- 应用启动
+
+用法：
+```bash
+# 以root权限运行
+sudo ./install.sh
+```
+
+## 模型优化策略
+
+对于不同的部署环境，我们提供了以下模型优化策略：
+
+1. **不同规模模型**
+   - 为不同硬件环境准备不同规模的模型
+   - 高性能环境：`models/best.pt`（完整模型）
+   - 低内存环境：`models/best_small.pt`（轻量级模型）
+   - 边缘设备：`models/best_nano.pt`（极简模型）
+
+2. **模型量化**
+   - 对模型进行INT8量化，减少内存占用
+   - 使用`models/best_quantized.pt`实现更低的内存和计算需求
+
+3. **按需加载**
+   - 系统默认采用延迟加载策略，需要时才加载模型到内存
+   - 可通过配置文件调整此行为
+
 ## 手动启动与停止
 
 如果不使用系统服务，可以手动管理应用：
@@ -230,6 +333,7 @@ tail -f logs/memory_monitor.log
 ```
 zdjy/
 ├── app.py              # 主应用文件
+├── config.py           # 配置文件
 ├── util/               # 工具模块
 │   └── DBUtil.py       # 数据库工具类
 ├── yolov8.py           # 模型预测工具
@@ -239,9 +343,11 @@ zdjy/
 ├── templates/          # 前端模板目录
 ├── gunicorn_config.py  # Gunicorn配置文件
 ├── zdjy.service        # 系统服务文件
-├── start.sh            # 启动脚本
-├── monitor_memory.sh   # 内存监控脚本
-└── deploy.sh           # 部署脚本
+├── deploy.sh           # 部署脚本
+├── monitor.sh          # 监控脚本
+├── crontab_setup.sh    # 定时任务设置脚本
+├── install.sh          # 全自动安装脚本
+└── start.sh            # 启动脚本
 ```
 
 ## 故障排除
