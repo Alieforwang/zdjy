@@ -103,6 +103,65 @@
             50% { transform: translateY(-5px); }
         }
         
+        .coze-chat-layout {
+            display: flex;
+            height: 100%;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .coze-chat-sidebar {
+            width: 0;
+            height: 100%;
+            background-color: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            transition: width 0.3s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 10;
+        }
+
+        .coze-chat-sidebar.active {
+            width: 250px;
+        }
+
+        .coze-chat-sidebar-header {
+            padding: 15px;
+            background-color: #2c4b80;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1c3566;
+        }
+
+        .coze-chat-sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .coze-chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            margin-left: 0;
+            transition: margin-left 0.3s ease;
+            width: 100%;
+        }
+        
+        .coze-chat-sidebar.active + .coze-chat-main {
+            margin-left: 250px;
+            width: calc(100% - 250px);
+        }
+
         .coze-chat-header {
             background-color: #2c4b80;
             color: white;
@@ -117,6 +176,10 @@
         .coze-chat-header h2 {
             margin: 0;
             flex: 1;
+            font-size: 16px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .coze-chat-controls {
@@ -152,9 +215,6 @@
         }
         
         .coze-chat-close {
-            position: absolute;
-            right: 15px;
-            top: 15px;
             background: none;
             border: none;
             color: white;
@@ -167,6 +227,7 @@
             overflow-y: auto;
             padding: 15px;
             background-color: #f0f2f5;
+            flex: 1;
         }
         
         .coze-chat-input {
@@ -174,8 +235,6 @@
             padding: 10px;
             background-color: #ffffff;
             border-top: 1px solid #e5e5e5;
-            position: absolute;
-            bottom: 0;
             width: 100%;
             box-sizing: border-box;
         }
@@ -370,6 +429,304 @@
             font-family: "Microsoft YaHei", Arial, sans-serif;
             font-size: 16px;
         }
+        
+        .coze-chat-conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .coze-chat-conversation-item {
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #333;
+        }
+
+        .coze-chat-conversation-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .coze-chat-conversation-item.active {
+            background-color: #e2eaf7;
+            border-left: 3px solid #2c4b80;
+        }
+
+        .coze-chat-conversation-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+        }
+
+        .coze-chat-conversation-date {
+            font-size: 11px;
+            color: #777;
+            margin-top: 4px;
+        }
+
+        .coze-chat-conversation-actions {
+            display: flex;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .coze-chat-conversation-item:hover .coze-chat-conversation-actions {
+            opacity: 1;
+        }
+
+        .coze-chat-conversation-action {
+            background: none;
+            border: none;
+            color: #777;
+            cursor: pointer;
+            padding: 3px;
+            margin-left: 5px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .coze-chat-conversation-action:hover {
+            background-color: #d0d0d0;
+            color: #333;
+        }
+
+        .coze-chat-sidebar-footer {
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .coze-new-conversation-btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #3a5998;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .coze-new-conversation-btn:hover {
+            background-color: #2c4b80;
+        }
+
+        .coze-new-conversation-btn i {
+            margin-right: 6px;
+        }
+
+        .coze-menu-toggle-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .coze-menu-toggle-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .coze-rename-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        /* 确认对话框样式 */
+        .coze-dialog-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .coze-dialog {
+            background-color: white;
+            border-radius: 8px;
+            width: 300px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .coze-dialog-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .coze-dialog-content {
+            margin-bottom: 20px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .coze-dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .coze-dialog-btn {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .coze-dialog-btn-cancel {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        .coze-dialog-btn-confirm {
+            background-color: #d32f2f;
+            color: white;
+        }
+
+        /* 重命名对话框 */
+        .coze-rename-dialog {
+            width: 350px;
+        }
+
+        .coze-rename-dialog-content {
+            margin-bottom: 15px;
+        }
+
+        .coze-rename-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .coze-chat-sidebar.active {
+                width: 200px;
+            }
+            
+            .coze-chat-sidebar.active + .coze-chat-main {
+                margin-left: 200px;
+                width: calc(100% - 200px);
+            }
+        }
+
+        /* 设置菜单样式 */
+        .coze-settings-menu {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            width: 250px;
+            z-index: 100;
+            display: none;
+        }
+        
+        .coze-settings-menu.active {
+            display: block;
+        }
+        
+        .coze-settings-header {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+        }
+        
+        .coze-settings-content {
+            padding: 15px;
+        }
+        
+        .coze-settings-item {
+            margin-bottom: 15px;
+        }
+        
+        .coze-settings-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .coze-settings-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+        
+        .coze-toggle {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        
+        .coze-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .coze-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        
+        .coze-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        .coze-toggle input:checked + .coze-toggle-slider {
+            background-color: #3a5998;
+        }
+        
+        .coze-toggle input:checked + .coze-toggle-slider:before {
+            transform: translateX(20px);
+        }
     </style>
 </head>
 <body>
@@ -392,10 +749,15 @@ class CozeChat {
             title: '灵瞳——YOLOv8-DeepSeek多模态街景治理实时检测平台智能助手',
             userAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f464.svg',
             botAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f916.svg',
+            autoTitleEnabled: true, // 是否启用自动标题
+            autoTitleMaxMessages: 3, // 更新标题的最大消息数
             ...options
         };
         
         this.currentConversationId = null;
+        this.conversations = []; // 存储所有会话
+        this.messageHistory = {}; // 存储会话历史消息
+        this.messageCounter = {}; // 记录每个会话的消息数
         this.init();
     }
     
@@ -404,8 +766,11 @@ class CozeChat {
         // 创建DOM结构
         this.createDOM();
         
-        // 初始化会话ID
-        this.initializeConversationId();
+        // 加载会话列表和初始化会话ID
+        this.loadConversations();
+        
+        // 加载用户设置
+        this.loadSettings();
         
         // 绑定事件
         this.bindEvents();
@@ -424,21 +789,90 @@ class CozeChat {
         
         container.innerHTML = `
             <div class="coze-chat-container" id="coze-chat-window">
-                <div class="coze-chat-header">
-                    <h2>${this.config.title}</h2>
-                    <div class="coze-chat-controls">
-                        <button id="coze-fullscreen-btn" title="全屏">⛶</button>
-                        <button class="coze-chat-close" id="coze-chat-close" title="关闭">×</button>
+                <div class="coze-chat-layout">
+                    <!-- 侧边栏：会话列表 -->
+                    <div class="coze-chat-sidebar" id="coze-chat-sidebar">
+                        <div class="coze-chat-sidebar-header">
+                            <h3 class="coze-chat-sidebar-title">会话列表</h3>
+                            <button class="coze-chat-conversation-action" id="coze-sidebar-close">×</button>
+                        </div>
+                        <div class="coze-chat-conversation-list" id="coze-conversation-list">
+                            <!-- 会话列表项将动态生成 -->
+                        </div>
+                        <div class="coze-chat-sidebar-footer">
+                            <button class="coze-new-conversation-btn" id="coze-new-conversation-btn">
+                                <i>+</i> 新建会话
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="coze-chat-box" id="coze-chat-box"></div>
-                <div class="coze-chat-input">
-                    <input type="text" id="coze-user-input" placeholder="请输入您的问题..." autocomplete="off">
-                    <button id="coze-send-btn">发送</button>
+                    
+                    <!-- 主内容区 -->
+                    <div class="coze-chat-main">
+                        <div class="coze-chat-header">
+                            <div class="coze-menu-toggle-btn" id="coze-menu-toggle">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M3 12H21M3 6H21M3 18H21" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <h2 id="coze-current-conversation-title">${this.config.title}</h2>
+                            <div class="coze-chat-controls">
+                                <button id="coze-settings-btn" title="设置">⚙</button>
+                                <button id="coze-fullscreen-btn" title="全屏">⛶</button>
+                                <button class="coze-chat-close" id="coze-chat-close" title="关闭">×</button>
+                            </div>
+                        </div>
+                        <div class="coze-chat-box" id="coze-chat-box"></div>
+                        <div class="coze-chat-input">
+                            <input type="text" id="coze-user-input" placeholder="请输入您的问题..." autocomplete="off">
+                            <button id="coze-send-btn">发送</button>
+                        </div>
+                        
+                        <!-- 设置菜单 -->
+                        <div class="coze-settings-menu" id="coze-settings-menu">
+                            <div class="coze-settings-header">设置选项</div>
+                            <div class="coze-settings-content">
+                                <div class="coze-settings-item">
+                                    <label class="coze-settings-label">
+                                        自动更新会话标题
+                                        <span class="coze-toggle">
+                                            <input type="checkbox" id="coze-auto-title-toggle" checked>
+                                            <span class="coze-toggle-slider"></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="coze-chat-loading" id="coze-loading">系统正在思考...</div>
                 <div class="coze-chat-resize-handle"></div>
                 <div class="coze-chat-resize-handle-horizontal"></div>
+            </div>
+            
+            <!-- 确认删除对话框 -->
+            <div class="coze-dialog-backdrop" id="coze-delete-dialog" style="display: none;">
+                <div class="coze-dialog">
+                    <div class="coze-dialog-title">确认删除</div>
+                    <div class="coze-dialog-content">您确定要删除这个会话吗？此操作无法撤销。</div>
+                    <div class="coze-dialog-actions">
+                        <button class="coze-dialog-btn coze-dialog-btn-cancel" id="coze-cancel-delete">取消</button>
+                        <button class="coze-dialog-btn coze-dialog-btn-confirm" id="coze-confirm-delete">删除</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 重命名对话框 -->
+            <div class="coze-dialog-backdrop" id="coze-rename-dialog" style="display: none;">
+                <div class="coze-dialog coze-rename-dialog">
+                    <div class="coze-dialog-title">重命名会话</div>
+                    <div class="coze-dialog-content coze-rename-dialog-content">
+                        <input type="text" id="coze-rename-input" class="coze-rename-input" placeholder="输入新的会话名称">
+                    </div>
+                    <div class="coze-dialog-actions">
+                        <button class="coze-dialog-btn coze-dialog-btn-cancel" id="coze-cancel-rename">取消</button>
+                        <button class="coze-dialog-btn" id="coze-confirm-rename" style="background-color: #3a5998; color: white;">确认</button>
+                    </div>
+                </div>
             </div>
         `;
         
@@ -450,7 +884,23 @@ class CozeChat {
             sendBtn: document.getElementById('coze-send-btn'),
             loading: document.getElementById('coze-loading'),
             chatIcon: document.getElementById('coze-chat-icon'),
-            closeBtn: document.getElementById('coze-chat-close')
+            closeBtn: document.getElementById('coze-chat-close'),
+            sidebar: document.getElementById('coze-chat-sidebar'),
+            sidebarClose: document.getElementById('coze-sidebar-close'),
+            menuToggle: document.getElementById('coze-menu-toggle'),
+            conversationList: document.getElementById('coze-conversation-list'),
+            newConversationBtn: document.getElementById('coze-new-conversation-btn'),
+            currentConversationTitle: document.getElementById('coze-current-conversation-title'),
+            deleteDialog: document.getElementById('coze-delete-dialog'),
+            confirmDelete: document.getElementById('coze-confirm-delete'),
+            cancelDelete: document.getElementById('coze-cancel-delete'),
+            renameDialog: document.getElementById('coze-rename-dialog'),
+            renameInput: document.getElementById('coze-rename-input'),
+            confirmRename: document.getElementById('coze-confirm-rename'),
+            cancelRename: document.getElementById('coze-cancel-rename'),
+            settingsBtn: document.getElementById('coze-settings-btn'),
+            settingsMenu: document.getElementById('coze-settings-menu'),
+            autoTitleToggle: document.getElementById('coze-auto-title-toggle')
         };
     }
     
@@ -462,6 +912,40 @@ class CozeChat {
         });
         this.elements.chatIcon.addEventListener('click', () => this.toggleChat());
         this.elements.closeBtn.addEventListener('click', () => this.toggleChat());
+        
+        // 侧边栏切换
+        this.elements.menuToggle.addEventListener('click', () => this.toggleSidebar());
+        this.elements.sidebarClose.addEventListener('click', () => this.toggleSidebar());
+        
+        // 新建会话
+        this.elements.newConversationBtn.addEventListener('click', () => this.createNewConversation());
+        
+        // 删除会话对话框
+        this.elements.confirmDelete.addEventListener('click', () => this.deleteCurrentConversation());
+        this.elements.cancelDelete.addEventListener('click', () => this.hideDeleteDialog());
+        
+        // 重命名会话对话框
+        this.elements.confirmRename.addEventListener('click', () => this.confirmRenameConversation());
+        this.elements.cancelRename.addEventListener('click', () => this.hideRenameDialog());
+        
+        // 设置菜单
+        this.elements.settingsBtn.addEventListener('click', () => this.toggleSettingsMenu());
+        this.elements.autoTitleToggle.addEventListener('change', (e) => {
+            this.config.autoTitleEnabled = e.target.checked;
+            // 保存设置到本地存储
+            localStorage.setItem('coze_settings', JSON.stringify({
+                autoTitleEnabled: this.config.autoTitleEnabled
+            }));
+        });
+        
+        // 点击其他区域关闭设置菜单
+        document.addEventListener('click', (e) => {
+            if (this.elements.settingsMenu.classList.contains('active') && 
+                !this.elements.settingsMenu.contains(e.target) &&
+                e.target !== this.elements.settingsBtn) {
+                this.elements.settingsMenu.classList.remove('active');
+            }
+        });
         
         // 添加全屏按钮事件
         const fullscreenBtn = document.getElementById('coze-fullscreen-btn');
@@ -522,34 +1006,344 @@ class CozeChat {
         });
     }
 
+    // 切换侧边栏
+    toggleSidebar() {
+        this.elements.sidebar.classList.toggle('active');
+        
+        // 在小屏幕上，如果侧边栏激活，则将其置于顶层
+        if (window.innerWidth <= 600) {
+            if (this.elements.sidebar.classList.contains('active')) {
+                this.elements.sidebar.style.zIndex = '20';
+            } else {
+                // 延迟将zIndex恢复，以便过渡效果完成
+                setTimeout(() => {
+                    this.elements.sidebar.style.zIndex = '10';
+                }, 300);
+            }
+        }
+    }
+    
+    // 加载会话列表
+    loadConversations() {
+        // 从本地存储加载会话列表
+        const savedConversations = localStorage.getItem('coze_conversations');
+        if (savedConversations) {
+            this.conversations = JSON.parse(savedConversations);
+        }
+        
+        // 如果没有会话，创建一个默认会话
+        if (this.conversations.length === 0) {
+            const defaultConversation = {
+                id: "conv_" + Date.now(),
+                title: "新会话",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            this.conversations.push(defaultConversation);
+            this.saveConversations();
+        }
+        
+        // 初始化当前会话
+        const lastConversationId = localStorage.getItem('coze_current_conversation_id');
+        if (lastConversationId) {
+            // 检查保存的会话ID是否存在于会话列表中
+            const conversationExists = this.conversations.some(conv => conv.id === lastConversationId);
+            if (conversationExists) {
+                this.currentConversationId = lastConversationId;
+            } else {
+                // 如果不存在，使用第一个会话
+                this.currentConversationId = this.conversations[0].id;
+            }
+        } else {
+            // 如果没有保存的会话ID，使用第一个会话
+            this.currentConversationId = this.conversations[0].id;
+        }
+        
+        // 持久化当前会话ID
+        this.persistCurrentConversationId();
+        
+        // 渲染会话列表
+        this.renderConversationList();
+        
+        // 加载会话历史消息
+        this.loadConversationMessages();
+    }
+    
+    // 保存会话列表到本地存储
+    saveConversations() {
+        localStorage.setItem('coze_conversations', JSON.stringify(this.conversations));
+    }
+    
+    // 持久化当前会话ID
+    persistCurrentConversationId() {
+        localStorage.setItem('coze_current_conversation_id', this.currentConversationId);
+    }
+    
+    // 渲染会话列表
+    renderConversationList() {
+        this.elements.conversationList.innerHTML = '';
+        
+        this.conversations.forEach(conversation => {
+            const isActive = conversation.id === this.currentConversationId;
+            const date = new Date(conversation.updatedAt);
+            const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            
+            const conversationItem = document.createElement('div');
+            conversationItem.className = `coze-chat-conversation-item ${isActive ? 'active' : ''}`;
+            conversationItem.setAttribute('data-id', conversation.id);
+            
+            conversationItem.innerHTML = `
+                <div class="coze-chat-conversation-info">
+                    <div class="coze-chat-conversation-title">${conversation.title}</div>
+                    <div class="coze-chat-conversation-date">${formattedDate}</div>
+                </div>
+                <div class="coze-chat-conversation-actions">
+                    <button class="coze-chat-conversation-action coze-rename-btn" title="重命名">✎</button>
+                    <button class="coze-chat-conversation-action coze-delete-btn" title="删除">🗑</button>
+                </div>
+            `;
+            
+            // 添加点击事件，切换会话
+            conversationItem.addEventListener('click', (e) => {
+                // 如果点击的是操作按钮，不进行会话切换
+                if (e.target.classList.contains('coze-chat-conversation-action')) {
+                    return;
+                }
+                
+                this.switchConversation(conversation.id);
+            });
+            
+            // 添加重命名按钮事件
+            const renameBtn = conversationItem.querySelector('.coze-rename-btn');
+            renameBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止冒泡，防止触发父元素的点击事件
+                this.showRenameDialog(conversation.id);
+            });
+            
+            // 添加删除按钮事件
+            const deleteBtn = conversationItem.querySelector('.coze-delete-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止冒泡，防止触发父元素的点击事件
+                this.showDeleteDialog(conversation.id);
+            });
+            
+            this.elements.conversationList.appendChild(conversationItem);
+        });
+        
+        // 更新当前会话标题
+        this.updateCurrentConversationTitle();
+    }
+    
+    // 更新当前会话标题
+    updateCurrentConversationTitle() {
+        const currentConversation = this.conversations.find(conv => conv.id === this.currentConversationId);
+        if (currentConversation) {
+            this.elements.currentConversationTitle.textContent = currentConversation.title;
+        }
+    }
+    
+    // 创建新会话
+    createNewConversation() {
+        // 创建新会话对象
+        const newConversation = {
+            id: "conv_" + Date.now(),
+            title: "新会话",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        // 添加到会话列表
+        this.conversations.unshift(newConversation);
+        
+        // 保存会话列表
+        this.saveConversations();
+        
+        // 切换到新会话
+        this.switchConversation(newConversation.id);
+        
+        // 在小屏幕上自动关闭侧边栏
+        if (window.innerWidth <= 600) {
+            this.toggleSidebar();
+        }
+    }
+    
+    // 切换会话
+    switchConversation(conversationId) {
+        // 保存当前会话的消息
+        this.saveConversationMessages();
+        
+        // 更新当前会话ID
+        this.currentConversationId = conversationId;
+        
+        // 持久化当前会话ID
+        this.persistCurrentConversationId();
+        
+        // 更新会话列表中的活动状态
+        this.renderConversationList();
+        
+        // 加载新会话的消息
+        this.loadConversationMessages();
+        
+        // 在小屏幕上自动关闭侧边栏
+        if (window.innerWidth <= 600) {
+            this.toggleSidebar();
+        }
+    }
+    
+    // 保存会话消息
+    saveConversationMessages() {
+        // 保存当前会话的消息
+        this.messageHistory[this.currentConversationId] = this.elements.chatBox.innerHTML;
+        
+        // 保存到localStorage
+        localStorage.setItem('coze_message_history', JSON.stringify(this.messageHistory));
+    }
+    
+    // 加载会话消息
+    loadConversationMessages() {
+        // 从localStorage加载所有会话的消息历史
+        const savedMessageHistory = localStorage.getItem('coze_message_history');
+        if (savedMessageHistory) {
+            this.messageHistory = JSON.parse(savedMessageHistory);
+        }
+        
+        // 清空当前消息框
+        this.elements.chatBox.innerHTML = '';
+        
+        // 加载当前会话的消息
+        if (this.messageHistory[this.currentConversationId]) {
+            this.elements.chatBox.innerHTML = this.messageHistory[this.currentConversationId];
+        } else {
+            // 如果是新会话，显示欢迎消息
+            this.addWelcomeMessage();
+        }
+        
+        // 滚动到底部
+        this.scrollToBottom();
+    }
+    
+    // 显示删除会话对话框
+    showDeleteDialog(conversationId) {
+        // 如果只有一个会话，不允许删除
+        if (this.conversations.length <= 1) {
+            alert('无法删除最后一个会话');
+            return;
+        }
+        
+        // 设置要删除的会话ID
+        this.conversationToDelete = conversationId;
+        
+        // 显示确认对话框
+        this.elements.deleteDialog.style.display = 'flex';
+    }
+    
+    // 隐藏删除会话对话框
+    hideDeleteDialog() {
+        this.elements.deleteDialog.style.display = 'none';
+        this.conversationToDelete = null;
+    }
+    
+    // 删除当前会话
+    deleteCurrentConversation() {
+        if (!this.conversationToDelete) return;
+        
+        // 找到要删除的会话索引
+        const index = this.conversations.findIndex(conv => conv.id === this.conversationToDelete);
+        
+        if (index !== -1) {
+            // 删除会话
+            this.conversations.splice(index, 1);
+            
+            // 删除会话消息
+            delete this.messageHistory[this.conversationToDelete];
+            localStorage.setItem('coze_message_history', JSON.stringify(this.messageHistory));
+            
+            // 如果删除的是当前会话，切换到第一个会话
+            if (this.conversationToDelete === this.currentConversationId) {
+                this.currentConversationId = this.conversations[0].id;
+                this.persistCurrentConversationId();
+                this.loadConversationMessages();
+            }
+            
+            // 保存会话列表
+            this.saveConversations();
+            
+            // 重新渲染会话列表
+            this.renderConversationList();
+        }
+        
+        // 隐藏对话框
+        this.hideDeleteDialog();
+    }
+    
+    // 显示重命名对话框
+    showRenameDialog(conversationId) {
+        // 找到要重命名的会话
+        const conversation = this.conversations.find(conv => conv.id === conversationId);
+        
+        if (conversation) {
+            // 设置要重命名的会话ID和当前名称
+            this.conversationToRename = conversationId;
+            this.elements.renameInput.value = conversation.title;
+            
+            // 显示重命名对话框
+            this.elements.renameDialog.style.display = 'flex';
+            
+            // 焦点到输入框
+            setTimeout(() => {
+                this.elements.renameInput.focus();
+                this.elements.renameInput.select();
+            }, 100);
+        }
+    }
+    
+    // 隐藏重命名对话框
+    hideRenameDialog() {
+        this.elements.renameDialog.style.display = 'none';
+        this.conversationToRename = null;
+    }
+    
+    // 确认重命名会话
+    confirmRenameConversation() {
+        if (!this.conversationToRename) return;
+        
+        const newTitle = this.elements.renameInput.value.trim();
+        if (!newTitle) {
+            alert('会话名称不能为空');
+            return;
+        }
+        
+        // 找到要重命名的会话
+        const conversation = this.conversations.find(conv => conv.id === this.conversationToRename);
+        
+        if (conversation) {
+            // 更新会话标题
+            conversation.title = newTitle;
+            conversation.updatedAt = new Date().toISOString();
+            
+            // 保存会话列表
+            this.saveConversations();
+            
+            // 重新渲染会话列表
+            this.renderConversationList();
+            
+            // 如果是当前会话，更新标题显示
+            if (this.conversationToRename === this.currentConversationId) {
+                this.updateCurrentConversationTitle();
+            }
+        }
+        
+        // 隐藏对话框
+        this.hideRenameDialog();
+    }
+
     // 切换聊天窗口显示状态
     toggleChat() {
         if (this.elements.chatWindow.style.display === 'none' || !this.elements.chatWindow.style.display) {
             this.elements.chatWindow.style.display = 'block';
         } else {
             this.elements.chatWindow.style.display = 'none';
-        }
-    }
-    
-    // 持久化存储会话ID
-    persistConversationId(id) {
-        localStorage.setItem('coze_conversation_id', id);
-    }
-    
-    // 清除会话数据
-    clearSession() {
-        localStorage.removeItem('coze_conversation_id');
-        this.currentConversationId = null;
-    }
-    
-    // 初始化会话ID
-    initializeConversationId() {
-        const savedId = localStorage.getItem('coze_conversation_id');
-        if (savedId) {
-            this.currentConversationId = savedId;
-        } else {
-            this.currentConversationId = "conv_" + Date.now();
-            this.persistConversationId(this.currentConversationId);
         }
     }
     
@@ -573,6 +1367,9 @@ class CozeChat {
                     ${welcomeMessage.replace(/\n/g, '<br>')}
                 </div>
             </div>`;
+            
+        // 保存欢迎消息
+        this.saveConversationMessages();
     }
     
     // 发送消息
@@ -589,6 +1386,19 @@ class CozeChat {
                     ${message}
                 </div>
             </div>`;
+        
+        // 更新消息计数器
+        if (!this.messageCounter[this.currentConversationId]) {
+            this.messageCounter[this.currentConversationId] = 0;
+        }
+        this.messageCounter[this.currentConversationId]++;
+        
+        // 检查是否需要更新会话标题
+        const currentConversation = this.conversations.find(conv => conv.id === this.currentConversationId);
+        const messageCount = this.messageCounter[this.currentConversationId];
+        const shouldUpdateTitle = this.config.autoTitleEnabled && 
+                                 currentConversation && 
+                                 (currentConversation.title === "新会话" || messageCount <= this.config.autoTitleMaxMessages);
         
         this.elements.userInput.value = '';
         this.elements.sendBtn.disabled = true;
@@ -610,6 +1420,9 @@ class CozeChat {
         
         // 滚动到底部
         this.scrollToBottom();
+        
+        // 保存当前的消息状态
+        this.saveConversationMessages();
         
         try {
             // 构造请求体
@@ -654,6 +1467,11 @@ class CozeChat {
                     if (message.role === 'assistant' && message.type === 'follow_up') {
                         followUps.push(message.content);
                     }
+                }
+                
+                // 如果需要更新标题
+                if (shouldUpdateTitle) {
+                    this.updateTitleFromContent(result.messages[result.messages.length - 1]);
                 }
                 
                 // 组合回答和跟进问题
@@ -704,6 +1522,12 @@ class CozeChat {
                             messageDiv.querySelector('.coze-message-content').appendChild(suggestionsDiv.firstElementChild);
                             this.scrollToBottom();
                         }
+                        
+                        // 保存消息
+                        this.saveConversationMessages();
+                        
+                        // 更新会话更新时间
+                        this.updateConversationTimestamp();
                     });
                 } else {
                     this.elements.chatBox.innerHTML += `
@@ -714,6 +1538,9 @@ class CozeChat {
                                 暂无相关回答，请尝试其他问题
                             </div>
                         </div>`;
+                    
+                    // 保存消息
+                    this.saveConversationMessages();
                 }
             } else {
                 throw new Error('未找到有效回答');
@@ -729,10 +1556,119 @@ class CozeChat {
                         ${error.message}
                     </div>
                 </div>`;
+            
+            // 保存消息
+            this.saveConversationMessages();
         } finally {
             this.elements.sendBtn.disabled = false;
             this.elements.loading.style.display = 'none';
             this.elements.chatBox.scrollTop = this.elements.chatBox.scrollHeight;
+        }
+    }
+
+    // 根据内容更新会话标题
+    updateTitleFromContent(message) {
+        if (!message) return;
+        
+        // 确保我们传递的是消息内容字符串，而不是消息对象
+        const messageContent = typeof message === 'string' ? message : 
+                             (message.content ? message.content : 
+                             (typeof message === 'object' ? JSON.stringify(message) : String(message)));
+        
+        // 从消息中提取标题
+        let title = this.generateMeaningfulTitle(messageContent);
+        
+        // 更新会话标题
+        const conversation = this.conversations.find(conv => conv.id === this.currentConversationId);
+        if (conversation) {
+            conversation.title = title;
+            this.saveConversations();
+            this.updateCurrentConversationTitle();
+        }
+    }
+    
+    // 生成有意义的标题
+    generateMeaningfulTitle(message) {
+        // 限制标题最大长度
+        const maxLength = 12;
+        
+        // 去除特殊字符和多余空格
+        let cleanMessage = message.replace(/[?？!！.。,，:：;；(（)）\[\]【】\r\n\t]/g, ' ')
+                                   .replace(/\s+/g, ' ')
+                                   .trim();
+        
+        // 如果消息很短，直接使用
+        if (cleanMessage.length <= maxLength) {
+            return cleanMessage;
+        }
+        
+        // 尝试提取问题的关键部分
+        let title = "";
+        
+        // 检查是否有关键词引导的问题
+        const questionPatterns = [
+            { pattern: /(如何|怎样|怎么)[^\s]{2,}/, group: 0 },
+            { pattern: /(什么是|什么叫|关于)[^\s]{2,}/, group: 0 },
+            { pattern: /(请问|问一下)[^\s]{2,}/, group: 0 },
+            { pattern: /^(查询|搜索|了解)[^\s]{2,}/, group: 0 }
+        ];
+        
+        // 尝试匹配问题模式
+        for (const patternObj of questionPatterns) {
+            const match = cleanMessage.match(patternObj.pattern);
+            if (match) {
+                title = match[patternObj.group];
+                break;
+            }
+        }
+        
+        // 如果没有匹配特定模式，取前面的词语
+        if (!title) {
+            // 尝试取前几个关键字
+            const words = cleanMessage.split(' ');
+            if (words.length > 0) {
+                // 选择第一个词和其后几个词
+                let titleWords = [];
+                let currentLength = 0;
+                
+                for (const word of words) {
+                    if (currentLength + word.length <= maxLength) {
+                        titleWords.push(word);
+                        currentLength += word.length + 1; // +1 是空格
+                    } else {
+                        break;
+                    }
+                }
+                
+                title = titleWords.join(' ');
+            }
+            
+            // 如果标题过长，截断并添加省略号
+            if (title.length > maxLength) {
+                title = title.substring(0, maxLength) + "...";
+            } else if (!title) {
+                // 默认策略：直接截取开头部分
+                title = cleanMessage.substring(0, maxLength) + "...";
+            }
+        }
+        
+        return title;
+    }
+
+    // 更新会话时间戳
+    updateConversationTimestamp() {
+        // 找到当前会话
+        const conversation = this.conversations.find(conv => conv.id === this.currentConversationId);
+        
+        if (conversation) {
+            // 更新时间戳
+            conversation.updatedAt = new Date().toISOString();
+            
+            // 保存会话列表
+            this.saveConversations();
+            
+            // 重新渲染会话列表
+            this.renderConversationList();
         }
     }
 
@@ -793,6 +1729,25 @@ class CozeChat {
         } else {
             fullscreenBtn.textContent = '⛶';
             fullscreenBtn.title = '全屏';
+        }
+    }
+
+    // 切换设置菜单
+    toggleSettingsMenu() {
+        this.elements.settingsMenu.classList.toggle('active');
+    }
+    
+    // 加载设置
+    loadSettings() {
+        const savedSettings = localStorage.getItem('coze_settings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            
+            // 更新配置
+            if (settings.hasOwnProperty('autoTitleEnabled')) {
+                this.config.autoTitleEnabled = settings.autoTitleEnabled;
+                this.elements.autoTitleToggle.checked = settings.autoTitleEnabled;
+            }
         }
     }
 }
