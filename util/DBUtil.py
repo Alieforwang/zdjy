@@ -32,6 +32,8 @@ except ImportError:
 # 全局连接池实例
 connection_pool = None
 pool_lock = threading.Lock()
+# 添加全局重置标志，防止多次重置
+pool_resetting = False
 
 def get_connection_pool(pool_size=10, pool_name="mysql_pool"):
     """获取全局连接池实例，如果不存在则创建"""
@@ -412,20 +414,68 @@ class DatabaseManager():
 # 添加一个定期清理连接池的函数
 def reset_connection_pool():
     """重置全局连接池，关闭所有连接并创建新的连接池"""
-    global connection_pool, pool_lock
+    global connection_pool, pool_lock, pool_resetting
     
-    with pool_lock:
+    # 如果已经在重置中，则立即返回
+    if pool_resetting:
+        print("警告: 连接池已经在重置中，跳过本次重置操作")
+        return False
+        
+    # 设置超时机制
+    timeout = 30  # 最多等待30秒
+    start_time = time.time()
+    
+    # 尝试获取锁，带超时
+    acquired = pool_lock.acquire(timeout=5)  # 最多等待5秒获取锁
+    if not acquired:
+        print("警告: 无法获取连接池锁，跳过重置操作")
+        return False
+    
+    try:
+        # 设置正在重置标志
+        pool_resetting = True
+        
         if connection_pool:
             try:
                 print("正在重置数据库连接池...")
-                # 尝试关闭池中所有连接
+                
+                # 创建临时连接池以保障服务
+                temp_config = DB_CONFIG.copy()
+                temp_config.update({
+                    "pool_size": 5,
+                    "pool_name": "temp_mysql_pool"
+                })
+                
+                try:
+                    temp_pool = pooling.MySQLConnectionPool(**temp_config)
+                    print("已创建临时连接池")
+                except Error as e:
+                    print(f"创建临时连接池失败: {str(e)}")
+                    temp_pool = None
+                
+                # 尝试关闭池中所有连接，使用超时机制
                 if hasattr(connection_pool, '_cnx_queue'):
-                    for cnx in list(connection_pool._cnx_queue.queue):
+                    connection_count = 0
+                    connection_closed = 0
+                    
+                    # 将队列转为列表处理，避免在迭代过程中修改队列
+                    connections_to_close = list(connection_pool._cnx_queue.queue)
+                    connection_count = len(connections_to_close)
+                    
+                    for cnx in connections_to_close:
+                        # 检查是否超时
+                        if time.time() - start_time > timeout:
+                            print(f"警告: 关闭连接超时，已处理 {connection_closed}/{connection_count} 个连接")
+                            break
+                            
                         try:
                             if hasattr(cnx, 'is_connected') and cnx.is_connected():
                                 cnx.close()
-                        except:
-                            pass
+                                connection_closed += 1
+                        except Exception as e:
+                            print(f"关闭连接失败: {str(e)}")
+                    
+                    print(f"已关闭 {connection_closed}/{connection_count} 个连接")
                 
                 # 清空连接池引用，让垃圾回收器处理它
                 connection_pool = None
@@ -435,12 +485,38 @@ def reset_connection_pool():
                 gc.collect()
                 
                 # 重新创建连接池
-                get_connection_pool(pool_size=10)
-                print("数据库连接池已重置")
+                pool_size = DB_CONFIG.get('pool_size', 10)
+                new_pool = pooling.MySQLConnectionPool(**DB_CONFIG)
+                connection_pool = new_pool
+                print(f"数据库连接池已重置，新池大小: {pool_size}")
+                
+                # 如果创建了临时池，关闭它
+                if temp_pool:
+                    if hasattr(temp_pool, '_cnx_queue'):
+                        for cnx in list(temp_pool._cnx_queue.queue):
+                            try:
+                                if hasattr(cnx, 'is_connected') and cnx.is_connected():
+                                    cnx.close()
+                            except:
+                                pass
+                    print("临时连接池已释放")
+                
                 return True
             except Exception as e:
                 print(f"重置连接池时出错: {str(e)}")
+                # 确保出错时仍然创建新连接池
+                try:
+                    connection_pool = pooling.MySQLConnectionPool(**DB_CONFIG)
+                    print("尽管出错，仍然重新创建了连接池")
+                except:
+                    print("无法恢复连接池，请检查数据库服务")
                 return False
+    finally:
+        # 重置标志并释放锁
+        pool_resetting = False
+        pool_lock.release()
+        print(f"连接池重置操作完成，总耗时: {time.time() - start_time:.2f}秒")
+    
     return False
 
 # 用户管理相关方法

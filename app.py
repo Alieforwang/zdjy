@@ -213,22 +213,61 @@ def clean_old_files(directory, days_old=7):
 
 # 设置定期重置连接池的任务
 def setup_db_connection_maintenance():
-    """设置数据库连接池维护任务"""
+    """设置数据库连接池定期维护任务"""
     from util.DBUtil import reset_connection_pool
-    import threading
     
     def reset_pool_periodically():
         # 每小时重置一次连接池，避免连接池耗尽问题
+        import threading
+        last_success = time.time()  # 记录上次成功重置的时间
+        
         while True:
             try:
-                # 睡眠1小时
-                time.sleep(3600)
-                # 重置连接池
-                logger.info("执行定期数据库连接池维护...")
-                reset_connection_pool()
-                logger.info("数据库连接池重置完成")
+                # 检查距离上次成功重置是否已经超过30分钟
+                current_time = time.time()
+                # 如果上次重置失败，且已经过了30分钟，则尝试更频繁地重置
+                if current_time - last_success > 1800:  # 30分钟
+                    sleep_time = 600  # 10分钟
+                else:
+                    sleep_time = 3600  # 1小时
+                
+                # 睡眠指定时间
+                logger.info(f"下次数据库连接池维护将在 {sleep_time} 秒后进行")
+                time.sleep(sleep_time)
+                
+                # 添加超时机制
+                reset_thread = threading.Thread(
+                    target=_do_reset_with_timeout,
+                    name="db-pool-reset-worker",
+                    daemon=True
+                )
+                reset_thread.start()
+                
+                # 等待重置完成，但最多等待2分钟
+                reset_thread.join(timeout=120)
+                
+                # 如果线程仍在运行，说明重置超时
+                if reset_thread.is_alive():
+                    logger.error("数据库连接池重置超时，将在下一个周期重试")
+                else:
+                    last_success = time.time()  # 更新成功时间
+                    
             except Exception as e:
-                logger.error(f"连接池维护任务出错: {str(e)}")
+                logger.error(f"连接池维护线程异常: {str(e)}")
+                # 发生异常时，短暂休眠后继续
+                time.sleep(60)
+    
+    def _do_reset_with_timeout():
+        """带超时保护的重置连接池操作"""
+        try:
+            logger.info("执行定期数据库连接池维护...")
+            success = reset_connection_pool()
+            if success:
+                logger.info("数据库连接池重置成功")
+            else:
+                logger.warning("数据库连接池重置可能未完全成功")
+        except Exception as e:
+            logger.error(f"数据库连接池重置出错: {str(e)}")
     
     # 在后台线程中运行
     maintenance_thread = threading.Thread(
