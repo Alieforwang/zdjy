@@ -4,6 +4,7 @@ DB_CONFIG = {
     'user': 'root',
     'password': '123456',
     'database': 'tiaozhanbei',
+    'port': 3369,
     'charset': 'utf8mb4',
     'pool_size': 10,
     'pool_name': 'mysql_pool',
