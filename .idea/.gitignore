@@ -6,3 +6,16 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.mpg
+*.mpeg
+*.flv
+*.mkv
+# 图片也一并忽略（可选）
+*.jpg
+*.jpeg
+*.png
+*.gif
