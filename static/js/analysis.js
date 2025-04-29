@@ -54,6 +54,24 @@ window.addEventListener('error', function(event) {
     return false;
 });
 
+// 处理未捕获的Promise拒绝
+window.addEventListener('unhandledrejection', function(event) {
+    console.warn('未处理的Promise拒绝:', event.reason);
+    // 避免在控制台显示"runtime.lastError"错误
+    if (event.reason && event.reason.message && 
+        event.reason.message.includes('message port closed')) {
+        event.preventDefault();  // 阻止默认处理
+    }
+});
+
+// 页面卸载前清理所有挂起的请求
+window.addEventListener('beforeunload', function() {
+    // 如果正在上传，标记为中止
+    if (window.isUploading) {
+        window.isUploading = false;
+    }
+});
+
 // 初始化页面
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded');
@@ -1163,6 +1181,20 @@ function handleFiles(files) {
         return;
     }
     
+    // 检查文件大小（限制为90MB）
+    const maxSize = 90 * 1024 * 1024; // 90MB
+    if (file.size > maxSize) {
+        window.isUploading = false;
+        const resultArea = document.getElementById('resultArea');
+        if (resultArea) {
+            resultArea.innerHTML = '<div class="error">文件太大，请上传小于90MB的文件</div>';
+        }
+        if (uploadText) {
+            uploadText.textContent = "拖拽文件到此处或点击上传";
+        }
+        return;
+    }
+    
     const formData = new FormData();
     formData.append('file', file);
     
@@ -1302,16 +1334,21 @@ function handleFiles(files) {
                         </div>
                         <div class="detection-details">
                             ${data.detections.map(d => `
-                                <div class="detection-item ${d.class_type}">
-                                    <span class="detection-name">${d.class_name}</span>
+                                <div class="detection-item ${d.class_type || ''}">
+                                    <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
                                     <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
                     <div class="image-container">
-                        <img src="${data.result_image}" class="result-image" alt="分析结果" onerror="handleImageError(this)">
-                        ${canvas.outerHTML}
+                        ${data.is_video ? 
+                            `<video src="${data.result_image}" class="result-image" controls onerror="handleVideoError(this)">
+                                您的浏览器不支持视频播放。
+                            </video>` : 
+                            `<img src="${data.result_image}" class="result-image" alt="分析结果" onerror="handleImageError(this)">
+                            ${canvas.outerHTML}`
+                        }
                     </div>
                     <div class="download-section">
                         <button class="download-btn" onclick="downloadResult('${data.result_image.split('/').pop()}')">
@@ -1490,8 +1527,8 @@ function loadLatestResult() {
                             </div>
                             <div class="detection-details">
                                 ${data.data.detections.map(d => `
-                                    <div class="detection-item ${d.class_type}">
-                                        <span class="detection-name">${d.class_name}</span>
+                                    <div class="detection-item ${d.class_type || ''}">
+                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
                                         <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                     </div>
                                 `).join('')}
@@ -1499,14 +1536,22 @@ function loadLatestResult() {
                         </div>
                         <div class="image-container">
                             ${data.data.is_video ? 
-                                `<video src="${resultImage}" class="result-image" controls>
+                                `<video src="${data.data.result_image}" 
+                                        class="result-image" 
+                                        controls
+                                        preload="auto"
+                                        onerror="handleVideoError(this)"
+                                        playsinline>
                                     您的浏览器不支持视频播放。
-                                </video>` : 
-                                `<img src="${resultImage}" class="result-image" alt="分析结果" onerror="handleImageError(this, 1)">`
+                                </video>` :
+                                `<img src="${data.data.result_image}" 
+                                      class="result-image" 
+                                      alt="分析结果"
+                                      onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
                             }
                         </div>
                         <div class="download-section">
-                            <button class="download-btn" onclick="downloadResult('${resultImage.split('/').pop().split('?')[0]}')">
+                            <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
                                 <span class="download-icon">⬇️</span>
                                 下载分析结果
                             </button>
@@ -1543,7 +1588,7 @@ function handleImageError(img, maxRetries) {
         img.retryCount = 0;
     }
     
-    if (img.retryCount < maxRetries) {
+    if (img.retryCount < (maxRetries || 1)) {
         img.retryCount++;
         console.log('图片加载失败，尝试加载默认图片');
         // 使用绝对路径和时间戳防止缓存
@@ -1554,13 +1599,48 @@ function handleImageError(img, maxRetries) {
             img.style.display = 'none';
             img.parentElement.innerHTML = '<div class="error-message">图片加载失败</div>';
         } else {
-            img.src = `/static/default_result.jpg?t=${timestamp}`;
+            img.src = `/static/@results/default_result.jpg?t=${timestamp}`;
             console.log('已将图片路径更改为默认图片:', img.src);
         }
     } else {
         console.error('图片加载失败，已达到最大重试次数');
         img.style.display = 'none';
         img.parentElement.innerHTML = '<div class="error-message">图片加载失败</div>';
+    }
+}
+
+// 处理视频加载错误
+function handleVideoError(video) {
+    console.log('视频加载错误处理开始，当前视频路径:', video.src);
+    video.onerror = null; // 防止无限循环
+    
+    // 显示错误信息，但保留视频元素，让用户可以重试
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <p>视频加载失败</p>
+        <button onclick="retryVideo(this.parentElement.previousElementSibling)">重试加载</button>
+    `;
+    
+    // 插入错误信息
+    if (video.parentElement) {
+        video.parentElement.appendChild(errorDiv);
+    }
+}
+
+// 重试加载视频
+function retryVideo(video) {
+    if (!video) return;
+    
+    // 添加时间戳避免缓存
+    const src = video.src.split('?')[0] + '?t=' + new Date().getTime();
+    video.src = src;
+    video.load(); // 重新加载视频
+    
+    // 移除错误信息
+    const errorMessage = video.parentElement.querySelector('.error-message');
+    if (errorMessage) {
+        errorMessage.remove();
     }
 }
 
@@ -1597,29 +1677,42 @@ function restoreLatestResult() {
                 // 恢复分析结果
                 const resultArea = document.getElementById('resultArea');
                 resultArea.innerHTML = `
-                    <div class="result-container">
-                        <div class="result-images">
-                            <div class="image-container">
-                                ${data.data.is_video ? 
-                                    `<video src="${data.data.result_image}" 
-                                            class="result-image" 
-                                            controls
-                                            preload="auto"
-                                            playsinline>
-                                        您的浏览器不支持视频播放。
-                                    </video>` :
-                                    `<img src="${data.data.result_image}" 
-                                          class="result-image" 
-                                          alt="分析结果"
-                                          onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
-                                }
+                    <div class="result-content">
+                        <div class="detection-info">
+                            <div class="detection-type-result">
+                                检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                                <span class="detection-count">(发现 ${data.data.detection_count} 个目标)</span>
                             </div>
-                            <div class="download-section">
-                                <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
-                                    <span class="download-icon">⬇️</span>
-                                    下载分析结果
-                                </button>
+                            <div class="detection-details">
+                                ${data.data.detections.map(d => `
+                                    <div class="detection-item ${d.class_type || ''}">
+                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                        <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                    </div>
+                                `).join('')}
                             </div>
+                        </div>
+                        <div class="image-container">
+                            ${data.data.is_video ? 
+                                `<video src="${data.data.result_image}" 
+                                        class="result-image" 
+                                        controls
+                                        preload="auto"
+                                        onerror="handleVideoError(this)"
+                                        playsinline>
+                                    您的浏览器不支持视频播放。
+                                </video>` :
+                                `<img src="${data.data.result_image}" 
+                                      class="result-image" 
+                                      alt="分析结果"
+                                      onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
+                            }
+                        </div>
+                        <div class="download-section">
+                            <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
+                                <span class="download-icon">⬇️</span>
+                                下载分析结果
+                            </button>
                         </div>
                     </div>
                 `;

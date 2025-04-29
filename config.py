@@ -4,7 +4,7 @@ DB_CONFIG = {
     'user': 'root',
     'password': '123456',
     'database': 'tiaozhanbei',
-    'port': 3369,
+    'port': 3306,
     'charset': 'utf8mb4',
     'pool_size': 10,
     'pool_name': 'mysql_pool',
@@ -32,7 +32,8 @@ APP_CONFIG = {
     'PERMANENT_SESSION_LIFETIME': 3600,  # session过期时间(秒)
     'UPLOAD_FOLDER': 'static/uploads',  # 上传文件存储目录
     'RESULT_FOLDER': 'static/@results',  # 结果文件存储目录
-    'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,  # 最大上传文件大小(16MB)
+    'TEMP_FOLDER': 'static/temp',  # 临时文件存储目录
+    'MAX_CONTENT_LENGTH': 100 * 1024 * 1024,  # 最大上传文件大小(100MB)
     'ALLOWED_EXTENSIONS': {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi'},  # 允许上传的文件类型
 }
 

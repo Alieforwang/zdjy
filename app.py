@@ -169,6 +169,7 @@ ALLOWED_EXTENSIONS = APP_CONFIG['ALLOWED_EXTENSIONS']
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULT_FOLDER'] = APP_CONFIG['RESULT_FOLDER']
+app.config['TEMP_FOLDER'] = APP_CONFIG['TEMP_FOLDER']
 app.config['MAX_CONTENT_LENGTH'] = APP_CONFIG['MAX_CONTENT_LENGTH']  # 设置最大上传大小
 
 # 清理旧文件的函数
@@ -357,6 +358,7 @@ def ensure_directories():
         'static/uploads',
         'static/results',
         'static/@results',
+        'static/temp',
         'static/tmp',
         'tmp',
         'tmp/uploads',
@@ -785,7 +787,7 @@ def delete_job(job_id):
 @app.route('/api/analyze', methods=['POST'])
 def upload_analyze():
     """
-    处理上传的图片并进行分析
+    处理上传的图片或视频并进行分析
     """
     thread_pool = get_thread_pool()
     
@@ -812,64 +814,175 @@ def upload_analyze():
             thread_pool.submit(clean_old_files, app.config['UPLOAD_FOLDER'], 7)
             thread_pool.submit(clean_old_files, app.config['RESULT_FOLDER'], 7)
             
-            # 使用新的YOLOv8模型实例进行预测
-            logger.info(f"开始分析图像: {filepath}")
-            results = model.predict(filepath, conf=0.25)
+            # 检查文件类型
+            is_video = filepath.lower().endswith(('.mp4', '.avi', '.mov'))
+            file_type = 'video' if is_video else 'image'
             
-            if results is None or len(results) == 0:
-                return jsonify({"error": "No detection results"}), 400
+            logger.info(f"开始分析{'视频' if is_video else '图像'}: {filepath}")
             
-            result = results[0]  # 获取第一个结果
-            
-            # 提取边界框和类别
-            boxes = result.boxes.xyxy.cpu().numpy()
-            classes = result.boxes.cls.cpu().numpy()
-            confs = result.boxes.conf.cpu().numpy()
-            
-            # 将结果保存为图像
-            result_img = result.plot()
-            result_filename = f"result_{unique_filename}"
-            result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
-            cv2.imwrite(result_path, result_img)
-            
-            # 准备响应数据
-            detections = []
-            
-            # 根据绘制结果判断检测类型
-            # 默认检测类型为固定摊位(zdjy_gd)
-            detect_type = 'zdjy_gd'
-            
-            # 重要：直接确认边框中的zdjy_gd标志，而不依赖类别ID
-            # 在YOLOv8中，模型会在框中直接标注类型，我们可以通过图像分析或直接信任模型输出
-            
-            for i in range(len(boxes)):
-                box = boxes[i]
-                cls_id = int(classes[i])
-                conf = float(confs[i])
+            # 使用YOLOv8模型进行预测
+            if is_video:
+                # 视频分析
+                # 仅分析视频的关键帧或取样帧，以提高效率
+                cap = cv2.VideoCapture(filepath)
+                if not cap.isOpened():
+                    return jsonify({"error": "无法打开视频文件"}), 400
                 
-                # 修正检测类型逻辑，根据训练顺序调整
-                # 训练模型时的标签顺序：0-zdjy_gd（固定摊位），1-zdjy_ld（流动摊位）
-                if cls_id == 0:  # 类别0对应固定摊位(zdjy_gd)
-                    name = "固定摊位"
-                    cls_type = 'zdjy_gd'
-                    # 确保总体类型也是正确的
-                    detect_type = 'zdjy_gd'
-                elif cls_id == 1:  # 类别1对应流动摊位(zdjy_ld)
-                    name = "流动摊位"
-                    cls_type = 'zdjy_ld'
-                    # 如果检测到流动摊位，则整体类型设为流动摊位
-                    detect_type = 'zdjy_ld'
-                else:
-                    name = f"未知类别-{cls_id}"
-                    cls_type = 'other'
+                # 获取视频信息
+                fps = int(cap.get(cv2.CAP_PROP_FPS))
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 
-                detections.append({
-                    "box": [float(x) for x in box],
-                    "class": cls_id,
-                    "class_name": name,
-                    "class_type": cls_type,
-                    "confidence": conf
-                })
+                # 处理分辨率过高的情况
+                max_dimension = 1280
+                if width > max_dimension or height > max_dimension:
+                    # 等比例缩放
+                    scale = min(max_dimension / width, max_dimension / height)
+                    width = int(width * scale)
+                    height = int(height * scale)
+                
+                # 创建输出视频文件名
+                result_filename = f"result_{unique_filename}"
+                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+                
+                # 使用合适的编码器
+                fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 编码
+                out = cv2.VideoWriter(result_path, fourcc, fps, (width, height))
+                
+                # 准备分析结果数据
+                detections = []
+                frame_count = 0
+                sample_interval = max(1, int(fps / 4))  # 每秒分析4帧
+                detect_type = 'zdjy_gd'  # 默认为固定摊位
+                
+                # 分析视频帧
+                while True:
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    
+                    # 只分析采样帧
+                    if frame_count % sample_interval == 0:
+                        # 缩放帧以匹配输出分辨率
+                        if width != frame.shape[1] or height != frame.shape[0]:
+                            frame = cv2.resize(frame, (width, height))
+                        
+                        # 保存当前帧为临时图像
+                        temp_frame_path = os.path.join(app.config['TEMP_FOLDER'], f"temp_frame_{timestamp}_{frame_count}.jpg")
+                        cv2.imwrite(temp_frame_path, frame)
+                        
+                        # 分析当前帧
+                        try:
+                            results = model.predict(temp_frame_path, conf=0.25)
+                            if results and len(results) > 0:
+                                result = results[0]
+                                
+                                # 提取边界框和类别
+                                frame_detections = []
+                                if result.boxes is not None and len(result.boxes) > 0:
+                                    boxes = result.boxes.xyxy.cpu().numpy()
+                                    classes = result.boxes.cls.cpu().numpy()
+                                    confs = result.boxes.conf.cpu().numpy()
+                                    
+                                    # 处理检测结果
+                                    for i, box in enumerate(boxes):
+                                        x1, y1, x2, y2 = map(int, box)
+                                        cls_id = int(classes[i])
+                                        conf = float(confs[i])
+                                        
+                                        # 获取类别名称
+                                        class_name = result.names[cls_id]
+                                        
+                                        # 检查是否为流动摊位
+                                        if '流动' in class_name:
+                                            detect_type = 'zdjy_ld'
+                                        
+                                        # 添加到检测结果
+                                        frame_detections.append({
+                                            "box": [float(x1), float(y1), float(x2), float(y2)],
+                                            "confidence": float(conf),
+                                            "class": class_name,
+                                            "frame": frame_count
+                                        })
+                                    
+                                    # 将当前帧的检测结果添加到总结果中
+                                    detections.extend(frame_detections)
+                                
+                                # 绘制当前帧的检测结果
+                                result_img = result.plot()
+                                out.write(result_img)
+                            else:
+                                # 如果没有检测到任何物体，直接写入原始帧
+                                out.write(frame)
+                        except Exception as e:
+                            logger.error(f"处理视频帧 {frame_count} 时出错: {str(e)}")
+                            # 如果处理失败，写入原始帧
+                            out.write(frame)
+                        
+                        # 删除临时帧文件
+                        if os.path.exists(temp_frame_path):
+                            os.remove(temp_frame_path)
+                    else:
+                        # 非采样帧，直接写入原始帧
+                        out.write(frame)
+                    
+                    frame_count += 1
+                
+                # 释放资源
+                cap.release()
+                out.release()
+                
+                # 如果没有任何检测结果，返回错误
+                if not detections:
+                    return jsonify({"error": "视频中未检测到任何目标"}), 400
+                
+            else:
+                # 图像分析（保持原有逻辑）
+                results = model.predict(filepath, conf=0.25)
+                
+                if results is None or len(results) == 0:
+                    return jsonify({"error": "No detection results"}), 400
+                
+                result = results[0]  # 获取第一个结果
+                
+                # 提取边界框和类别
+                boxes = result.boxes.xyxy.cpu().numpy()
+                classes = result.boxes.cls.cpu().numpy()
+                confs = result.boxes.conf.cpu().numpy()
+                
+                # 将结果保存为图像
+                result_img = result.plot()
+                result_filename = f"result_{unique_filename}"
+                result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
+                cv2.imwrite(result_path, result_img)
+                
+                # 准备响应数据
+                detections = []
+                
+                # 根据绘制结果判断检测类型
+                # 默认检测类型为固定摊位(zdjy_gd)
+                detect_type = 'zdjy_gd'
+                
+                # 处理检测结果
+                for i, box in enumerate(boxes):
+                    x1, y1, x2, y2 = map(int, box)
+                    cls_id = int(classes[i])
+                    conf = float(confs[i])
+                    
+                    # 获取类别名称
+                    class_name = result.names[cls_id]
+                    
+                    # 检查是否为流动摊位
+                    if '流动' in class_name:
+                        detect_type = 'zdjy_ld'
+                    
+                    # 添加到检测结果
+                    detections.append({
+                        "box": [float(x1), float(y1), float(x2), float(y2)],
+                        "confidence": float(conf),
+                        "class": class_name
+                    })
             
             # 创建数据库连接并保存分析结果
             try:
@@ -888,11 +1001,8 @@ def upload_analyze():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
                 """
                 
-                # 设置默认值
-                file_type = 'image'
-                avg_confidence = 0.0
-                
                 # 计算平均置信度
+                avg_confidence = 0.0
                 if detections:
                     avg_confidence = sum(d["confidence"] for d in detections) / len(detections)
                 
@@ -910,16 +1020,17 @@ def upload_analyze():
             
             return jsonify({
                 "success": True,
-                "message": "图像分析完成",
+                "message": f"{'视频' if is_video else '图像'}分析完成",
                 "result_image": url_for('get_result', filename=result_filename),
-                "uploaded_image": url_for('get_upload', filename=unique_filename),
+                "uploaded_file": url_for('get_upload', filename=unique_filename),
                 "detections": detections,
                 "detection_count": len(detections),
-                "detect_type": detect_type
+                "detect_type": detect_type,
+                "is_video": is_video
             })
             
         except Exception as e:
-            logger.error(f"图像分析错误: {str(e)}")
+            logger.error(f"{'视频' if filepath.lower().endswith(('.mp4', '.avi', '.mov')) else '图像'}分析错误: {str(e)}")
             traceback.print_exc()
             return jsonify({"error": str(e)}), 500
 
@@ -1212,17 +1323,15 @@ def get_latest_result():
                 'file_type': 'image',
                 'file_path': '/static/@results/default_result.jpg',
                 'result_image': '/static/@results/default_result.jpg',
-                'detect_type': '固定摊位', # 修改为中文显示
-                'detect_type_code': 'zdjy_gd', # 保留原始代码，以防前端需要
+                'detect_type': 'zdjy_gd',
+                'is_video': False,
                 'confidence': 0.0,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'detections': [
                     {
                         "box": [100, 100, 200, 200],
-                        "class": 0,
-                        "class_name": "固定摊位",
-                        "class_type": "zdjy_gd",
-                        "confidence": 0.8
+                        "confidence": 0.8,
+                        "class": "固定摊位"
                     }
                 ],
                 'detection_count': 1
@@ -1257,17 +1366,15 @@ def get_latest_result():
                     'file_type': 'image',
                     'file_path': '/static/@results/default_result.jpg',
                     'result_image': '/static/@results/default_result.jpg',
-                    'detect_type': '固定摊位', # 修改为中文显示
-                    'detect_type_code': 'zdjy_gd', # 保留原始代码，以防前端需要
+                    'detect_type': 'zdjy_gd',
+                    'is_video': False,
                     'confidence': 0.0,
                     'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'detections': [
                         {
                             "box": [100, 100, 200, 200],
-                            "class": 0,
-                            "class_name": "固定摊位",
-                            "class_type": "zdjy_gd",
-                            "confidence": 0.8
+                            "confidence": 0.8,
+                            "class": "固定摊位"
                         }
                     ],
                     'detection_count': 1
@@ -1278,37 +1385,26 @@ def get_latest_result():
         # 构建响应数据
         record = result[0]
         detect_type = record[6]  # 获取检测类型代码
-        
-        # 将检测类型代码转换为中文显示名称
-        type_display = '未知'
-        if detect_type:
-            if detect_type == 'zdjy_gd':
-                type_display = '固定摊位'
-            elif detect_type == 'zdjy_ld':
-                type_display = '流动摊位'
-            else:
-                # 保留原始值，以防有其他类型
-                type_display = detect_type
+        file_type = record[2]    # 获取文件类型
+        is_video = file_type == 'video'  # 判断是否视频
         
         response_data = {
             'success': True,
             'data': {
                 'id': record[0],
                 'user_id': record[1],
-                'file_type': record[2],
+                'file_type': file_type,
                 'file_path': '/static/@results/default_result.jpg',  # 默认图片
                 'result_image': '/static/@results/default_result.jpg',  # 默认图片
-                'detect_type': type_display,  # 使用中文显示
-                'detect_type_code': detect_type,  # 保留原始代码，以防前端需要
+                'detect_type': detect_type,  # 使用原始的代码
+                'is_video': is_video,        # 添加是否视频的标志
                 'confidence': float(record[7]),
                 'created_at': record[8].strftime('%Y-%m-%d %H:%M:%S'),
                 'detections': [
                     {
                         "box": [100, 100, 200, 200],
-                        "class": 0,
-                        "class_name": "固定摊位",
-                        "class_type": "zdjy_gd",
-                        "confidence": 0.8
+                        "confidence": 0.8,
+                        "class": "流动摊位" if detect_type == 'zdjy_ld' else "固定摊位"
                     }
                 ],
                 'detection_count': 1
@@ -1351,17 +1447,15 @@ def get_latest_result():
                 'file_type': 'image',
                 'file_path': '/static/@results/default_result.jpg',
                 'result_image': '/static/@results/default_result.jpg',
-                'detect_type': '固定摊位', # 修改为中文显示
-                'detect_type_code': 'zdjy_gd', # 保留原始代码，以防前端需要
+                'detect_type': 'zdjy_gd',
+                'is_video': False,
                 'confidence': 0.0,
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'detections': [
                     {
                         "box": [100, 100, 200, 200],
-                        "class": 0,
-                        "class_name": "固定摊位",
-                        "class_type": "zdjy_gd",
-                        "confidence": 0.8
+                        "confidence": 0.8,
+                        "class": "固定摊位"
                     }
                 ],
                 'detection_count': 1

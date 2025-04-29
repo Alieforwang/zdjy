@@ -50,6 +50,11 @@ limit_request_line = 4096
 limit_request_fields = 100
 limit_request_field_size = 8190
 
+# 请求主体大小限制 - 允许上传大视频文件（100MB）
+# 注意：此配置需要确保在Flask应用中也设置了相应的MAX_CONTENT_LENGTH
+max_request_line = 0
+limit_request_body = 104857600  # 100MB in bytes
+
 # 每个工作进程的线程数
 threads = 4
 
