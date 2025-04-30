@@ -34,6 +34,7 @@ import io
 from PIL import Image
 import csv
 import requests
+import platform
 
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
@@ -786,6 +787,35 @@ def delete_job(job_id):
     print("DELETE FROM gw_list WHERE id = {}".format(job_id))
     return jsonify({"message": "Job deleted successfully!"})
 
+# 检测操作系统类型
+OS_TYPE = platform.system()  # 返回 'Linux', 'Windows', 'Darwin' 等
+
+# 根据操作系统设置合适的视频编解码器
+def get_platform_video_codec():
+    """根据平台返回合适的视频编解码器"""
+    if OS_TYPE == 'Linux':
+        # Linux通常支持这些编解码器
+        return [
+            ('MJPG', '.avi'),  # Motion JPEG for AVI
+            ('XVID', '.avi'),  # XVID for AVI
+            ('X264', '.mp4'),  # H.264 for MP4
+            ('mp4v', '.mp4')   # 另一种MP4编码
+        ]
+    elif OS_TYPE == 'Windows':
+        # Windows通常支持这些编解码器
+        return [
+            ('avc1', '.mp4'),  # H.264 for MP4
+            ('XVID', '.avi'),  # XVID for AVI
+            ('MJPG', '.avi')   # Motion JPEG for AVI
+        ]
+    else:
+        # 默认选项，适用于macOS等其他系统
+        return [
+            ('avc1', '.mp4'),  # H.264 for MP4
+            ('mp4v', '.mp4'),  # 另一种MP4编码
+            ('MJPG', '.avi')   # Motion JPEG for AVI
+        ]
+
 @app.route('/api/analyze', methods=['POST'])
 def upload_analyze():
     """
@@ -848,9 +878,43 @@ def upload_analyze():
                 result_filename = f"result_{unique_filename}"
                 result_path = os.path.join(app.config['RESULT_FOLDER'], result_filename)
                 
-                # 使用合适的编码器
-                fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 编码
-                out = cv2.VideoWriter(result_path, fourcc, fps, (width, height))
+                # 使用平台兼容的编解码器
+                codec_options = get_platform_video_codec()
+                video_writer = None
+                
+                # 尝试不同的编解码器
+                for codec, ext in codec_options:
+                    try:
+                        if ext != os.path.splitext(result_path)[1]:
+                            # 如果扩展名不匹配，更改输出文件名
+                            result_path = os.path.splitext(result_path)[0] + ext
+                            
+                        logger.info(f"尝试使用编解码器 {codec} 保存到 {result_path}")
+                        fourcc = cv2.VideoWriter_fourcc(*codec)
+                        video_writer = cv2.VideoWriter(result_path, fourcc, fps, (width, height))
+                        
+                        # 测试写入，确保编解码器可用
+                        test_frame = np.zeros((height, width, 3), dtype=np.uint8)
+                        video_writer.write(test_frame)
+                        
+                        # 如果没有异常，说明编解码器可用
+                        logger.info(f"使用编解码器 {codec} 保存视频成功")
+                        break
+                    except Exception as e:
+                        logger.warning(f"编解码器 {codec} 不可用: {str(e)}")
+                        if video_writer:
+                            video_writer.release()
+                            video_writer = None
+                            # 如果文件已创建但有问题，删除它
+                            if os.path.exists(result_path):
+                                try:
+                                    os.remove(result_path)
+                                except:
+                                    pass
+                
+                if not video_writer:
+                    logger.error("所有编解码器都失败，无法创建视频")
+                    return jsonify({"error": "无法创建输出视频，不支持的编解码器"}), 500
                 
                 # 准备分析结果数据
                 detections = []
@@ -913,27 +977,27 @@ def upload_analyze():
                                 
                                 # 绘制当前帧的检测结果
                                 result_img = result.plot()
-                                out.write(result_img)
+                                video_writer.write(result_img)
                             else:
                                 # 如果没有检测到任何物体，直接写入原始帧
-                                out.write(frame)
+                                video_writer.write(frame)
                         except Exception as e:
                             logger.error(f"处理视频帧 {frame_count} 时出错: {str(e)}")
                             # 如果处理失败，写入原始帧
-                            out.write(frame)
+                            video_writer.write(frame)
                         
                         # 删除临时帧文件
                         if os.path.exists(temp_frame_path):
                             os.remove(temp_frame_path)
                     else:
                         # 非采样帧，直接写入原始帧
-                        out.write(frame)
+                        video_writer.write(frame)
                     
                     frame_count += 1
                 
                 # 释放资源
                 cap.release()
-                out.release()
+                video_writer.release()
                 
                 # 如果没有任何检测结果，返回错误
                 if not detections:
@@ -1077,8 +1141,11 @@ def serve_static(filename):
 
 @app.route('/get_result/<path:filename>')
 def get_result(filename):
-    """从保存的结果文件夹获取分析结果图像"""
+    """从保存的结果文件夹获取分析结果图像或视频"""
     try:
+        # 记录请求详情，帮助调试
+        logger.info(f"尝试获取结果文件: {filename}")
+        
         # 如果是请求默认图片，直接从@results目录返回
         if filename == 'default_result.jpg':
             return send_from_directory('static/@results', filename)
@@ -1086,6 +1153,14 @@ def get_result(filename):
         # 清理文件名，移除可能错误包含的路径前缀
         if '/' in filename:
             filename = filename.split('/')[-1]
+        elif '\\' in filename:  # 处理Windows风格的路径
+            filename = filename.split('\\')[-1]
+        
+        # 移除查询参数
+        if '?' in filename:
+            filename = filename.split('?')[0]
+            
+        logger.info(f"清理后的文件名: {filename}")
         
         # 查询数据库获取该文件的结果文件夹
         db = DBM.DatabaseManager()
@@ -1097,10 +1172,49 @@ def get_result(filename):
         # 如果找到对应记录，使用记录中的结果文件夹
         if result and result[0][0]:
             result_folder = result[0][0]
-            return send_from_directory(result_folder, filename)
+            logger.info(f"从数据库找到结果文件夹: {result_folder}")
+            
+            # 标准化路径，处理不同操作系统的路径差异
+            result_folder = os.path.normpath(result_folder)
+            
+            # 检查文件是否实际存在
+            full_path = os.path.join(result_folder, filename)
+            if os.path.exists(full_path):
+                logger.info(f"文件存在: {full_path}")
+                
+                # 确定正确的MIME类型
+                mimetype = None
+                if filename.endswith('.mp4'):
+                    mimetype = 'video/mp4'
+                elif filename.endswith(('.jpg', '.jpeg')):
+                    mimetype = 'image/jpeg'
+                elif filename.endswith('.png'):
+                    mimetype = 'image/png'
+                
+                return send_from_directory(result_folder, filename, mimetype=mimetype)
+            else:
+                logger.warning(f"文件不存在: {full_path}")
         
-        # 如果没有找到记录，使用配置中的默认结果文件夹
-        return send_from_directory(app.config['RESULT_FOLDER'], filename)
+        # 如果没有找到记录或文件不存在，使用配置中的默认结果文件夹
+        default_folder = os.path.normpath(app.config['RESULT_FOLDER'])
+        full_path = os.path.join(default_folder, filename)
+        logger.info(f"尝试从默认文件夹获取: {full_path}")
+        
+        if os.path.exists(full_path):
+            # 确定正确的MIME类型
+            mimetype = None
+            if filename.endswith('.mp4'):
+                mimetype = 'video/mp4'
+            elif filename.endswith(('.jpg', '.jpeg')):
+                mimetype = 'image/jpeg'
+            elif filename.endswith('.png'):
+                mimetype = 'image/png'
+                
+            return send_from_directory(default_folder, filename, mimetype=mimetype)
+        else:
+            logger.warning(f"默认文件夹中也找不到文件: {full_path}")
+            return send_from_directory('static/@results', 'default_result.jpg')
+            
     except Exception as e:
         logger.error(f"获取结果图像错误: {str(e)}")
         return send_from_directory('static/@results', 'default_result.jpg')
@@ -1288,9 +1402,20 @@ def check_login():
 def download_result(filename):
     """下载分析结果文件"""
     try:
+        # 记录下载请求，帮助调试
+        logger.info(f"尝试下载文件: {filename}")
+        
         # 清理文件名，移除可能错误包含的路径前缀
         if '/' in filename:
             filename = filename.split('/')[-1]
+        elif '\\' in filename:  # 处理Windows风格的路径
+            filename = filename.split('\\')[-1]
+            
+        # 移除查询参数
+        if '?' in filename:
+            filename = filename.split('?')[0]
+            
+        logger.info(f"清理后的文件名: {filename}")
             
         # 查询数据库获取该文件的结果文件夹
         db = DBM.DatabaseManager()
@@ -1302,10 +1427,48 @@ def download_result(filename):
         # 如果找到对应记录，使用记录中的结果文件夹
         if result and result[0][0]:
             result_folder = result[0][0]
-            return send_from_directory(result_folder, filename, as_attachment=True)
+            logger.info(f"从数据库找到结果文件夹: {result_folder}")
+            
+            # 标准化路径，处理不同操作系统的路径差异
+            result_folder = os.path.normpath(result_folder)
+            
+            # 检查文件是否实际存在
+            full_path = os.path.join(result_folder, filename)
+            if os.path.exists(full_path):
+                logger.info(f"文件存在: {full_path}")
+                
+                # 确定正确的MIME类型
+                mimetype = None
+                if filename.endswith('.mp4'):
+                    mimetype = 'video/mp4'
+                elif filename.endswith(('.jpg', '.jpeg')):
+                    mimetype = 'image/jpeg'
+                elif filename.endswith('.png'):
+                    mimetype = 'image/png'
+                
+                return send_from_directory(result_folder, filename, as_attachment=True, mimetype=mimetype)
+            else:
+                logger.warning(f"文件不存在: {full_path}")
         
-        # 如果没有找到记录，使用配置中的默认结果文件夹
-        return send_from_directory(app.config['RESULT_FOLDER'], filename, as_attachment=True)
+        # 如果没有找到记录或文件不存在，使用配置中的默认结果文件夹
+        default_folder = os.path.normpath(app.config['RESULT_FOLDER'])
+        full_path = os.path.join(default_folder, filename)
+        logger.info(f"尝试从默认文件夹下载: {full_path}")
+        
+        if os.path.exists(full_path):
+            # 确定正确的MIME类型
+            mimetype = None
+            if filename.endswith('.mp4'):
+                mimetype = 'video/mp4'
+            elif filename.endswith(('.jpg', '.jpeg')):
+                mimetype = 'image/jpeg'
+            elif filename.endswith('.png'):
+                mimetype = 'image/png'
+                
+            return send_from_directory(default_folder, filename, as_attachment=True, mimetype=mimetype)
+        else:
+            logger.warning(f"默认文件夹中也找不到文件: {full_path}")
+            return "文件不存在或无法下载", 404
     except Exception as e:
         logger.error(f"下载结果文件错误: {str(e)}")
         return "文件不存在或无法下载", 404

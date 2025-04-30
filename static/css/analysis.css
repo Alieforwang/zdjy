@@ -556,115 +556,44 @@ body {
 }
 
 .image-container {
-    width: 100%;
     position: relative;
-    border-radius: 8px;
-    overflow: hidden;
-    background: transparent;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 5px;
-    height: auto;
+    width: 100%;
+    text-align: center;
     margin: 5px 0;
+    height: 100%;  /* 使容器填充父元素 */
+    overflow-y: auto;
+    min-height: 200px;  /* 确保有足够的高度显示视频或错误信息 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    scrollbar-width: thin;  /* Firefox */
+    -ms-overflow-style: -ms-autohiding-scrollbar;  /* IE 和 Edge */
 }
 
 /* 视频播放器样式 */
-.result-image {
-    max-width: 90%;
-    margin-top: 0%;
-    height: auto;
-    max-height: 250px;
+.result-images video,
+.image-container video {
+    width: 100%;
+    max-height: 500px;
     object-fit: contain;
-    display: block;
-    margin: 0 auto;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-}
-
-.result-image:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-video.result-image {
     background: transparent !important;
-    max-height: 250px;
-    width: auto;
-    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* 视频控制器样式 */
-video::-webkit-media-controls {
-    background-color: rgba(0, 0, 0, 0.5);
+.result-images video:focus,
+.image-container video:focus {
+    outline: none;
 }
 
-video::-webkit-media-controls-panel {
-    display: flex !important;
-    opacity: 1 !important;
-    background: rgba(0, 0, 0, 0.5);
-}
-
-.loading {
-    text-align: center;
-    padding: 20px;
-    color: #40a9ff;
-    font-size: 18px;
-}
-
-/* 添加旋转加载动画 */
-.spinner {
-    margin: 20px auto;
-    width: 40px;
-    height: 40px;
-    border: 4px solid rgba(0, 42, 84, 0.1);
-    border-radius: 50%;
-    border-top: 4px solid #40a9ff;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.error {
-    text-align: center;
-    padding: 20px;
-    color: #f5222d;
-    background-color: rgba(245, 34, 45, 0.1);
-    border-radius: 4px;
-    margin: 10px 0;
-}
-
-/* 上传区域的内容容器 */
-.upload-content {
-    width: 100%;
-    min-height: 100px;
-    display: flex;
-    flex-direction: column;
-}
-
-/* 预览容器样式优化 */
-.preview-container {
-    width: 100%;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100px;
-    height: auto;
-    background: transparent;
-    overflow: hidden;
-}
-
-/* 视频预览样式 */
+/* 视频预览样式增强 */
 #videoPreview {
     background: transparent !important;
     border-radius: 8px;
     max-width: 100%;
     height: auto;
+    display: block;  /* 确保即使未加载也占据空间 */
 }
 
 /* 图片和视频预览的通用样式 */
@@ -682,6 +611,8 @@ video::-webkit-media-controls-panel {
 /* 移除视频播放器的默认黑色背景 */
 video {
     background: transparent !important;
+    min-height: 100px;  /* 确保视频即使未加载也占据最小空间 */
+    display: block;  /* 避免行内元素问题 */
 }
 
 /* 视频控制器样式 */
@@ -709,28 +640,36 @@ video::-webkit-media-controls-panel {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
-/* 视频播放器样式 */
-.result-images video {
-    width: 100%;
-    max-height: 500px;
-    object-fit: contain;
-    background: #000;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+/* 错误消息样式 */
+.error-message {
+    background-color: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-top: 10px;
+    text-align: center;
+    width: 80%;
+    max-width: 300px;
 }
 
-.result-images video:focus {
-    outline: none;
+.error-message p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
 }
 
-/* 视频控制器样式 */
-.result-images video::-webkit-media-controls {
-    background-color: rgba(0, 0, 0, 0.5);
-    border-radius: 0 0 8px 8px;
+.error-message button {
+    background-color: rgba(0, 122, 255, 0.8);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.2s;
 }
 
-.result-images video::-webkit-media-controls-panel {
-    padding: 0 10px;
+.error-message button:hover {
+    background-color: rgba(0, 122, 255, 1);
 }
 
 /* 下载区域容器 */
@@ -742,31 +681,31 @@ video::-webkit-media-controls-panel {
     background: transparent;
 }
 
-/* 下载按钮样式 */
+/* 下载按钮样式增强 */
 .download-btn {
-    background-color: #1890ff;
+    padding: 8px 15px;
+    background: #1890ff;
     color: white;
     border: none;
-    padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    transition: all 0.3s ease;
+    gap: 5px;
+    transition: background-color 0.2s, transform 0.1s;
 }
 
 .download-btn:hover {
-    background-color: #40a9ff;
+    background: #40a9ff;
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
 }
 
 .download-btn:active {
-    transform: translateY(0);
+    transform: translateY(1px);
 }
 
+/* 下载图标样式 */
 .download-icon {
     font-size: 16px;
 }

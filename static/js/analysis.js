@@ -1243,6 +1243,8 @@ function handleFiles(files) {
         }
         
         if (data.success) {
+            console.log('检测结果:', data);
+            
             // 更新检测类型显示
             const currentDetectionType = document.getElementById('currentDetectionType');
             if (currentDetectionType) {
@@ -1324,40 +1326,69 @@ function handleFiles(files) {
             imageContainer.appendChild(img);
             imageContainer.appendChild(canvas);
             
-            // 显示分析结果
-            resultArea.innerHTML = `
-                <div class="result-content">
-                    <div class="detection-info">
-                        <div class="detection-type-result">
-                            检测结果: <span class="${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                            <span class="detection-count">(发现 ${data.detection_count} 个目标)</span>
+            // 显示分析结果，修正视频版本的HTML字符串
+            if (data.is_video) {
+                // 视频结果
+                resultArea.innerHTML = `
+                    <div class="result-content">
+                        <div class="detection-info">
+                            <div class="detection-type-result">
+                                检测结果: <span class="${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                                <span class="detection-count">(发现 ${data.detection_count} 个目标)</span>
+                            </div>
+                            <div class="detection-details">
+                                ${data.detections.map(d => `
+                                    <div class="detection-item ${d.class_type || ''}">
+                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                        <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
-                        <div class="detection-details">
-                            ${data.detections.map(d => `
-                                <div class="detection-item ${d.class_type || ''}">
-                                    <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
-                                    <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div class="image-container">
-                        ${data.is_video ? 
-                            `<video src="${data.result_image}" class="result-image" controls onerror="handleVideoError(this)">
+                        <div class="image-container">
+                            <video src="${data.result_image}" class="result-image" controls onerror="handleVideoError(this)">
                                 您的浏览器不支持视频播放。
-                            </video>` : 
-                            `<img src="${data.result_image}" class="result-image" alt="分析结果" onerror="handleImageError(this)">
-                            ${canvas.outerHTML}`
-                        }
+                            </video>
+                        </div>
+                        <div class="download-section">
+                            <button class="download-btn" onclick="downloadResult('${data.result_image.split('/').pop()}')">
+                                <span class="download-icon">⬇️</span>
+                                下载分析结果
+                            </button>
+                        </div>
                     </div>
-                    <div class="download-section">
-                        <button class="download-btn" onclick="downloadResult('${data.result_image.split('/').pop()}')">
-                            <span class="download-icon">⬇️</span>
-                            下载分析结果
-                        </button>
+                `;
+            } else {
+                // 图片结果
+                resultArea.innerHTML = `
+                    <div class="result-content">
+                        <div class="detection-info">
+                            <div class="detection-type-result">
+                                检测结果: <span class="${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                                <span class="detection-count">(发现 ${data.detection_count} 个目标)</span>
+                            </div>
+                            <div class="detection-details">
+                                ${data.detections.map(d => `
+                                    <div class="detection-item ${d.class_type || ''}">
+                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                        <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="${data.result_image}" class="result-image" alt="分析结果" onerror="handleImageError(this)">
+                            ${canvas.outerHTML}
+                        </div>
+                        <div class="download-section">
+                            <button class="download-btn" onclick="downloadResult('${data.result_image.split('/').pop()}')">
+                                <span class="download-icon">⬇️</span>
+                                下载分析结果
+                            </button>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
             
             // 上传成功后重新加载统计数据
             loadStats();
@@ -1463,120 +1494,139 @@ function initUpload() {
 // 加载最新的分析结果
 function loadLatestResult() {
     console.log('加载最新分析结果...');
+    
     fetch('/api/latest_result', {
         method: 'GET',
-        credentials: 'include',
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
+        credentials: 'include'  // 确保发送cookies以维持会话
     })
-        .then(response => {
-            if (!response.ok) {
-                console.error(`API响应错误: ${response.status} - ${response.statusText}`);
-                if (response.status === 401) {
-                    throw new Error('用户未登录，请刷新页面并重新登录');
-                } else if (response.status === 500) {
-                    throw new Error('服务器内部错误，请稍后再试');
-                } else {
-                    throw new Error(`请求失败(${response.status})`);
-                }
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             if (data.success) {
+                console.log('获取到最新分析结果:', data);
+                
+                // 更新检测类型显示
+                const currentDetectionType = document.getElementById('currentDetectionType');
+                if (currentDetectionType) {
+                    currentDetectionType.textContent = data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位';
+                }
+                
+                // 显示预览图
+                const previewContainer = document.getElementById('previewContainer');
+                const imagePreview = document.getElementById('imagePreview');
+                const videoPreview = document.getElementById('videoPreview');
+                const uploadHint = document.getElementById('uploadHint');
+                
+                if (previewContainer && imagePreview && videoPreview && uploadHint) {
+                    previewContainer.style.display = 'block';
+                    uploadHint.style.display = 'none';
+                    
+                    if (data.data.is_video) {
+                        videoPreview.src = data.data.file_path;
+                        videoPreview.style.display = 'block';
+                        imagePreview.style.display = 'none';
+                    } else {
+                        imagePreview.src = data.data.file_path;
+                        imagePreview.style.display = 'block';
+                        videoPreview.style.display = 'none';
+                    }
+                }
+                
+                // 显示分析结果
                 const resultArea = document.getElementById('resultArea');
-                if (!resultArea) {
-                    console.error('未找到resultArea元素');
-                    return;
+                const resultImage = data.data.result_image;
+                
+                // 确保文件名正确处理
+                let filename = resultImage.split('/').pop();
+                // 移除查询参数
+                if (filename.includes('?')) {
+                    filename = filename.split('?')[0];
                 }
                 
-                if (!data.data || !data.data.result_image) {
-                    console.error('返回的数据不完整:', data);
-                    resultArea.innerHTML = '<div class="error-message">数据不完整，无法显示结果</div>';
-                    return;
-                }
-                
-                // 处理图片路径 - 检查是否有效路径
-                let resultImage = data.data.result_image;
-                
-                // 确保路径以/开头
-                if (!resultImage.startsWith('/')) {
-                    resultImage = '/' + resultImage;
-                }
-                
-                // 检查是否是static目录下的图片，如果是，可能是一个错误的路径
-                if (resultImage.startsWith('/static/results.jpg')) {
-                    console.warn('检测到可能错误的图片路径，改用默认图片');
-                    resultImage = '/static/default_result.jpg';
-                }
-                
-                // 添加时间戳防止缓存
-                const timestamp = new Date().getTime();
-                resultImage = `${resultImage}?t=${timestamp}`;
-                
-                console.log('处理后的图片路径:', resultImage);
-                
-                resultArea.innerHTML = `
-                    <div class="result-content">
-                        <div class="detection-info">
-                            <div class="detection-type-result">
-                                检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                                <span class="detection-count">(发现 ${data.data.detection_count} 个目标)</span>
+                // 根据是否是视频生成不同的结果HTML
+                if (data.data.is_video) {
+                    // 视频结果
+                    resultArea.innerHTML = `
+                        <div class="result-content">
+                            <div class="detection-info">
+                                <div class="detection-type-result">
+                                    检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                                    <span class="detection-count">(发现 ${data.data.detection_count || 0} 个目标)</span>
+                                </div>
+                                <div class="detection-details">
+                                    ${(data.data.detections || []).map(d => `
+                                        <div class="detection-item ${d.class_type || ''}">
+                                            <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                            <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
-                            <div class="detection-details">
-                                ${data.data.detections.map(d => `
-                                    <div class="detection-item ${d.class_type || ''}">
-                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
-                                        <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                        <div class="image-container">
-                            ${data.data.is_video ? 
-                                `<video src="${data.data.result_image}" 
-                                        class="result-image" 
-                                        controls
-                                        preload="auto"
-                                        onerror="handleVideoError(this)"
-                                        playsinline>
+                            <div class="image-container">
+                                <video src="${resultImage}" 
+                                       class="result-image" 
+                                       controls
+                                       preload="auto"
+                                       onerror="handleVideoError(this)"
+                                       playsinline>
                                     您的浏览器不支持视频播放。
-                                </video>` :
-                                `<img src="${data.data.result_image}" 
-                                      class="result-image" 
-                                      alt="分析结果"
-                                      onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">`
-                            }
+                                </video>
+                            </div>
+                            <div class="download-section">
+                                <button class="download-btn" onclick="downloadResult('${filename}')">
+                                    <span class="download-icon">⬇️</span>
+                                    下载分析结果
+                                </button>
+                            </div>
                         </div>
-                        <div class="download-section">
-                            <button class="download-btn" onclick="downloadResult('${data.data.result_image.split('/').pop()}')">
-                                <span class="download-icon">⬇️</span>
-                                下载分析结果
-                            </button>
+                    `;
+                } else {
+                    // 图片结果
+                    resultArea.innerHTML = `
+                        <div class="result-content">
+                            <div class="detection-info">
+                                <div class="detection-type-result">
+                                    检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
+                                    <span class="detection-count">(发现 ${data.data.detection_count || 0} 个目标)</span>
+                                </div>
+                                <div class="detection-details">
+                                    ${(data.data.detections || []).map(d => `
+                                        <div class="detection-item ${d.class_type || ''}">
+                                            <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                            <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div class="image-container">
+                                <img src="${resultImage}" 
+                                     class="result-image" 
+                                     alt="分析结果"
+                                     onerror="this.onerror=null; this.src='/static/img/error.png'; this.alt='加载失败';">
+                            </div>
+                            <div class="download-section">
+                                <button class="download-btn" onclick="downloadResult('${filename}')">
+                                    <span class="download-icon">⬇️</span>
+                                    下载分析结果
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
                 
                 console.log('最新分析结果加载成功，图片路径:', resultImage);
             } else {
                 console.log('无最新分析结果:', data.message);
                 const resultArea = document.getElementById('resultArea');
                 if (resultArea) {
-                    resultArea.innerHTML = '<div class="empty-state">暂无分析记录，请上传图片进行分析</div>';
+                    resultArea.innerHTML = '<div class="empty-result"><span class="empty-icon">📊</span><p>暂无分析记录，请上传图片或视频进行分析</p></div>';
                 }
             }
         })
         .catch(error => {
-            console.error('加载最新结果失败:', error);
+            console.error('加载最新分析结果出错:', error);
             const resultArea = document.getElementById('resultArea');
             if (resultArea) {
-                resultArea.innerHTML = `<div class="error-message">
-                    <div class="error-icon">❌</div>
-                    <div class="error-text">加载分析结果失败: ${error.message || '未知错误'}</div>
-                    <div class="error-hint">请刷新页面或稍后再试</div>
-                </div>`;
+                resultArea.innerHTML = '<div class="empty-result"><span class="empty-icon">⚠️</span><p>加载分析记录时出错</p></div>';
             }
         });
 }
@@ -1614,6 +1664,24 @@ function handleVideoError(video) {
     console.log('视频加载错误处理开始，当前视频路径:', video.src);
     video.onerror = null; // 防止无限循环
     
+    // 添加时间戳避免缓存问题
+    const originalSrc = video.src.split('?')[0];
+    const newSrc = `${originalSrc}?t=${new Date().getTime()}`;
+    
+    // 尝试使用绝对路径
+    if (!originalSrc.startsWith('http')) {
+        const absolutePath = window.location.origin + (originalSrc.startsWith('/') ? '' : '/') + originalSrc;
+        video.src = absolutePath + `?t=${new Date().getTime()}`;
+        console.log('尝试使用绝对路径:', video.src);
+        
+        // 设置一个标志，记录已经尝试过的解决方案
+        video.dataset.retryWithAbsolutePath = 'true';
+        
+        // 重新加载视频
+        video.load();
+        return;
+    }
+    
     // 显示错误信息，但保留视频元素，让用户可以重试
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
@@ -1622,8 +1690,8 @@ function handleVideoError(video) {
         <button onclick="retryVideo(this.parentElement.previousElementSibling)">重试加载</button>
     `;
     
-    // 插入错误信息
-    if (video.parentElement) {
+    // 如果已有错误消息，则不重复添加
+    if (!video.parentElement.querySelector('.error-message')) {
         video.parentElement.appendChild(errorDiv);
     }
 }
@@ -1634,8 +1702,15 @@ function retryVideo(video) {
     
     // 添加时间戳避免缓存
     const src = video.src.split('?')[0] + '?t=' + new Date().getTime();
+    console.log('重试加载视频:', src);
+    
     video.src = src;
     video.load(); // 重新加载视频
+    
+    // 添加事件监听器以在加载完成时记录成功信息
+    video.onloadeddata = function() {
+        console.log('视频加载成功:', video.src);
+    };
     
     // 移除错误信息
     const errorMessage = video.parentElement.querySelector('.error-message');
@@ -1646,7 +1721,30 @@ function retryVideo(video) {
 
 // 下载结果文件
 function downloadResult(filename) {
-    window.location.href = `/download_result/${filename}`;
+    // 检查文件名格式，进行清理以确保跨平台兼容性
+    if (!filename) {
+        console.error("无效的文件名");
+        return;
+    }
+    
+    // 从完整路径中获取文件名，去除任何路径前缀
+    if (filename.includes('/')) {
+        filename = filename.split('/').pop();
+    } else if (filename.includes('\\')) {
+        // 处理Windows风格的路径分隔符
+        filename = filename.split('\\').pop();
+    }
+    
+    // 移除查询参数
+    if (filename.includes('?')) {
+        filename = filename.split('?')[0];
+    }
+    
+    console.log("下载文件:", filename);
+    
+    // 添加时间戳避免缓存问题
+    const downloadUrl = `/download_result/${filename}?t=${new Date().getTime()}`;
+    window.location.href = downloadUrl;
 }
 
 // 添加恢复最近结果的函数
