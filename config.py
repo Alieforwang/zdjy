@@ -42,4 +42,13 @@ LOG_CONFIG = {
     'filename': 'app.log',
     'level': 'INFO',
     'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+}
+
+# Dify API配置
+DIFY_CONFIG = {
+    'API_KEY': 'app-ID7NMYoFr6GQeZ33d4GsVbsO',
+    'API_URL': 'http://localhost/v1/chat-messages',
+    'HEADERS': {
+        'Content-Type': 'application/json'
+    }
 } 

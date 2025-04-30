@@ -4123,65 +4123,58 @@ def set_confidence_threshold():
     
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    """处理聊天请求，连接到Dify AI服务"""
     try:
-        # 记录请求信息
-        logger.info("收到聊天请求")
-        
-        # 解析请求数据
-        data = request.get_json()
-        if not data:
-            logger.warning("请求体为空")
-            return jsonify({
-                'error': '请求体不能为空'
-            }), 400
-
-        query = data.get('query')
-        conversation_id = data.get('conversation_id')
+        # 获取请求数据
+        data = request.json
+        query = data.get('query', '')
+        conversation_id = data.get('conversation_id', None)
         debug = data.get('debug', False)
-
-        if not query:
-            logger.warning("查询内容为空")
-            return jsonify({
-                'error': '查询内容不能为空'
-            }), 400
-
+        
+        logger.info(f"收到聊天请求")
         logger.info(f"收到请求 - 查询: {query}, 会话ID: {conversation_id}")
         
-        # 检查会话ID的合法性
-        if conversation_id and not (conversation_id == "new" or conversation_id.startswith("conv_")):
-            logger.warning(f"无效的会话ID格式: {conversation_id}")
-            # 如果会话ID格式不正确，重置为"new"
-            conversation_id = "new"
+        # 创建流式响应
+        def generate():
+            # 调用dify_chat的流式接口
+            from util.dify_chat import send_message_streaming
+            
+            # 流式返回响应
+            final_conversation_id = None
+            full_answer = ""
+            
+            for chunk_data in send_message_streaming(query, conversation_id, debug):
+                if 'conversation_id' in chunk_data and chunk_data['conversation_id']:
+                    final_conversation_id = chunk_data['conversation_id']
+                
+                if 'answer_chunk' in chunk_data:
+                    chunk = chunk_data['answer_chunk']
+                    full_answer += chunk
+                    yield json.dumps({
+                        'event': 'chunk',
+                        'data': {
+                            'text': chunk
+                        }
+                    }) + '\n\n'
+            
+            # 发送完成事件
+            yield json.dumps({
+                'event': 'done',
+                'data': {
+                    'conversation_id': final_conversation_id or conversation_id,
+                    'answer': full_answer
+                }
+            }) + '\n\n'
+            
+            logger.info(f"AI响应成功，会话ID: {final_conversation_id or conversation_id}, 回答长度: {len(full_answer)}")
         
-        # 调用AI服务
-        try:
-            conversation_id, answer = send_message(query, conversation_id, debug)
-        except Exception as e:
-            logger.error(f"AI服务调用失败: {str(e)}", exc_info=True)
-            return jsonify({
-                'error': f'AI服务调用失败: {str(e)}'
-            }), 500
+        # 返回流式响应
+        return Response(generate(), mimetype='text/event-stream')
         
-        # 检查AI服务返回结果
-        if conversation_id is None or answer is None:
-            logger.error("AI服务不可用")
-            return jsonify({
-                'error': 'AI 服务暂时不可用，请稍后重试'
-            }), 503
-
-        # 返回成功响应
-        logger.info(f"AI响应成功，会话ID: {conversation_id}, 回答长度: {len(answer if answer else '')}")
-        return jsonify({
-            'conversation_id': conversation_id,
-            'answer': answer
-        })
-
     except Exception as e:
-        # 记录异常并返回服务器错误
-        error_message = f"处理聊天请求时发生错误: {str(e)}"
-        logger.error(error_message, exc_info=True)
+        logger.error(f"处理聊天请求时出错: {str(e)}")
         return jsonify({
-            'error': '服务器内部错误: ' + str(e)
+            'error': f"处理请求时出错: {str(e)}"
         }), 500
 
 @app.route('/health', methods=['GET'])

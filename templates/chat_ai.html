@@ -646,12 +646,13 @@
             position: absolute;
             top: 60px;
             right: 10px;
-            background-color: white;
+            background-color: #ffffff;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            width: 250px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 280px;
             z-index: 100;
             display: none;
+            border: 1px solid #d0d0d0;
         }
         
         .coze-settings-menu.active {
@@ -659,21 +660,28 @@
         }
         
         .coze-settings-header {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e0e0e0;
+            padding: 15px;
+            border-bottom: 1px solid #d0d0d0;
             font-weight: 600;
+            font-size: 16px;
+            color: #000000;
+            background-color: #f0f2f5;
         }
         
         .coze-settings-content {
-            padding: 15px;
+            padding: 20px;
         }
         
         .coze-settings-item {
-            margin-bottom: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
         }
         
         .coze-settings-item:last-child {
             margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
         }
         
         .coze-settings-label {
@@ -681,13 +689,18 @@
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #000000;
+            margin-bottom: 12px;
+            line-height: 1.5;
         }
         
         .coze-toggle {
             position: relative;
             display: inline-block;
-            width: 40px;
-            height: 20px;
+            width: 44px;
+            height: 22px;
         }
         
         .coze-toggle input {
@@ -711,8 +724,8 @@
         .coze-toggle-slider:before {
             position: absolute;
             content: "";
-            height: 16px;
-            width: 16px;
+            height: 18px;
+            width: 18px;
             left: 2px;
             bottom: 2px;
             background-color: white;
@@ -725,26 +738,32 @@
         }
         
         .coze-toggle input:checked + .coze-toggle-slider:before {
-            transform: translateX(20px);
+            transform: translateX(22px);
         }
 
         /* 添加服务状态样式 */
         .coze-service-status {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 16px;
+            font-weight: 600;
+            color: #000000;
+            line-height: 1.5;
         }
 
         .coze-test-service-btn {
             width: 100%;
-            padding: 8px;
+            padding: 12px;
             background-color: #3a5998;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .coze-test-service-btn:hover {
@@ -754,20 +773,43 @@
         .coze-status-available {
             color: #4caf50;
             font-weight: bold;
+            font-size: 16px;
         }
 
         .coze-status-unavailable {
             color: #f44336;
             font-weight: bold;
+            font-size: 16px;
         }
 
         .coze-status-error {
             color: #ff9800;
             font-weight: bold;
+            font-size: 16px;
         }
 
         .coze-status-unknown {
-            color: #9e9e9e;
+            color: #333333;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        /* 设置按钮样式 */
+        #coze-settings-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            font-weight: bold;
+            padding: 5px 10px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        #coze-settings-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
@@ -858,7 +900,7 @@ class CozeChat {
                             </div>
                             <h2 id="coze-current-conversation-title">${this.config.title}</h2>
                             <div class="coze-chat-controls">
-                                <button id="coze-settings-btn" title="设置">⚙</button>
+                                <button id="coze-settings-btn" title="设置">设置</button>
                                 <button id="coze-fullscreen-btn" title="全屏">⛶</button>
                                 <button class="coze-chat-close" id="coze-chat-close" title="关闭">×</button>
                             </div>
@@ -1404,6 +1446,26 @@ class CozeChat {
     
     // 添加欢迎消息
     addWelcomeMessage() {
+        // 首先检查是否已经有欢迎消息
+        const welcomeMessages = this.elements.chatBox.querySelectorAll('.coze-chat-bot-message');
+        let hasWelcomeMessage = false;
+        
+        if (welcomeMessages.length > 0) {
+            // 检查第一条消息是否包含欢迎信息关键词
+            const firstMessage = welcomeMessages[0];
+            const messageContent = firstMessage.querySelector('.coze-message-content').textContent || '';
+            
+            if (messageContent.includes('欢迎使用灵瞳') || 
+                messageContent.includes('YOLOv8-DeepSeek多模态街景治理实时检测平台')) {
+                hasWelcomeMessage = true;
+            }
+        }
+        
+        // 如果已经有欢迎消息，就不再添加
+        if (hasWelcomeMessage) {
+            return;
+        }
+        
         const welcomeMessage = `
 欢迎使用灵瞳——YOLOv8-DeepSeek多模态街景治理实时检测平台！我是您的专属智能顾问。如需以下方面的帮助，请随时咨询：
 
@@ -1461,23 +1523,39 @@ class CozeChat {
         // 滚动到底部
         this.scrollToBottom();
         
-        // 显示思考动画
-        this.elements.chatBox.innerHTML += `
-            <div class="coze-chat-message coze-chat-bot-message">
-                <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                <div class="coze-message-content">
-                    <div class="coze-thinking">
-                        正在分析
-                        <span></span>
-                    </div>
-                </div>
-            </div>`;
+        // 创建新的回复消息元素
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'coze-chat-message coze-chat-bot-message';
+        
+        messageDiv.innerHTML = `
+            <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
+            <div class="coze-message-content">
+                <strong>智能顾问:</strong>
+                <span class="ai-response"></span>
+            </div>
+        `;
+        
+        this.elements.chatBox.appendChild(messageDiv);
+        
+        // 获取AI回复内容容器
+        const responseElement = messageDiv.querySelector('.ai-response');
+        
+        // 初始显示思考动画
+        responseElement.innerHTML = `
+            <div class="coze-thinking">
+                正在分析
+                <span></span>
+            </div>
+        `;
         
         // 滚动到底部
         this.scrollToBottom();
         
         // 保存当前的消息状态
         this.saveConversationMessages();
+        
+        let fullAnswer = "";
+        let newConversationId = null;
         
         try {
             // 构造请求体 - 保持会话ID一致性
@@ -1489,7 +1567,7 @@ class CozeChat {
             
             console.log("发送聊天请求:", payload);
             
-            // 调用本地对话接口
+            // 使用fetch API的流式功能
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
@@ -1502,97 +1580,74 @@ class CozeChat {
             
             // 检查响应状态
             if (!response.ok) {
-                let errorMessage = '请求失败';
-                let responseText = "";
-                
+                throw new Error(`服务器返回错误状态码: ${response.status}`);
+            }
+            
+            // 创建响应读取器并处理流式响应
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = "";
+            
+            // 移除思考动画
+            responseElement.innerHTML = '';
+            
+            const processStream = async () => {
                 try {
-                    // 尝试读取响应内容
-                    responseText = await response.text();
-                    console.log("错误响应内容:", responseText);
-                    
-                    // 尝试解析为JSON
-                    try {
-                        const errorData = JSON.parse(responseText);
-                        if (errorData && errorData.error) {
-                            errorMessage = errorData.error;
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        
+                        if (done) {
+                            console.log("流读取完成");
+                            break;
                         }
-                    } catch (e) {
-                        // 解析失败，使用原始文本
+                        
+                        // 解码二进制数据
+                        const text = decoder.decode(value, { stream: true });
+                        buffer += text;
+                        
+                        // 寻找完整的事件数据块
+                        const lines = buffer.split('\n\n');
+                        buffer = lines.pop() || ''; // 保留最后一个不完整的块
+                        
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    const eventData = JSON.parse(line);
+                                    
+                                    if (eventData.event === 'chunk') {
+                                        // 处理文本块
+                                        const chunk = eventData.data.text;
+                                        fullAnswer += chunk;
+                                        
+                                        // 直接添加文本到响应元素
+                                        this.appendTextToElement(responseElement, chunk);
+                                        
+                                        // 滚动到底部
+                                        this.scrollToBottom();
+                                    } 
+                                    else if (eventData.event === 'done') {
+                                        // 处理完成事件
+                                        console.log("回答完成:", eventData.data);
+                                        
+                                        // 更新会话ID
+                                        if (eventData.data.conversation_id) {
+                                            newConversationId = eventData.data.conversation_id;
+                                            
+                                            // 更新当前会话ID
+                                            if (newConversationId && newConversationId !== this.currentConversationId) {
+                                                console.log(`更新会话ID: ${this.currentConversationId} -> ${newConversationId}`);
+                                                this.currentConversationId = newConversationId;
+                                                this.persistCurrentConversationId();
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error("解析事件数据失败:", e, line);
+                                }
+                            }
+                        }
                     }
-                } catch (e) {
-                    console.error("无法读取响应内容", e);
-                }
-                
-                // 根据状态码设置错误消息
-                if (response.status === 503) {
-                    errorMessage = 'AI 服务暂时不可用，请稍后重试';
-                } else if (response.status === 400) {
-                    errorMessage = '请求参数错误，请检查输入';
-                    if (responseText) {
-                        errorMessage += `: ${responseText.substring(0, 100)}`;
-                    }
-                } else if (response.status === 500) {
-                    errorMessage = '服务器内部错误，请稍后重试';
-                }
-                
-                throw new Error(errorMessage);
-            }
-            
-            // 读取JSON响应
-            const resultText = await response.text();
-            console.log("成功响应内容:", resultText);
-            
-            let result;
-            try {
-                result = JSON.parse(resultText);
-            } catch (e) {
-                console.error("解析JSON响应失败", e);
-                throw new Error("服务器返回了无效的响应格式");
-            }
-            
-            if (result.error) {
-                throw new Error(result.error);
-            }
-            
-            // 处理响应结果
-            const answer = result.answer;
-            const newConversationId = result.conversation_id;
-            
-            console.log("会话ID:", newConversationId, "当前会话ID:", this.currentConversationId);
-            
-            // 更新会话ID - 只有在返回了新的会话ID时才更新
-            if (newConversationId && newConversationId !== this.currentConversationId) {
-                console.log(`更新会话ID: ${this.currentConversationId} -> ${newConversationId}`);
-                this.currentConversationId = newConversationId;
-                this.persistCurrentConversationId();
-            }
-            
-            if (answer) {
-                // 移除思考动画
-                const lastMessage = this.elements.chatBox.lastElementChild;
-                if (lastMessage) {
-                    lastMessage.remove();
-                }
-                
-                // 创建新的消息元素
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'coze-chat-message coze-chat-bot-message';
-                
-                messageDiv.innerHTML = `
-                    <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                    <div class="coze-message-content">
-                        <strong>智能顾问:</strong>
-                        <span class="ai-response"></span>
-                    </div>
-                `;
-                
-                this.elements.chatBox.appendChild(messageDiv);
-                
-                // 获取AI回复内容容器
-                const responseElement = messageDiv.querySelector('.ai-response');
-                
-                // 应用打字机效果
-                this.typeWriterEffect(answer, responseElement).then(() => {
+                    
                     // 保存消息
                     this.saveConversationMessages();
                     
@@ -1603,44 +1658,45 @@ class CozeChat {
                     
                     // 更新会话更新时间
                     this.updateConversationTimestamp();
-                });
-            } else {
-                this.elements.chatBox.innerHTML += `
-                    <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
-                        <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                        <div class="coze-message-content">
-                            <strong>系统提示:</strong>
-                            暂无相关回答，请尝试其他问题
-                        </div>
-                    </div>`;
-                
-                // 保存消息
-                this.saveConversationMessages();
-            }
+                    
+                } catch (error) {
+                    console.error("读取流时出错:", error);
+                    responseElement.innerHTML += `<br><span style="color: red;">读取回答时出错: ${error.message}</span>`;
+                    this.saveConversationMessages();
+                }
+            };
+            
+            await processStream();
             
         } catch (error) {
             console.error('请求失败:', error);
-            // 移除思考动画
-            const lastMessage = this.elements.chatBox.lastElementChild;
-            if (lastMessage) {
-                lastMessage.remove();
-            }
             
-            this.elements.chatBox.innerHTML += `
-                <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
-                    <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                    <div class="coze-message-content">
-                        <strong>系统提示:</strong>
-                        ${error.message}
-                    </div>
-                </div>`;
+            // 清除思考动画
+            responseElement.innerHTML = `<span style="color: red;">错误: ${error.message}</span>`;
             
             // 保存消息
             this.saveConversationMessages();
         } finally {
             this.elements.sendBtn.disabled = false;
             this.elements.loading.style.display = 'none';
-            this.elements.chatBox.scrollTop = this.elements.chatBox.scrollHeight;
+            this.scrollToBottom();
+        }
+    }
+    
+    // 添加一个方法用于安全地向元素追加文本
+    appendTextToElement(element, text) {
+        // 处理换行符，转换为<br>标签
+        const htmlText = text.replace(/\n/g, '<br>');
+        
+        // 创建一个安全的方式添加HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlText;
+        
+        // 或者使用innerHTML直接追加
+        if (element.innerHTML.includes('coze-thinking')) {
+            element.innerHTML = htmlText;
+        } else {
+            element.innerHTML += htmlText;
         }
     }
 
@@ -1674,35 +1730,6 @@ class CozeChat {
     sendSuggestedQuestion(question) {
         this.elements.userInput.value = question;
         this.sendMessage();
-    }
-
-    // 打字机效果显示文本
-    typeWriterEffect(text, element, speed = 30) {
-        return new Promise((resolve) => {
-            let i = 0;
-            const fullText = text.replace(/\n/g, '<br>');
-            element.innerHTML = '';
-            
-            const timer = setInterval(() => {
-                if (i < fullText.length) {
-                    // 处理HTML标签
-                    if (fullText.substr(i, 4) === '<br>' || fullText.substr(i, 3) === '<br') {
-                        let endIndex = fullText.indexOf('>', i) + 1;
-                        element.innerHTML += fullText.substring(i, endIndex);
-                        i = endIndex;
-                    } else {
-                        element.innerHTML += fullText.charAt(i);
-                        i++;
-                    }
-                    
-                    // 滚动到底部
-                    this.scrollToBottom();
-                } else {
-                    clearInterval(timer);
-                    resolve(); // 打字效果完成
-                }
-            }, speed);
-        });
     }
 
     // 添加全屏切换方法
