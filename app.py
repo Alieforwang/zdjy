@@ -3,6 +3,7 @@ from flask_cors import CORS
 import util.DBUtil as DBM
 import os
 from werkzeug.utils import secure_filename
+from util.dify_chat import send_message
 from yolov8 import predict_image, YOLOv8
 from datetime import timedelta, datetime
 import numpy as np
@@ -32,6 +33,7 @@ import base64
 import io
 from PIL import Image
 import csv
+import requests
 
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
@@ -4118,6 +4120,175 @@ def set_confidence_threshold():
     except Exception as e:
         logger.error(f"设置置信度阈值时出错: {str(e)}")
         return jsonify({"status": "error", "message": f"设置置信度阈值时出错: {str(e)}"}), 500
+    
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    try:
+        # 记录请求信息
+        logger.info("收到聊天请求")
+        
+        # 解析请求数据
+        data = request.get_json()
+        if not data:
+            logger.warning("请求体为空")
+            return jsonify({
+                'error': '请求体不能为空'
+            }), 400
+
+        query = data.get('query')
+        conversation_id = data.get('conversation_id')
+        debug = data.get('debug', False)
+
+        if not query:
+            logger.warning("查询内容为空")
+            return jsonify({
+                'error': '查询内容不能为空'
+            }), 400
+
+        logger.info(f"收到请求 - 查询: {query}, 会话ID: {conversation_id}")
+        
+        # 检查会话ID的合法性
+        if conversation_id and not (conversation_id == "new" or conversation_id.startswith("conv_")):
+            logger.warning(f"无效的会话ID格式: {conversation_id}")
+            # 如果会话ID格式不正确，重置为"new"
+            conversation_id = "new"
+        
+        # 调用AI服务
+        try:
+            conversation_id, answer = send_message(query, conversation_id, debug)
+        except Exception as e:
+            logger.error(f"AI服务调用失败: {str(e)}", exc_info=True)
+            return jsonify({
+                'error': f'AI服务调用失败: {str(e)}'
+            }), 500
+        
+        # 检查AI服务返回结果
+        if conversation_id is None or answer is None:
+            logger.error("AI服务不可用")
+            return jsonify({
+                'error': 'AI 服务暂时不可用，请稍后重试'
+            }), 503
+
+        # 返回成功响应
+        logger.info(f"AI响应成功，会话ID: {conversation_id}, 回答长度: {len(answer if answer else '')}")
+        return jsonify({
+            'conversation_id': conversation_id,
+            'answer': answer
+        })
+
+    except Exception as e:
+        # 记录异常并返回服务器错误
+        error_message = f"处理聊天请求时发生错误: {str(e)}"
+        logger.error(error_message, exc_info=True)
+        return jsonify({
+            'error': '服务器内部错误: ' + str(e)
+        }), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'ok'
+    })
+
+@app.route('/api/chat/status', methods=['GET'])
+def check_chat_service():
+    """检查AI聊天服务的可用性"""
+    from util.dify_chat import url, headers
+    
+    try:
+        # 测试连接Dify服务
+        logger.info("测试Dify服务连接")
+        
+        # 发送一个简单的OPTIONS请求检查服务可用性
+        response = requests.options(url, headers=headers, timeout=5)
+        
+        if response.status_code < 400:
+            # 服务可以连接
+            logger.info(f"Dify服务可用，状态码: {response.status_code}")
+            return jsonify({
+                'status': 'available',
+                'message': 'AI聊天服务正常运行',
+                'url': url
+            })
+        else:
+            # 服务返回错误
+            logger.warning(f"Dify服务返回错误状态码: {response.status_code}")
+            return jsonify({
+                'status': 'error',
+                'message': f'AI聊天服务返回错误: HTTP {response.status_code}',
+                'url': url
+            })
+    
+    except requests.exceptions.ConnectionError:
+        # 连接错误
+        logger.error("无法连接到Dify服务")
+        return jsonify({
+            'status': 'unavailable',
+            'message': '无法连接到AI聊天服务',
+            'url': url
+        }), 503
+    
+    except requests.exceptions.Timeout:
+        # 连接超时
+        logger.error("连接Dify服务超时")
+        return jsonify({
+            'status': 'timeout',
+            'message': '连接AI聊天服务超时',
+            'url': url
+        }), 503
+    
+    except Exception as e:
+        # 其他错误
+        logger.error(f"检查Dify服务时发生错误: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': f'检查AI聊天服务时出错: {str(e)}',
+            'url': url
+        }), 500
+
+@app.route('/api/generate_title', methods=['POST'])
+def generate_conversation_title():
+    """根据聊天内容生成会话标题"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '请求体不能为空'}), 400
+            
+        messages = data.get('messages', [])
+        if not messages or len(messages) == 0:
+            return jsonify({'error': '消息列表不能为空'}), 400
+            
+        # 取最近的几条消息（第一条用户消息和第一条AI回复）
+        user_message = None
+        for msg in messages:
+            if msg.get('role') == 'user':
+                user_message = msg.get('content')
+                break
+                
+        if not user_message:
+            user_message = messages[0].get('content', '')
+            if len(user_message) > 50:
+                user_message = user_message[:50] + '...'
+        
+        # 生成标题逻辑 - 简单方式：使用用户第一条消息的前20个字符
+        title = user_message[:20]
+        if len(user_message) > 20:
+            title += '...'
+            
+        # 如果内容为空，使用默认标题
+        if not title or title.isspace():
+            title = "新会话"
+            
+        logger.info(f"生成会话标题: {title}")
+        return jsonify({
+            'title': title
+        })
+        
+    except Exception as e:
+        logger.error(f"生成标题时出错: {str(e)}")
+        return jsonify({
+            'error': f'生成标题失败: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     try:
