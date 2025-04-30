@@ -1480,7 +1480,6 @@ class CozeChat {
             <div class="coze-chat-message coze-chat-bot-message">
                 <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
                 <div class="coze-message-content">
-                    <strong>智能顾问:</strong>
                     ${welcomeMessage.replace(/\n/g, '<br>')}
                 </div>
             </div>`;
@@ -1494,12 +1493,11 @@ class CozeChat {
         const message = this.elements.userInput.value.trim();
         if (!message) return;
         
-        // 显示用户消息
+        // 显示用户消息 - 移除"您:"前缀
         this.elements.chatBox.innerHTML += `
             <div class="coze-chat-message coze-chat-user-message">
                 <img src="${this.config.userAvatar}" class="coze-avatar" alt="User">
                 <div class="coze-message-content">
-                    <strong>您:</strong>
                     ${message}
                 </div>
             </div>`;
@@ -1530,7 +1528,6 @@ class CozeChat {
         messageDiv.innerHTML = `
             <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
             <div class="coze-message-content">
-                <strong>智能顾问:</strong>
                 <span class="ai-response"></span>
             </div>
         `;
@@ -1671,6 +1668,15 @@ class CozeChat {
         } catch (error) {
             console.error('请求失败:', error);
             
+            // 显示错误
+            this.elements.chatBox.innerHTML += `
+                <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
+                    <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
+                    <div class="coze-message-content">
+                        无法检查AI服务状态: ${error.message}
+                    </div>
+                </div>`;
+            
             // 清除思考动画
             responseElement.innerHTML = `<span style="color: red;">错误: ${error.message}</span>`;
             
@@ -1795,7 +1801,6 @@ class CozeChat {
                     <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
                         <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
                         <div class="coze-message-content">
-                            <strong>系统提示:</strong>
                             AI服务状态检查: ${result.message}
                             <br>服务地址: ${result.url}
                         </div>
@@ -1815,7 +1820,6 @@ class CozeChat {
                     <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
                         <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
                         <div class="coze-message-content">
-                            <strong>系统提示:</strong>
                             AI服务状态检查: ${result.message}
                             <br>服务地址: ${result.url}
                         </div>
@@ -1837,7 +1841,6 @@ class CozeChat {
                 <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
                     <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
                     <div class="coze-message-content">
-                        <strong>系统提示:</strong>
                         无法检查AI服务状态: ${error.message}
                     </div>
                 </div>`;
