@@ -1611,42 +1611,40 @@ function handleImageError(img, maxRetries) {
 
 // 处理视频加载错误
 function handleVideoError(video) {
-    console.log('视频加载错误处理开始，当前视频路径:', video.src);
-    video.onerror = null; // 防止无限循环
-    
-    // 显示错误信息，但保留视频元素，让用户可以重试
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.innerHTML = `
-        <p>视频加载失败</p>
-        <button onclick="retryVideo(this.parentElement.previousElementSibling)">重试加载</button>
-    `;
-    
-    // 插入错误信息
-    if (video.parentElement) {
-        video.parentElement.appendChild(errorDiv);
-    }
-}
-
-// 重试加载视频
-function retryVideo(video) {
-    if (!video) return;
-    
-    // 添加时间戳避免缓存
-    const src = video.src.split('?')[0] + '?t=' + new Date().getTime();
-    video.src = src;
-    video.load(); // 重新加载视频
-    
-    // 移除错误信息
-    const errorMessage = video.parentElement.querySelector('.error-message');
-    if (errorMessage) {
-        errorMessage.remove();
-    }
+    console.log('视频加载错误，重试中...');
+    const currentSrc = video.src;
+    video.src = ''; // 清除当前源
+    setTimeout(() => {
+        video.src = currentSrc + '?retry=' + new Date().getTime();
+    }, 1000);
 }
 
 // 下载结果文件
 function downloadResult(filename) {
-    window.location.href = `/download_result/${filename}`;
+    // 检查文件名格式，进行清理以确保跨平台兼容性
+    if (!filename) {
+        console.error("无效的文件名");
+        return;
+    }
+    
+    // 从完整路径中获取文件名，去除任何路径前缀
+    if (filename.includes('/')) {
+        filename = filename.split('/').pop();
+    } else if (filename.includes('\\')) {
+        // 处理Windows风格的路径分隔符
+        filename = filename.split('\\').pop();
+    }
+    
+    // 移除查询参数
+    if (filename.includes('?')) {
+        filename = filename.split('?')[0];
+    }
+    
+    console.log("下载文件:", filename);
+    
+    // 添加时间戳避免缓存问题
+    const downloadUrl = `/download_result/${filename}?t=${new Date().getTime()}`;
+    window.location.href = downloadUrl;
 }
 
 // 添加恢复最近结果的函数

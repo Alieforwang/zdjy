@@ -32,6 +32,8 @@ import base64
 import io
 from PIL import Image
 import csv
+import platform
+from pathlib import Path
 
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
@@ -1073,35 +1075,122 @@ def serve_static(filename):
         # 发生错误时返回默认图片
         return send_from_directory('static/@results', 'default_result.jpg')
 
+# 检测操作系统类型
+OS_TYPE = platform.system()  # 返回 'Linux', 'Windows', 'Darwin' 等
+
+def normalize_path(path):
+    """规范化文件路径，确保跨平台兼容性"""
+    return str(Path(path))
+
 @app.route('/get_result/<path:filename>')
 def get_result(filename):
-    """从保存的结果文件夹获取分析结果图像"""
+    """从保存的结果文件夹获取分析结果图像或视频"""
     try:
-        # 如果是请求默认图片，直接从@results目录返回
-        if filename == 'default_result.jpg':
-            return send_from_directory('static/@results', filename)
-            
+        # 记录请求详情，帮助调试
+        logger.info(f"尝试获取结果文件: {filename}")
+        
         # 清理文件名，移除可能错误包含的路径前缀
-        if '/' in filename:
-            filename = filename.split('/')[-1]
+        clean_filename = os.path.basename(filename)
+        
+        # 移除查询参数
+        if '?' in clean_filename:
+            clean_filename = clean_filename.split('?')[0]
+            
+        logger.info(f"清理后的文件名: {clean_filename}")
         
         # 查询数据库获取该文件的结果文件夹
         db = DBM.DatabaseManager()
         db.connect()
-        query = "SELECT result_folder FROM analysis_records WHERE result_path = %s LIMIT 1"
-        result = db.query_data(query, (filename,))
-        db.disconnect()
+        result_info = db.get_result_by_filename(clean_filename)
+        db.disconnect()  # 使用disconnect替代close
         
-        # 如果找到对应记录，使用记录中的结果文件夹
-        if result and result[0][0]:
-            result_folder = result[0][0]
-            return send_from_directory(result_folder, filename)
+        if not result_info:
+            logger.warning(f"未找到文件信息: {clean_filename}")
+            # 尝试在默认结果目录中查找
+            default_path = os.path.join(app.config['RESULT_FOLDER'], clean_filename)
+            if os.path.exists(default_path):
+                return send_from_directory(app.config['RESULT_FOLDER'], clean_filename)
+            # 如果找不到，返回默认图片
+            return send_from_directory('static/@results', 'default_result.jpg')
+            
+        # 构建规范化的文件路径
+        result_folder = result_info['result_folder']
+        if not result_folder:
+            result_folder = app.config['RESULT_FOLDER']
+            
+        # 确保结果文件夹存在
+        if not os.path.exists(result_folder):
+            logger.error(f"结果目录不存在: {result_folder}")
+            return send_from_directory('static/@results', 'default_result.jpg')
+            
+        # 确定文件类型
+        is_video = clean_filename.lower().endswith(('.mp4', '.avi', '.mov'))
+        mimetype = 'video/mp4' if is_video else None
         
-        # 如果没有找到记录，使用配置中的默认结果文件夹
-        return send_from_directory(app.config['RESULT_FOLDER'], filename)
+        # 发送文件
+        return send_from_directory(
+            result_folder,
+            clean_filename,
+            as_attachment=False,
+            mimetype=mimetype
+        )
+        
     except Exception as e:
-        logger.error(f"获取结果图像错误: {str(e)}")
+        logger.error(f"获取结果文件时出错: {str(e)}")
         return send_from_directory('static/@results', 'default_result.jpg')
+
+@app.route('/download_result/<path:filename>')
+def download_result(filename):
+    """下载结果文件"""
+    try:
+        # 清理和规范化文件名
+        clean_filename = os.path.basename(filename)
+        if '?' in clean_filename:
+            clean_filename = clean_filename.split('?')[0]
+            
+        # 查询数据库获取文件信息
+        db = DBM.DatabaseManager()
+        db.connect()
+        result_info = db.get_result_by_filename(clean_filename)
+        db.disconnect()  # 使用disconnect替代close
+        
+        if not result_info:
+            logger.warning(f"未找到文件信息: {clean_filename}")
+            # 尝试在默认结果目录中查找
+            default_path = os.path.join(app.config['RESULT_FOLDER'], clean_filename)
+            if os.path.exists(default_path):
+                return send_from_directory(
+                    app.config['RESULT_FOLDER'],
+                    clean_filename,
+                    as_attachment=True
+                )
+            return jsonify({"error": "文件不存在"}), 404
+            
+        # 构建规范化的文件路径
+        result_folder = result_info['result_folder']
+        if not result_folder:
+            result_folder = app.config['RESULT_FOLDER']
+            
+        # 确保结果文件夹存在
+        if not os.path.exists(result_folder):
+            logger.error(f"结果目录不存在: {result_folder}")
+            return jsonify({"error": "结果目录不存在"}), 404
+            
+        # 确定文件类型
+        is_video = clean_filename.lower().endswith(('.mp4', '.avi', '.mov'))
+        mimetype = 'video/mp4' if is_video else None
+        
+        # 发送文件
+        return send_from_directory(
+            result_folder,
+            clean_filename,
+            as_attachment=True,
+            mimetype=mimetype
+        )
+        
+    except Exception as e:
+        logger.error(f"下载文件时出错: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/get_upload/<path:filename>')
 def get_upload(filename):
@@ -1281,32 +1370,6 @@ def check_login():
             'logged_in': False,
             'message': f'检查登录状态时出错: {str(e)}'
         })
-
-@app.route('/download_result/<path:filename>')
-def download_result(filename):
-    """下载分析结果文件"""
-    try:
-        # 清理文件名，移除可能错误包含的路径前缀
-        if '/' in filename:
-            filename = filename.split('/')[-1]
-            
-        # 查询数据库获取该文件的结果文件夹
-        db = DBM.DatabaseManager()
-        db.connect()
-        query = "SELECT result_folder FROM analysis_records WHERE result_path = %s LIMIT 1"
-        result = db.query_data(query, (filename,))
-        db.disconnect()
-        
-        # 如果找到对应记录，使用记录中的结果文件夹
-        if result and result[0][0]:
-            result_folder = result[0][0]
-            return send_from_directory(result_folder, filename, as_attachment=True)
-        
-        # 如果没有找到记录，使用配置中的默认结果文件夹
-        return send_from_directory(app.config['RESULT_FOLDER'], filename, as_attachment=True)
-    except Exception as e:
-        logger.error(f"下载结果文件错误: {str(e)}")
-        return "文件不存在或无法下载", 404
 
 @app.route('/api/latest_result', methods=['GET'])
 def get_latest_result():

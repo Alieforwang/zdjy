@@ -411,6 +411,43 @@ class DatabaseManager():
         except Exception as e:
             print(f"关闭所有连接时出错: {str(e)}")
 
+    def get_result_by_filename(self, filename):
+        """
+        根据文件名获取分析结果记录
+        
+        Args:
+            filename: 结果文件名
+            
+        Returns:
+            dict: 包含结果信息的字典，如果未找到则返回None
+        """
+        try:
+            query = """
+                SELECT id, user_id, file_type, file_path, result_path, result_folder, detect_type, confidence, created_at
+                FROM analysis_records 
+                WHERE result_path = %s 
+                LIMIT 1
+            """
+            result = self.query_data(query, (filename,))
+            
+            if result and len(result) > 0:
+                return {
+                    'id': result[0][0],
+                    'user_id': result[0][1],
+                    'file_type': result[0][2],
+                    'file_path': result[0][3],
+                    'result_path': result[0][4],
+                    'result_folder': result[0][5],
+                    'detect_type': result[0][6],
+                    'confidence': result[0][7],
+                    'created_at': result[0][8]
+                }
+            return None
+            
+        except Exception as e:
+            print(f"获取结果记录时出错: {str(e)}")
+            return None
+
 # 添加一个定期清理连接池的函数
 def reset_connection_pool():
     """重置全局连接池，关闭所有连接并创建新的连接池"""
