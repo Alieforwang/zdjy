@@ -151,6 +151,40 @@ python app.py
    - 采用DPO方法进行指令微调
    - 提升模型与业务需求的语义对齐度
 
+#### 部署教程链接
+- Dify与Ollama本地部署详见： [知乎专栏教程](https://zhuanlan.zhihu.com/p/28744712219)
+
+#### 对话智能体创建
+使用Dify控制台或Ollama CLI创建对话型智能体：
+1. 登录Dify控制台或启动Ollama环境
+2. 选择模型 `DeepSeek-R1-32B`
+3. 定义对话意图、槽位和示例对话
+4. 完成部署并获取 `agent_id` 与 `api_token`
+
+#### 智能体API接入
+1. 在 `config.py` 中配置：
+```python
+AGENT_API_URL = "http://localhost:3000/api/agent/{agent_id}/chat"
+AGENT_API_TOKEN = "your_api_token_here"
+```
+2. 在 `templates/chat_ai.html` 中调用：
+```html
+<script>
+async function sendMessage(msg) {
+  const res = await fetch(AGENT_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${AGENT_API_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message: msg })
+  });
+  const data = await res.json();
+  appendChat(data.reply);
+}
+</script>
+```
+
 ## 低内存环境部署指南
 
 适用于2核心2G内存服务器的优化部署方案。
@@ -283,4 +317,4 @@ chmod +x deploy.sh
 1. 手动执行脚本：
    - 双击`db_monitor.bat`文件，或
    - 在命令提示符中运行：
-   ```
+   
