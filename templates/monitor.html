@@ -766,6 +766,19 @@
         .small-action-btn:hover {
             background-color: #2980b9;
         }
+        
+        /* 添加布局切换样式 */
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .monitor-grid.grid-vertical {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr 1fr;
+        }
     </style>
 </body>
 </html>
