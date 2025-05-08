@@ -1,21 +1,43 @@
-# 默认忽略的文件
-/shelf/
-/workspace.xml
-# 基于编辑器的 HTTP 客户端请求
-/httpRequests/
-# Datasource local storage ignored files
-/dataSources/
-/dataSources.local.xml
+# 忽略视频文件
 *.mp4
 *.avi
 *.mov
 *.wmv
-*.mpg
-*.mpeg
 *.flv
 *.mkv
-# 图片也一并忽略（可选）
+
+# 忽略图片文件
 *.jpg
 *.jpeg
 *.png
 *.gif
+*.bmp
+*.tiff
+*.webp
+*.ico
+
+# 忽略特定目录下的所有文件
+static/uploads/
+static/@results/
+static/temp/
+/tmp/
+
+# 排除特定的保留文件
+!static/@results/default_result.jpg
+!static/default_result.jpg
+
+# 忽略临时文件
+*.tmp
+*.temp
+*.log
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 忽略数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 忽略会话文件
+/sessions/ 
