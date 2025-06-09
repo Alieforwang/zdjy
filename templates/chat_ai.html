@@ -865,6 +865,10 @@ class CozeChat {
             botAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f916.svg',
             autoTitleEnabled: true, // 是否启用自动标题
             autoTitleMaxMessages: 3, // 更新标题的最大消息数
+            ttsEnabled: false,     // 是否启用语音朗读
+            ttsChunkSize: 100,     // 每次发送合成的文字长度
+            ttsVoice: "x4_yezi",   // 讯飞发音人
+            ttsAutoplay: true,     // 自动播放
             ...options
         };
         
@@ -877,6 +881,12 @@ class CozeChat {
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.isRecording = false;
+        
+        // 在constructor中初始化
+        this.ttsQueue = [];
+        this.ttsPlaying = false;
+        this.ttsAudioContext = null;
+        this.ttsBufferSource = null;
         
         this.init();
     }
@@ -968,6 +978,15 @@ class CozeChat {
                                     </div>
                                     <button id="coze-check-service-btn" class="coze-test-service-btn">检查服务状态</button>
                                 </div>
+                                <div class="coze-settings-item">
+                                    <label class="coze-settings-label">
+                                        AI回复语音朗读
+                                        <span class="coze-toggle">
+                                            <input type="checkbox" id="coze-tts-toggle">
+                                            <span class="coze-toggle-slider"></span>
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1028,7 +1047,8 @@ class CozeChat {
             cancelRename: document.getElementById('coze-cancel-rename'),
             settingsBtn: document.getElementById('coze-settings-btn'),
             settingsMenu: document.getElementById('coze-settings-menu'),
-            autoTitleToggle: document.getElementById('coze-auto-title-toggle')
+            autoTitleToggle: document.getElementById('coze-auto-title-toggle'),
+            ttsToggle: document.getElementById('coze-tts-toggle')
         };
     }
     
@@ -1068,7 +1088,15 @@ class CozeChat {
             this.config.autoTitleEnabled = e.target.checked;
             // 保存设置到本地存储
             localStorage.setItem('coze_settings', JSON.stringify({
-                autoTitleEnabled: this.config.autoTitleEnabled
+                autoTitleEnabled: this.config.autoTitleEnabled,
+                ttsEnabled: this.config.ttsEnabled
+            }));
+        });
+        this.elements.ttsToggle.addEventListener('change', (e) => {
+            this.config.ttsEnabled = e.target.checked;
+            localStorage.setItem('coze_settings', JSON.stringify({
+                autoTitleEnabled: this.config.autoTitleEnabled,
+                ttsEnabled: this.config.ttsEnabled
             }));
         });
         
@@ -1662,12 +1690,22 @@ class CozeChat {
                                         // 直接添加文本到响应元素
                                         this.appendTextToElement(responseElement, chunk);
                                         
+                                        // 将当前块发送给TTS处理
+                                        if (this.config.ttsEnabled && chunk.trim()) {
+                                            await this.processStreamForTTS(chunk);
+                                        }
+                                        
                                         // 滚动到底部
                                         this.scrollToBottom();
                                     } 
                                     else if (eventData.event === 'done') {
                                         // 处理完成事件
                                         console.log("回答完成:", eventData.data);
+                                        
+                                        // 标记TTS结束
+                                        if (this.config.ttsEnabled) {
+                                            await this.processStreamForTTS("", true);
+                                        }
                                         
                                         // 更新会话ID
                                         if (eventData.data.conversation_id) {
@@ -1812,6 +1850,10 @@ class CozeChat {
             if (settings.hasOwnProperty('autoTitleEnabled')) {
                 this.config.autoTitleEnabled = settings.autoTitleEnabled;
                 this.elements.autoTitleToggle.checked = settings.autoTitleEnabled;
+            }
+            if (settings.hasOwnProperty('ttsEnabled')) {
+                this.config.ttsEnabled = settings.ttsEnabled;
+                this.elements.ttsToggle.checked = settings.ttsEnabled;
             }
         }
     }
@@ -2238,6 +2280,222 @@ class CozeChat {
             // 清空录音数据
             this.audioChunks = [];
         }
+    }
+
+    // 添加TTS播放队列和音频播放器管理
+    // 在constructor中初始化
+    ttsQueue = [];
+    ttsPlaying = false;
+    ttsAudioContext = null;
+    ttsBufferSource = null;
+
+    // 添加TTS处理方法
+    async processStreamForTTS(text, isEnd = false) {
+        if (!this.config.ttsEnabled) return;
+        
+        // 将文本添加到TTS队列
+        if (text && text.trim()) {
+            this.ttsQueue.push({text, isEnd});
+        }
+        
+        // 如果不在播放中，开始处理队列
+        if (!this.ttsPlaying) {
+            this.processTTSQueue();
+        }
+    }
+
+    // 处理TTS队列
+    async processTTSQueue() {
+        if (this.ttsQueue.length === 0 || this.ttsPlaying) return;
+        
+        this.ttsPlaying = true;
+        const item = this.ttsQueue.shift();
+        
+        try {
+            // 如果文本为空，跳过处理
+            if (!item.text || !item.text.trim()) {
+                this.ttsPlaying = false;
+                this.processTTSQueue();
+                return;
+            }
+            
+            console.log(`处理TTS请求: ${item.text.substring(0, 30)}${item.text.length > 30 ? '...' : ''}`);
+            
+            // 删除特殊字符和过多的标点，优化TTS文本
+            let cleanText = item.text.trim()
+                .replace(/[^\u4e00-\u9fa5a-zA-Z0-9.,，。!?！？;:；：、""''()（）《》<>【】\s]/g, '')  // 只保留中英文、数字、常用标点
+                .replace(/([.,，。!?！？;:；：])\1+/g, '$1')  // 删除重复的标点符号
+                .trim();
+                
+            if (!cleanText) {
+                console.log('文本清理后为空，跳过TTS处理');
+                this.ttsPlaying = false;
+                this.processTTSQueue();
+                return;
+            }
+            
+            // 限制文本长度，避免请求过大
+            if (cleanText.length > 100) {
+                cleanText = cleanText.substring(0, 100);
+                console.log('文本已截断至100字符');
+            }
+            
+            // 发送TTS请求
+            const response = await fetch('/api/tts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    text: cleanText,
+                    voice: this.config.ttsVoice
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'TTS请求失败');
+            }
+            
+            // 获取音频数据并播放
+            const arrayBuffer = await response.arrayBuffer();
+            
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                throw new Error('服务器返回了空的音频数据');
+            }
+            
+            console.log(`接收到音频数据: ${arrayBuffer.byteLength} 字节`);
+            await this.playTTSAudio(arrayBuffer);
+            
+            // 重置失败计数
+            this.ttsFailCount = 0;
+            
+            // 处理队列中的下一项
+            this.ttsPlaying = false;
+            this.processTTSQueue();
+        } catch (error) {
+            console.error('TTS处理失败:', error);
+            this.ttsPlaying = false;
+            
+            // 添加到失败次数计数
+            this.ttsFailCount = (this.ttsFailCount || 0) + 1;
+            
+            // 如果连续失败超过阈值，禁用TTS
+            if (this.ttsFailCount > 5) {
+                console.error('TTS连续失败超过5次，暂时禁用TTS功能');
+                this.config.ttsEnabled = false;
+                
+                // 更新UI
+                const ttsToggle = document.getElementById('coze-tts-toggle');
+                if (ttsToggle) {
+                    ttsToggle.checked = false;
+                }
+                
+                // 清空队列
+                this.ttsQueue = [];
+                
+                // 显示提示
+                this.showToast('语音朗读功能暂时不可用，已自动关闭');
+                
+                return;
+            }
+            
+            // 继续处理下一项
+            setTimeout(() => {
+                this.processTTSQueue();
+            }, 500);
+        }
+    }
+
+    // 播放TTS音频
+    async playTTSAudio(arrayBuffer) {
+        try {
+            // 如果没有初始化音频上下文，创建一个
+            if (!this.ttsAudioContext) {
+                this.ttsAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // 检查arrayBuffer是否为空
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                console.error('收到空的音频数据');
+                return;
+            }
+            
+            // 调试信息
+            console.log(`收到音频数据: ${arrayBuffer.byteLength} 字节`);
+            
+            // 使用标准的Audio API播放WAV格式音频
+            const audioBlob = new Blob([arrayBuffer], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            return new Promise((resolve, reject) => {
+                const audio = new Audio();
+                
+                audio.oncanplaythrough = () => {
+                    console.log('音频已加载，开始播放');
+                    audio.play()
+                        .then(() => console.log('音频播放开始'))
+                        .catch(e => {
+                            console.error('播放失败:', e);
+                            reject(e);
+                        });
+                };
+                
+                audio.onended = () => {
+                    console.log('音频播放完成');
+                    URL.revokeObjectURL(audioUrl);
+                    resolve();
+                };
+                
+                audio.onerror = (e) => {
+                    console.error('音频加载失败:', e);
+                    URL.revokeObjectURL(audioUrl);
+                    reject(e);
+                };
+                
+                audio.src = audioUrl;
+            });
+        } catch (error) {
+            console.error('播放TTS音频失败:', error);
+            throw error;
+        }
+    }
+
+    // 添加一个简单的Toast提示功能
+    showToast(message, duration = 3000) {
+        // 检查是否已存在toast元素
+        let toast = document.getElementById('coze-toast');
+        
+        if (!toast) {
+            // 创建toast元素
+            toast = document.createElement('div');
+            toast.id = 'coze-toast';
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                z-index: 9999;
+                opacity: 0;
+                transition: opacity 0.3s;
+            `;
+            document.body.appendChild(toast);
+        }
+        
+        // 设置消息内容
+        toast.textContent = message;
+        
+        // 显示toast
+        setTimeout(() => {
+            toast.style.opacity = '1';
+        }, 10);
+        
+        // 一段时间后隐藏
+        setTimeout(() => {
+            toast.style.opacity = '0';
+        }, duration);
     }
 }
 

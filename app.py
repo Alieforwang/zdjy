@@ -1,4 +1,4 @@
-from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response, send_file
+from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response, send_file, make_response
 from flask_cors import CORS
 import util.DBUtil as DBM
 import os
@@ -35,6 +35,21 @@ from PIL import Image
 import csv
 import requests
 import platform
+import asyncio
+import websockets
+import json
+import base64
+import hmac
+import hashlib
+from urllib.parse import urlencode
+import time
+from wsgiref.handlers import format_date_time
+from datetime import datetime
+from time import mktime
+import io
+import ssl
+import websocket  # 添加这一行，确保导入websocket-client库
+import wave
 
 
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
@@ -4577,6 +4592,271 @@ def stream_voice_to_text():
         logger.error(f"流式语音识别失败: {str(e)}")
         return jsonify({'error': f'流式语音识别失败: {str(e)}'}), 500
     
+def convert_pcm_to_wav(pcm_data, channels=1, sample_width=2, sample_rate=16000):
+    """将PCM数据转换为WAV格式
+    
+    Args:
+        pcm_data: PCM格式的二进制数据
+        channels: 音频通道数，默认1（单声道）
+        sample_width: 采样宽度（字节），默认2字节（16位）
+        sample_rate: 采样率，默认16000Hz
+    
+    Returns:
+        WAV格式的二进制数据
+    """
+    try:
+        import wave
+        import io
+        
+        # 创建一个内存文件对象
+        wav_buffer = io.BytesIO()
+        
+        # 创建wave文件对象
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(channels)  # 设置通道数
+            wav_file.setsampwidth(sample_width)  # 设置采样宽度
+            wav_file.setframerate(sample_rate)  # 设置采样率
+            wav_file.writeframes(pcm_data)  # 写入PCM数据
+        
+        # 获取WAV数据
+        wav_data = wav_buffer.getvalue()
+        logger.info(f"PCM转WAV成功: PCM大小={len(pcm_data)}字节, WAV大小={len(wav_data)}字节")
+        return wav_data
+    except Exception as e:
+        logger.error(f"PCM转WAV失败: {str(e)}")
+        raise
+
+@app.route('/api/tts', methods=['POST'])
+def text_to_speech():
+    """将文本转换为语音的API"""
+    try:
+        text = request.json.get('text', '')
+        voice = request.json.get('voice', 'x4_yezi')
+        
+        if not text:
+            return jsonify({'error': '文本不能为空'}), 400
+        
+        # 记录请求信息
+        logger.info(f"TTS请求: 文本长度={len(text)}, 发音人={voice}")
+        
+        # 调用同步版本的讯飞TTS接口
+        pcm_data = generate_speech_sync(text, voice)
+        
+        if not pcm_data:
+            logger.error("TTS返回空音频")
+            return jsonify({'error': '语音合成失败'}), 500
+        
+        # 将PCM转换为WAV格式，更适合浏览器播放
+        wav_data = convert_pcm_to_wav(pcm_data)
+        
+        # 返回WAV格式的音频数据
+        response = make_response(wav_data)
+        response.headers['Content-Type'] = 'audio/wav'  # 设置正确的MIME类型
+        response.headers['Content-Length'] = str(len(wav_data))
+        return response
+        
+    except Exception as e:
+        logger.error(f"TTS处理异常: {str(e)}")
+        traceback_str = traceback.format_exc()
+        logger.error(f"TTS异常堆栈: {traceback_str}")
+        return jsonify({'error': str(e)}), 500
+
+def generate_speech_sync(text, voice="x4_yezi"):
+    """同步版本的讯飞TTS接口"""
+    # 讯飞API参数
+    APPID = '506341da'
+    APIKey = '6dddc782ff39ecac9da6a255b6ba4713'
+    APISecret = 'OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2'
+    
+    # 记录请求开始
+    logger.info(f"开始TTS请求: 文本长度: {len(text)}, 发音人: {voice}")
+    
+    # 创建参数对象
+    class Ws_Param:
+        # 初始化
+        def __init__(self, APPID, APIKey, APISecret, Text):
+            self.APPID = APPID
+            self.APIKey = APIKey
+            self.APISecret = APISecret
+            self.Text = Text
+            self.CommonArgs = {"app_id": self.APPID}
+            self.BusinessArgs = {
+                "aue": "raw", 
+                "auf": "audio/L16;rate=16000", 
+                "vcn": voice, 
+                "tte": "utf8",
+                "sfl": 1,  # 添加流式返回标记
+                "speed": 50,  # 语速
+                "volume": 50,  # 音量
+                "pitch": 50,  # 音调
+                "reg": "0",   # 英文发音方式
+                "rdn": "0"    # 数字发音方式
+            }
+            self.Data = {"status": 2, "text": str(base64.b64encode(self.Text.encode('utf-8')), "UTF8")}
+        
+        # 生成url
+        def create_url(self):
+            url = 'wss://tts-api.xfyun.cn/v2/tts'
+            # 生成RFC1123格式的时间戳
+            now = datetime.now()
+            date = format_date_time(mktime(now.timetuple()))
+
+            # 拼接字符串
+            signature_origin = "host: " + "ws-api.xfyun.cn" + "\n"
+            signature_origin += "date: " + date + "\n"
+            signature_origin += "GET " + "/v2/tts " + "HTTP/1.1"
+            # 进行hmac-sha256进行加密
+            signature_sha = hmac.new(self.APISecret.encode('utf-8'), signature_origin.encode('utf-8'),
+                                    digestmod=hashlib.sha256).digest()
+            signature_sha = base64.b64encode(signature_sha).decode(encoding='utf-8')
+
+            authorization_origin = "api_key=\"%s\", algorithm=\"%s\", headers=\"%s\", signature=\"%s\"" % (
+                self.APIKey, "hmac-sha256", "host date request-line", signature_sha)
+            authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode(encoding='utf-8')
+            # 将请求的鉴权参数组合为字典
+            v = {
+                "authorization": authorization,
+                "date": date,
+                "host": "ws-api.xfyun.cn"
+            }
+            # 拼接鉴权参数，生成url
+            url = url + '?' + urlencode(v)
+            return url
+    
+    # 初始化参数对象
+    wsParam = Ws_Param(APPID=APPID, APIKey=APIKey, APISecret=APISecret, Text=text)
+    wsUrl = wsParam.create_url()
+    
+    # 音频数据缓存
+    audio_buffer = io.BytesIO()
+    synthesis_complete = False
+    error_message = None
+    received_audio = False
+    
+    # 定义WebSocket回调函数
+    def on_message(ws, message):
+        nonlocal audio_buffer, synthesis_complete, error_message, received_audio
+        try:
+            message_obj = json.loads(message)
+            
+            if "code" in message_obj:
+                if message_obj["code"] != 0:
+                    error_code = message_obj["code"]
+                    error_msg = f"TTS API错误: {message_obj.get('message', f'未知错误码: {error_code}')}"
+                    error_message = error_msg
+                    logger.error(error_msg)
+                    return
+            
+            if "data" in message_obj and message_obj["data"] is not None:
+                if "audio" in message_obj["data"]:
+                    audio = message_obj["data"]["audio"]
+                    if audio:
+                        audio_bytes = base64.b64decode(audio)
+                        audio_buffer.write(audio_bytes)
+                        received_audio = True
+                        logger.debug(f"收到音频数据: {len(audio_bytes)} 字节")
+                
+                if "status" in message_obj["data"] and message_obj["data"]["status"] == 2:
+                    synthesis_complete = True
+                    logger.info("语音合成完成")
+        except Exception as e:
+            error_message = f"解析消息异常: {str(e)}"
+            logger.error(error_message)
+
+    def on_error(ws, error):
+        nonlocal error_message
+        error_message = f"WebSocket错误: {str(error)}"
+        logger.error(error_message)
+
+    def on_close(ws, close_status_code=None, close_reason=None):
+        nonlocal error_message, synthesis_complete, received_audio
+        if not synthesis_complete and not error_message and not received_audio:
+            error_message = "WebSocket连接已关闭，未收到合成音频"
+            logger.error(error_message)
+
+    def on_open(ws):
+        try:
+            # 发送合成请求
+            data = {
+                "common": wsParam.CommonArgs,
+                "business": wsParam.BusinessArgs,
+                "data": wsParam.Data,
+            }
+            logger.debug(f"发送TTS请求参数: {json.dumps(data)}")
+            ws.send(json.dumps(data))
+        except Exception as e:
+            nonlocal error_message
+            error_message = f"发送数据时出错: {str(e)}"
+            logger.error(error_message)
+            ws.close()
+    
+    # 禁用详细日志
+    websocket.enableTrace(False)
+    # 设置超时
+    websocket.setdefaulttimeout(15)
+    
+    try:
+        # 创建WebSocketApp对象
+        ws = websocket.WebSocketApp(
+            wsUrl, 
+            on_message=on_message,
+            on_error=on_error, 
+            on_close=on_close,
+            on_open=on_open
+        )
+        
+        # 使用单独的线程运行WebSocket客户端
+        ws_thread = threading.Thread(target=ws.run_forever, kwargs={"sslopt": {"cert_reqs": ssl.CERT_NONE}})
+        ws_thread.daemon = True
+        ws_thread.start()
+        
+        # 等待合成完成或出现错误
+        timeout = 15  # 最长等待15秒
+        start_time = time.time()
+        while not synthesis_complete and not error_message and (time.time() - start_time < timeout):
+            time.sleep(0.1)
+        
+        # 如果超时未完成也视为错误
+        if not synthesis_complete and not error_message:
+            error_message = "语音合成超时"
+            logger.error(error_message)
+        
+        # 确保WebSocket连接关闭
+        try:
+            ws.close()
+        except:
+            pass
+        
+        # 等待线程结束
+        ws_thread.join(2.0)  # 最多等待2秒
+        
+    except Exception as e:
+        error_message = f"WebSocket连接异常: {str(e)}"
+        logger.error(error_message)
+        return None
+
+    if error_message:
+        raise Exception(error_message)
+
+    # 获取最终的音频数据
+    audio_data = audio_buffer.getvalue()
+    audio_size = len(audio_data)
+    
+    if audio_size == 0:
+        error_msg = "语音合成未生成任何音频数据"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+    
+    logger.info(f"TTS请求成功完成，返回音频数据大小: {audio_size} 字节")
+    return audio_data
+
+# 删除下面这两个异步函数，因为已经不需要了
+# async def generate_speech(text, voice="x4_yezi"):
+# ...
+
+# async def websockets.connect(url) as websocket:
+# ...
+
 
     
 
