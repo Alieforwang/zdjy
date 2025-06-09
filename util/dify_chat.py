@@ -324,6 +324,16 @@ def send_message(query, conversation_id=None, debug=False):
         logger.error(error_msg)
         print(f"\n处理异常: {error_msg}")
         return None, None
+    
+#添加一个用于ai界面用户输入语音转文字的函数
+def voice_to_text(audio_data):
+    """将语音数据转换为文字"""
+    # 使用讯飞语音识别
+    text = xunfei_asr.asr(audio_data)
+    return text
+
+
+
 
 def main():
     print("Dify 对话应用")

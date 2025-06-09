@@ -251,6 +251,36 @@
             font-family: "Microsoft YaHei", Arial, sans-serif;
         }
         
+        .coze-voice-btn {
+            background: none;
+            border: none;
+            color: #3a5998;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 8px;
+            margin-right: 5px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .coze-voice-btn:hover {
+            background-color: rgba(58, 89, 152, 0.1);
+        }
+        
+        .coze-voice-btn.recording {
+            color: #d32f2f;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
         .coze-chat-input input::placeholder {
             color: #999999;
         }
@@ -842,6 +872,12 @@ class CozeChat {
         this.conversations = []; // 存储所有会话
         this.messageHistory = {}; // 存储会话历史消息
         this.messageCounter = {}; // 记录每个会话的消息数
+        
+        // 语音录制相关状态
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.isRecording = false;
+        
         this.init();
     }
     
@@ -907,6 +943,7 @@ class CozeChat {
                         </div>
                         <div class="coze-chat-box" id="coze-chat-box"></div>
                         <div class="coze-chat-input">
+                            <button class="coze-voice-btn" id="coze-voice-btn" title="语音输入">🎤</button>
                             <input type="text" id="coze-user-input" placeholder="请输入您的问题..." autocomplete="off">
                             <button id="coze-send-btn">发送</button>
                         </div>
@@ -1003,6 +1040,12 @@ class CozeChat {
         });
         this.elements.chatIcon.addEventListener('click', () => this.toggleChat());
         this.elements.closeBtn.addEventListener('click', () => this.toggleChat());
+        
+        // 添加语音输入功能
+        const voiceBtn = document.getElementById('coze-voice-btn');
+        if (voiceBtn) {
+            voiceBtn.addEventListener('click', () => this.toggleVoiceRecording());
+        }
         
         // 侧边栏切换
         this.elements.menuToggle.addEventListener('click', () => this.toggleSidebar());
@@ -1922,6 +1965,278 @@ class CozeChat {
             
         } catch (error) {
             console.error("生成标题时出错:", error);
+        }
+    }
+
+    // 添加语音录制功能
+    toggleVoiceRecording() {
+        if (this.isRecording) {
+            this.stopRecording();
+        } else {
+            this.startRecording();
+        }
+    }
+
+    // 开始录音
+    async startRecording() {
+        try {
+            // 获取用户媒体设备
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // 更新UI状态
+            const voiceBtn = document.getElementById('coze-voice-btn');
+            if (voiceBtn) {
+                voiceBtn.classList.add('recording');
+                voiceBtn.textContent = '⏺';
+                voiceBtn.title = '点击停止录音';
+            }
+            
+            this.audioChunks = [];
+            this.isRecording = true;
+            
+            // 创建音频上下文和ScriptProcessor用于采样率转换
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 16000});
+            const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+            const processor = audioContext.createScriptProcessor(16384, 1, 1);
+            
+            // 连接节点
+            mediaStreamSource.connect(processor);
+            processor.connect(audioContext.destination);
+            
+            // 存储音频数据
+            processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                // 转换为16位PCM
+                const pcmData = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    pcmData[i] = Math.min(1, Math.max(-1, inputData[i])) * 0x7FFF;
+                }
+                this.audioChunks.push(pcmData.buffer);
+            };
+            
+            // 存储引用以便稍后清理
+            this.audioContext = audioContext;
+            this.processor = processor;
+            this.mediaStreamSource = mediaStreamSource;
+            this.stream = stream;
+            
+            console.log("开始录音 (16kHz PCM格式)");
+        } catch (error) {
+            console.error('无法获取麦克风: ', error);
+            alert('无法访问麦克风，请确保您已授权浏览器访问麦克风。');
+            this.isRecording = false;
+        }
+    }
+    
+    // 停止录音
+    stopRecording() {
+        if (this.isRecording) {
+            // 断开音频处理
+            if (this.processor && this.mediaStreamSource) {
+                this.mediaStreamSource.disconnect();
+                this.processor.disconnect();
+            }
+            
+            // 关闭音频上下文
+            if (this.audioContext && this.audioContext.state !== 'closed') {
+                this.audioContext.close();
+            }
+            
+            // 关闭媒体流
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+            }
+            
+            this.isRecording = false;
+            console.log("停止录音");
+            
+            // 处理录音数据
+            this.processAudioData();
+            
+            // 重置UI
+            const voiceBtn = document.getElementById('coze-voice-btn');
+            if (voiceBtn) {
+                voiceBtn.classList.remove('recording');
+                voiceBtn.textContent = '🎤';
+                voiceBtn.title = '语音输入';
+            }
+        }
+    }
+    
+    // 处理音频数据
+    async processAudioData() {
+        if (this.audioChunks.length === 0) {
+            console.warn("没有录制到音频数据");
+            return;
+        }
+        
+        try {
+            // 合并音频数据缓冲区
+            const audioBuffers = this.audioChunks.map(buffer => new Int16Array(buffer));
+            let totalLength = 0;
+            audioBuffers.forEach(buffer => {
+                totalLength += buffer.length;
+            });
+            
+            // 创建合并后的缓冲区
+            const mergedBuffer = new Int16Array(totalLength);
+            let offset = 0;
+            
+            // 复制数据
+            audioBuffers.forEach(buffer => {
+                mergedBuffer.set(buffer, offset);
+                offset += buffer.length;
+            });
+            
+            // 将Int16Array转换为原始PCM数据 - 讯飞API需要的格式
+            const rawPcmBuffer = new ArrayBuffer(mergedBuffer.length * 2);
+            const pcmView = new DataView(rawPcmBuffer);
+            for (let i = 0; i < mergedBuffer.length; i++) {
+                pcmView.setInt16(i * 2, mergedBuffer[i], true); // true表示小端字节序
+            }
+            
+            // 创建Blob对象 - 直接使用原始PCM数据，不添加WAV头
+            const audioBlob = new Blob([rawPcmBuffer], { type: 'audio/L16;rate=16000' });
+            
+            // 创建FormData对象
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.pcm');
+            
+            // 显示处理中提示
+            this.elements.userInput.placeholder = "正在识别语音...";
+            this.elements.userInput.disabled = true;
+            this.elements.sendBtn.disabled = true;
+            
+            // 创建状态显示消息
+            const statusElement = document.createElement('div');
+            statusElement.className = 'coze-chat-message coze-chat-bot-message';
+            statusElement.innerHTML = `
+                <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
+                <div class="coze-message-content">
+                    <span class="ai-response">语音识别中...</span>
+                </div>
+            `;
+            this.elements.chatBox.appendChild(statusElement);
+            this.scrollToBottom();
+            
+            // 获取结果容器
+            const resultSpan = statusElement.querySelector('.ai-response');
+            
+            // 初始化流式请求
+            const response = await fetch('/api/stream_voice_to_text', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`语音识别请求失败: ${response.status}`);
+            }
+            
+            // 读取响应流
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let completeText = "";
+            
+            // 处理响应流
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                // 解码数据
+                const chunk = decoder.decode(value, { stream: true });
+                
+                // 解析SSE事件
+                const events = chunk.split('\n\n');
+                for (const event of events) {
+                    if (!event.trim()) continue;
+                    
+                    // 提取事件类型和数据
+                    const lines = event.split('\n');
+                    let eventType = 'message';
+                    let data = '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('event:')) {
+                            eventType = line.replace('event:', '').trim();
+                        } else if (line.startsWith('data:')) {
+                            data = line.replace('data:', '').trim();
+                        }
+                    }
+                    
+                    if (!data) continue;
+                    
+                    try {
+                        const jsonData = JSON.parse(data);
+                        
+                        // 处理不同类型的事件
+                        if (eventType === 'start') {
+                            resultSpan.textContent = "识别中...";
+                        } else if (jsonData.text) {
+                            // 更新识别文本
+                            try {
+                                // 尝试解析嵌套的JSON
+                                const textData = JSON.parse(jsonData.text);
+                                if (textData && typeof textData === 'object') {
+                                    // 提取中文识别结果
+                                    if (textData.cn && textData.cn.st && textData.cn.st.rt) {
+                                        let text = '';
+                                        for (const rt of textData.cn.st.rt) {
+                                            for (const ws of rt.ws) {
+                                                for (const cw of ws.cw) {
+                                                    text += cw.w;
+                                                }
+                                            }
+                                        }
+                                        if (text) {
+                                            completeText = text;
+                                            resultSpan.textContent = completeText;
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                // 如果不是JSON格式，则直接使用文本
+                                completeText = jsonData.text;
+                                resultSpan.textContent = completeText;
+                            }
+                            
+                            // 滚动到底部
+                            this.scrollToBottom();
+                        } else if (jsonData.error) {
+                            resultSpan.innerHTML = `<span style="color: red;">错误: ${jsonData.error}</span>`;
+                        } else if (jsonData.status === "completed") {
+                            resultSpan.textContent = completeText || "识别完成";
+                        }
+                    } catch (e) {
+                        console.error('解析事件数据失败:', e, data);
+                    }
+                }
+            }
+            
+            // 恢复输入框状态
+            this.elements.userInput.placeholder = "请输入您的问题...";
+            this.elements.userInput.disabled = false;
+            this.elements.sendBtn.disabled = false;
+            
+            if (completeText && completeText.trim()) {
+                // 将结果放入输入框并发送
+                this.elements.userInput.value = completeText.trim();
+                
+                // 延迟发送消息
+                setTimeout(() => {
+                    this.sendMessage();
+                }, 500);
+            } else {
+                resultSpan.textContent = "未能识别出有效文字，请重试。";
+            }
+            
+        } catch (error) {
+            console.error('语音识别失败: ', error);
+            this.elements.userInput.placeholder = "请输入您的问题...";
+            this.elements.userInput.disabled = false;
+            this.elements.sendBtn.disabled = false;
+        } finally {
+            // 清空录音数据
+            this.audioChunks = [];
         }
     }
 }

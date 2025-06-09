@@ -36,6 +36,7 @@ import csv
 import requests
 import platform
 
+
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
 os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
@@ -4445,6 +4446,139 @@ def generate_conversation_title():
         return jsonify({
             'error': f'生成标题失败: {str(e)}'
         }), 500
+    
+from flask import Response, stream_with_context
+import hashlib
+import hmac
+import base64
+import json, time, threading
+from urllib.parse import quote
+import uuid
+import tempfile
+import os
+
+@app.route('/api/stream_voice_to_text', methods=['POST'])
+def stream_voice_to_text():
+    """流式语音识别接口"""
+    try:
+        # 获取音频数据
+        audio_file = request.files['audio']
+        if not audio_file:
+            return jsonify({'error': '未提供语音数据'}), 400
+            
+        # 保存为临时文件，因为讯飞接口需要文件路径
+        temp_dir = tempfile.gettempdir()
+        temp_filename = f"voice_{uuid.uuid4().hex}.pcm"
+        temp_filepath = os.path.join(temp_dir, temp_filename)
+        
+        audio_file.save(temp_filepath)
+        
+        # 设置讯飞API参数
+        app_id = "506341da"
+        api_key = "711523167504dd0a9925dffb34dbb96f"
+        
+        def generate():
+            # 创建WebSocket客户端类
+            class StreamClient:
+                def __init__(self):
+                    base_url = "ws://rtasr.xfyun.cn/v1/ws"
+                    ts = str(int(time.time()))
+                    tt = (app_id + ts).encode('utf-8')
+                    md5 = hashlib.md5()
+                    md5.update(tt)
+                    baseString = md5.hexdigest()
+                    baseString = bytes(baseString, encoding='utf-8')
+
+                    apiKey = api_key.encode('utf-8')
+                    signa = hmac.new(apiKey, baseString, hashlib.sha1).digest()
+                    signa = base64.b64encode(signa)
+                    signa = str(signa, 'utf-8')
+                    self.end_tag = "{\"end\": true}"
+                    
+                    from websocket import create_connection
+                    self.ws = create_connection(base_url + "?appid=" + app_id + "&ts=" + ts + "&signa=" + quote(signa))
+                    self.results = []
+                    self.is_finished = False
+                    
+                def send_audio(self, file_path):
+                    try:
+                        with open(file_path, 'rb') as file:
+                            chunk_size = 1280  # 每次发送1280字节
+                            while True:
+                                chunk = file.read(chunk_size)
+                                if not chunk:
+                                    break
+                                self.ws.send(chunk)
+                                time.sleep(0.04)  # 控制发送速率
+                        
+                        # 发送结束标记
+                        self.ws.send(bytes(self.end_tag.encode('utf-8')))
+                        logger.info("语音数据发送完成")
+                    except Exception as e:
+                        logger.error(f"发送音频数据失败: {str(e)}")
+                    
+                def receive_results(self):
+                    try:
+                        while self.ws.connected and not self.is_finished:
+                            result = str(self.ws.recv())
+                            if not result or len(result) == 0:
+                                break
+                                
+                            result_dict = json.loads(result)
+                            
+                            if result_dict["action"] == "result":
+                                # 提取识别文本并返回
+                                yield f"data: {json.dumps({'text': result_dict.get('data', '')})}\n\n"
+                                
+                            elif result_dict["action"] == "error":
+                                logger.error(f"讯飞识别错误: {result}")
+                                yield f"data: {json.dumps({'error': result_dict.get('desc', '识别错误')})}\n\n"
+                                self.is_finished = True
+                                break
+                                
+                            elif result_dict["action"] == "end":
+                                self.is_finished = True
+                                break
+                    except Exception as e:
+                        logger.error(f"接收识别结果错误: {str(e)}")
+                        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    finally:
+                        self.ws.close()
+            
+            # 创建客户端实例并执行识别
+            client = StreamClient()
+            
+            # 启动发送线程
+            send_thread = threading.Thread(target=client.send_audio, args=(temp_filepath,))
+            send_thread.daemon = True
+            send_thread.start()
+            
+            # 返回结果流
+            yield "event: start\ndata: {\"status\": \"started\"}\n\n"
+            
+            # 获取并转发识别结果
+            yield from client.receive_results()
+            
+            # 最终返回结束标记
+            yield "event: end\ndata: {\"status\": \"completed\"}\n\n"
+            
+            # 清理临时文件
+            try:
+                os.remove(temp_filepath)
+                logger.info(f"临时文件已删除: {temp_filepath}")
+            except Exception as e:
+                logger.error(f"删除临时文件失败: {str(e)}")
+        
+        # 返回Server-Sent Events流
+        return Response(stream_with_context(generate()), 
+                      mimetype='text/event-stream')
+                      
+    except Exception as e:
+        logger.error(f"流式语音识别失败: {str(e)}")
+        return jsonify({'error': f'流式语音识别失败: {str(e)}'}), 500
+    
+
+    
 
 if __name__ == '__main__':
     try:

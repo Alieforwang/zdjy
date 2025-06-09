@@ -46,8 +46,8 @@ LOG_CONFIG = {
 
 # Dify API配置
 DIFY_CONFIG = {
-    'API_KEY': 'app-ID7NMYoFr6GQeZ33d4GsVbsO',
-    'API_URL': 'http://localhost/v1/chat-messages',
+    'API_KEY': 'app-9HGYkNQbCdy7cuCNMEc6xA9g',
+    'API_URL': 'http://8.137.48.26:8000/v1/chat-messages',
     'HEADERS': {
         'Content-Type': 'application/json'
     }
