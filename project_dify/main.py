@@ -179,6 +179,102 @@ if __name__ == "__main__":
                 is_recognizing = False
             time.sleep(1)  # 错误后等待一段时间再继续
 
+# 添加新的路由处理AI回复的语音合成
+@app.route('/api/tts_response', methods=['POST'])
+def tts_response():
+    try:
+        # 获取请求数据
+        data = request.json
+        if not data or 'text' not in data:
+            return jsonify({'error': '请求缺少文本参数'}), 400
+        
+        text = data['text']
+        voice = data.get('voice', 'xiaoyan')  # 默认使用xiaoyan音色
+        
+        # 文本分句处理
+        sentences = split_text_into_sentences(text)
+        
+        # 创建一个生成器来流式传输音频数据
+        def generate_audio():
+            for i, sentence in enumerate(sentences):
+                if not sentence.strip():
+                    continue
+                    
+                # 处理文本，删除特殊字符和过多的标点
+                clean_text = clean_sentence_for_tts(sentence)
+                if not clean_text:
+                    continue
+                
+                # 调用讯飞TTS生成语音
+                audio_data = tts(clean_text, vcn=voice)
+                if not audio_data:
+                    continue
+                
+                # 创建JSON事件数据
+                event_data = {
+                    'audio': base64.b64encode(audio_data).decode('utf-8'),
+                    'text': sentence,
+                    'index': i
+                }
+                
+                # 发送事件
+                yield f"data: {json.dumps(event_data)}\n\n"
+                
+            # 发送完成事件
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        
+        # 返回流式响应
+        return Response(stream_with_context(generate_audio()), 
+                      content_type='text/event-stream')
+                      
+    except Exception as e:
+        app.logger.error(f"TTS响应处理错误: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# 辅助函数：文本分句
+def split_text_into_sentences(text):
+    # 改进句子分割正则表达式，识别中英文标点符号
+    pattern = r'[^!?.。！？…]+[!?.。！？…]+'
+    sentences = re.findall(pattern, text)
+    
+    # 处理可能剩余的文本（没有结束标点的最后一部分）
+    if sentences:
+        matched_text = ''.join(sentences)
+        if len(matched_text) < len(text):
+            remainder = text[len(matched_text):].strip()
+            if remainder:
+                sentences.append(remainder)
+    else:
+        # 如果没有匹配到句子，将整个文本作为一个句子
+        if text.strip():
+            sentences = [text.strip()]
+    
+    # 合并短句
+    min_length = 15
+    merged = []
+    current = ""
+    
+    for s in sentences:
+        if len(current) + len(s) < min_length:
+            current += s
+        else:
+            if current:
+                merged.append(current)
+            current = s
+            
+    if current:
+        merged.append(current)
+        
+    return merged
+
+# 辅助函数：清理文本用于TTS
+def clean_sentence_for_tts(text):
+    # 清理文本，保留中文、英文、数字和常用标点
+    clean_text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9.,，。!?！？;:；：、""''()（）《》<>【】\s]', '', text)
+    # 删除重复的标点符号
+    clean_text = re.sub(r'([.,，。!?！？;:；：])\1+', r'\1', clean_text)
+    return clean_text.strip()
+
 
 
 

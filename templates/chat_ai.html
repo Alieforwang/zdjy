@@ -841,6 +841,35 @@
         #coze-settings-btn:hover {
             background-color: rgba(255, 255, 255, 0.3);
         }
+
+        /* 在样式部分添加 */
+        .coze-tts-controls {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .coze-tts-toggle-btn {
+            background-color: #3a5998;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .coze-tts-toggle-btn:hover {
+            background-color: #2c4b80;
+        }
+
+        .coze-tts-status {
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -853,24 +882,31 @@
 <script>
 // Coze聊天组件
 class CozeChat {
+    // 默认配置
+    defaultConfig = {
+        containerId: 'coze-chat',
+        apiBase: 'https://api.coze.cn/open_api/v2',
+        botId: '7490567895723327497',
+        apiToken: 'pat_VVZSSzgJi1O3MY80eoqjD8r71FMO1xlKO7DWiGX8ajbgq2VyEbajSti97p1yfQf6',
+        title: '灵瞳——YOLOv8-DeepSeek多模态街景治理实时检测平台智能助手',
+        userAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f464.svg',
+        botAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f916.svg',
+        autoTitleEnabled: true, // 是否启用自动标题
+        autoTitleMaxMessages: 3, // 更新标题的最大消息数
+        ttsEnabled: false,     // 是否启用语音朗读
+        ttsChunkSize: 100,     // 每次发送合成的文字长度
+        ttsVoice: "x4_yezi",   // 讯飞发音人
+        ttsAutoplay: true      // 自动播放
+    };
+
     constructor(options = {}) {
-        // 默认配置
-        this.config = {
-            containerId: 'coze-chat',
-            apiBase: 'https://api.coze.cn/open_api/v2',
-            botId: '7490567895723327497',
-            apiToken: 'pat_VVZSSzgJi1O3MY80eoqjD8r71FMO1xlKO7DWiGX8ajbgq2VyEbajSti97p1yfQf6',
-            title: '灵瞳——YOLOv8-DeepSeek多模态街景治理实时检测平台智能助手',
-            userAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f464.svg',
-            botAvatar: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f916.svg',
-            autoTitleEnabled: true, // 是否启用自动标题
-            autoTitleMaxMessages: 3, // 更新标题的最大消息数
-            ttsEnabled: false,     // 是否启用语音朗读
-            ttsChunkSize: 100,     // 每次发送合成的文字长度
-            ttsVoice: "x4_yezi",   // 讯飞发音人
-            ttsAutoplay: true,     // 自动播放
-            ...options
-        };
+        // 合并默认配置和用户配置
+        this.config = { ...this.defaultConfig, ...options };
+        
+        // 初始化音频队列 - 用于按句子顺序播放TTS音频
+        this.audioQueue = [];
+        this.isAudioPlaying = false;
+        this.currentAudio = null;
         
         this.currentConversationId = null;
         this.conversations = []; // 存储所有会话
@@ -882,7 +918,6 @@ class CozeChat {
         this.audioChunks = [];
         this.isRecording = false;
         
-        // 在constructor中初始化
         this.ttsQueue = [];
         this.ttsPlaying = false;
         this.ttsAudioContext = null;
@@ -1626,11 +1661,13 @@ class CozeChat {
         let newConversationId = null;
         
         try {
-            // 构造请求体 - 保持会话ID一致性
+            // 构造请求体 - 保持会话ID一致性并添加TTS选项
             const payload = {
                 "conversation_id": this.currentConversationId || "new",
                 "query": message,
-                "debug": true // 添加调试标志
+                "debug": true,
+                "enable_tts": this.config.ttsEnabled, // 添加TTS标志
+                "voice": this.config.ttsVoice // 添加TTS语音选项
             };
             
             console.log("发送聊天请求:", payload);
@@ -1675,7 +1712,7 @@ class CozeChat {
                         
                         // 寻找完整的事件数据块
                         const lines = buffer.split('\n\n');
-                        buffer = lines.pop() || ''; // 保留最后一个不完整的块
+                        buffer = lines.pop() || '';
                         
                         for (const line of lines) {
                             if (line.trim()) {
@@ -1690,22 +1727,20 @@ class CozeChat {
                                         // 直接添加文本到响应元素
                                         this.appendTextToElement(responseElement, chunk);
                                         
-                                        // 将当前块发送给TTS处理
-                                        if (this.config.ttsEnabled && chunk.trim()) {
-                                            await this.processStreamForTTS(chunk);
-                                        }
-                                        
                                         // 滚动到底部
                                         this.scrollToBottom();
                                     } 
-                                    else if (eventData.event === 'done') {
-                                        // 处理完成事件
-                                        console.log("回答完成:", eventData.data);
+                                    else if (eventData.event === 'sentence') {
+                                        // 处理完整句子，包含音频
+                                        const sentenceData = eventData.data;
                                         
-                                        // 标记TTS结束
-                                        if (this.config.ttsEnabled) {
-                                            await this.processStreamForTTS("", true);
+                                        // 如果有音频数据，播放音频
+                                        if (sentenceData.audio && this.config.ttsEnabled) {
+                                            this.playAudioForSentence(sentenceData.text, sentenceData.audio);
                                         }
+                                    }
+                                    else if (eventData.event === 'done') {
+                                        console.log("回答完成:", eventData.data);
                                         
                                         // 更新会话ID
                                         if (eventData.data.conversation_id) {
@@ -1713,7 +1748,6 @@ class CozeChat {
                                             
                                             // 更新当前会话ID
                                             if (newConversationId && newConversationId !== this.currentConversationId) {
-                                                console.log(`更新会话ID: ${this.currentConversationId} -> ${newConversationId}`);
                                                 this.currentConversationId = newConversationId;
                                                 this.persistCurrentConversationId();
                                             }
@@ -2496,6 +2530,289 @@ class CozeChat {
         setTimeout(() => {
             toast.style.opacity = '0';
         }, duration);
+    }
+
+    // 添加新方法：请求后端进行TTS处理
+    requestTTSForResponse(text) {
+        if (!text || !this.config.ttsEnabled) return;
+        
+        console.log("发送TTS请求到后端");
+        
+        // 添加控制元素到UI
+        const audioControlsId = 'tts-audio-controls-' + Date.now();
+        const controlsHtml = `
+            <div class="coze-tts-controls" id="${audioControlsId}">
+                <button class="coze-tts-toggle-btn">暂停朗读</button>
+                <span class="coze-tts-status">正在准备朗读...</span>
+            </div>
+        `;
+        
+        this.elements.chatBox.querySelector('.coze-chat-bot-message:last-child .coze-message-content')
+            .insertAdjacentHTML('beforeend', controlsHtml);
+        
+        const controlsElement = document.getElementById(audioControlsId);
+        const toggleButton = controlsElement.querySelector('.coze-tts-toggle-btn');
+        const statusElement = controlsElement.querySelector('.coze-tts-status');
+        
+        // 音频控制变量
+        let isPaused = false;
+        let audioQueue = [];
+        let currentAudio = null;
+        let isPlaying = false;
+        
+        // 按钮事件处理
+        toggleButton.addEventListener('click', () => {
+            if (isPaused) {
+                // 恢复播放
+                isPaused = false;
+                toggleButton.textContent = "暂停朗读";
+                if (currentAudio) {
+                    currentAudio.play();
+                } else if (audioQueue.length > 0 && !isPlaying) {
+                    playNext();
+                }
+            } else {
+                // 暂停播放
+                isPaused = true;
+                toggleButton.textContent = "继续朗读";
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
+            }
+        });
+        
+        // 播放下一个音频片段
+        const playNext = () => {
+            if (isPaused || audioQueue.length === 0) {
+                isPlaying = false;
+                return;
+            }
+            
+            isPlaying = true;
+            
+            // 获取并移除队列中第一个音频
+            const audioItem = audioQueue.shift();
+            
+            // 更新状态显示
+            statusElement.textContent = `正在朗读第 ${audioItem.index + 1} 句，共 ${audioItem.total} 句`;
+            
+            // 解码音频数据
+            const audioData = Uint8Array.from(atob(audioItem.audio), c => c.charCodeAt(0));
+            const audioBlob = new Blob([audioData], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            // 创建音频元素
+            currentAudio = new Audio(audioUrl);
+            
+            // 设置事件监听
+            currentAudio.addEventListener('ended', () => {
+                URL.revokeObjectURL(audioUrl);
+                currentAudio = null;
+                
+                // 播放下一个片段
+                setTimeout(() => playNext(), 300);
+            });
+            
+            currentAudio.addEventListener('error', (e) => {
+                console.error('音频播放错误:', e);
+                URL.revokeObjectURL(audioUrl);
+                currentAudio = null;
+                
+                // 继续尝试播放下一个
+                setTimeout(() => playNext(), 300);
+            });
+            
+            // 开始播放
+            currentAudio.play().catch(e => {
+                console.error('音频播放失败:', e);
+                URL.revokeObjectURL(audioUrl);
+                currentAudio = null;
+                
+                // 继续尝试播放下一个
+                setTimeout(() => playNext(), 300);
+            });
+        };
+        
+        // 生成唯一会话ID
+        const sessionId = 'tts_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+        
+        // 首先发送POST请求触发生成过程
+        statusElement.textContent = "正在处理语音合成请求...";
+        fetch('/api/tts_response', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text,
+                voice: this.config.ttsVoice,
+                session_id: sessionId
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP错误! 状态: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || '处理请求失败');
+            }
+            
+            console.log(`TTS请求处理成功: ${data.message}`);
+            statusElement.textContent = "正在获取语音数据...";
+            
+            // 请求成功后，创建EventSource接收音频数据
+            const eventSource = new EventSource(`/api/tts_response?session_id=${sessionId}&t=${Date.now()}`);
+            let sentenceCount = 0;
+            
+            // 监听事件源
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.status === 'connected') {
+                        console.log('已连接到TTS事件流');
+                        return;
+                    }
+                    
+                    if (data.error) {
+                        console.error(`TTS错误: ${data.message}`);
+                        statusElement.textContent = `朗读失败: ${data.message}`;
+                        eventSource.close();
+                        return;
+                    }
+                    
+                    if (data.done) {
+                        // 处理完成
+                        console.log('TTS数据接收完成');
+                        eventSource.close();
+                        
+                        if (audioQueue.length === 0 && !isPlaying) {
+                            statusElement.textContent = "朗读已完成";
+                            setTimeout(() => {
+                                controlsElement.style.display = 'none';
+                            }, 2000);
+                        }
+                        
+                        return;
+                    }
+                    
+                    if (data.audio) {
+                        sentenceCount++;
+                        
+                        // 将音频添加到队列
+                        audioQueue.push({
+                            audio: data.audio,
+                            text: data.text,
+                            index: data.index,
+                            total: sentenceCount
+                        });
+                        
+                        // 如果当前没有播放，开始播放
+                        if (!isPlaying && !isPaused) {
+                            playNext();
+                        }
+                    }
+                } catch (e) {
+                    console.error('解析TTS事件数据失败:', e);
+                }
+            };
+            
+            // 处理错误
+            eventSource.onerror = (error) => {
+                console.error('TTS事件流错误:', error);
+                eventSource.close();
+                statusElement.textContent = "朗读服务发生错误";
+                
+                // 如果有音频正在播放，停止播放
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
+                
+                // 清空队列
+                audioQueue = [];
+                isPlaying = false;
+            };
+        })
+        .catch(error => {
+            console.error('TTS请求失败:', error);
+            statusElement.textContent = `朗读请求失败: ${error.message}`;
+        });
+    }
+
+    // 向CozeChat类添加播放单个句子音频的方法
+    playAudioForSentence(text, audioBase64) {
+        console.log(`收到句子音频: ${text.substring(0, 20)}...`);
+        
+        // 将音频添加到队列
+        this.audioQueue.push({
+            text: text,
+            audio: audioBase64
+        });
+        
+        // 如果当前没有音频播放，则开始播放队列
+        if (!this.isAudioPlaying) {
+            this.playNextAudio();
+        }
+    }
+
+    // 添加队列播放方法
+    playNextAudio() {
+        // 如果队列为空，标记为未播放状态
+        if (this.audioQueue.length === 0) {
+            this.isAudioPlaying = false;
+            this.currentAudio = null;
+            return;
+        }
+        
+        // 标记为正在播放
+        this.isAudioPlaying = true;
+        
+        // 获取并移除队列中第一个音频
+        const audioItem = this.audioQueue.shift();
+        
+        // 解码音频数据
+        const audioData = Uint8Array.from(atob(audioItem.audio), c => c.charCodeAt(0));
+        const audioBlob = new Blob([audioData], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // 创建音频元素
+        this.currentAudio = new Audio(audioUrl);
+        
+        // 记录音频句子，用于调试
+        console.log(`正在播放: ${audioItem.text.substring(0, 20)}...`);
+        
+        // 设置事件监听
+        this.currentAudio.addEventListener('ended', () => {
+            console.log('音频播放完成，准备播放下一个');
+            URL.revokeObjectURL(audioUrl);
+            this.currentAudio = null;
+            
+            // 播放下一个音频
+            setTimeout(() => this.playNextAudio(), 300);
+        });
+        
+        this.currentAudio.addEventListener('error', (e) => {
+            console.error('音频播放错误:', e);
+            URL.revokeObjectURL(audioUrl);
+            this.currentAudio = null;
+            
+            // 继续尝试播放下一个
+            setTimeout(() => this.playNextAudio(), 300);
+        });
+        
+        // 开始播放
+        this.currentAudio.play().catch(e => {
+            console.error('音频播放失败:', e);
+            URL.revokeObjectURL(audioUrl);
+            this.currentAudio = null;
+            
+            // 继续尝试播放下一个
+            setTimeout(() => this.playNextAudio(), 300);
+        });
     }
 }
 

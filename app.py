@@ -50,6 +50,13 @@ import io
 import ssl
 import websocket  # 添加这一行，确保导入websocket-client库
 import wave
+import sys
+import os
+import re  # 添加正则表达式模块导入
+
+# 添加项目根目录到系统路径，以便导入project_dify中的模块
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from project_dify.tts.xunfei_tts import tts  # 导入讯飞TTS模块的tts函数
 
 
 # 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
@@ -990,7 +997,6 @@ def upload_analyze():
                                     
                                     # 将当前帧的检测结果添加到总结果中
                                     detections.extend(frame_detections)
-                                
                                 # 绘制当前帧的检测结果
                                 result_img = result.plot()
                                 video_writer.write(result_img)
@@ -4302,16 +4308,18 @@ def set_confidence_threshold():
     
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """处理聊天请求，连接到Dify AI服务"""
+    """处理聊天请求，连接到Dify AI服务，按句子分割并支持同步TTS"""
     try:
         # 获取请求数据
-        data = request.json
+        data = request.get_json()
         query = data.get('query', '')
         conversation_id = data.get('conversation_id', None)
         debug = data.get('debug', False)
+        enable_tts = data.get('enable_tts', False)  # 是否启用TTS
+        voice = data.get('voice', 'xiaoyan')  # TTS发音人
         
         logger.info(f"收到聊天请求")
-        logger.info(f"收到请求 - 查询: {query}, 会话ID: {conversation_id}")
+        logger.info(f"收到请求 - 查询: {query}, 会话ID: {conversation_id}, TTS: {enable_tts}")
         
         # 创建流式响应
         def generate():
@@ -4321,6 +4329,8 @@ def chat():
             # 流式返回响应
             final_conversation_id = None
             full_answer = ""
+            current_sentence = ""
+            sentence_index = 0
             
             for chunk_data in send_message_streaming(query, conversation_id, debug):
                 if 'conversation_id' in chunk_data and chunk_data['conversation_id']:
@@ -4329,12 +4339,84 @@ def chat():
                 if 'answer_chunk' in chunk_data:
                     chunk = chunk_data['answer_chunk']
                     full_answer += chunk
+                    current_sentence += chunk
+                    
+                    # 检查当前句子是否已结束（包含句号、问号、感叹号等标点）
+                    if re.search(r'[.。!！?？;；]\s*$', current_sentence) or len(current_sentence) > 100:
+                        # 句子结束，发送整个句子
+                        clean_sentence = current_sentence.strip()
+                        
+                        response_data = {
+                            'event': 'sentence',
+                            'data': {
+                                'text': clean_sentence,
+                                'index': sentence_index
+                            }
+                        }
+                        
+                        # 如果启用了TTS，则生成语音
+                        if enable_tts and clean_sentence:
+                            try:
+                                # 处理文本，删除特殊字符和过多的标点
+                                clean_text = clean_sentence_for_tts(clean_sentence)
+                                
+                                if clean_text:
+                                    # 生成语音
+                                    pcm_data = tts(clean_text, vcn=voice)
+                                    
+                                    if pcm_data:
+                                        # 转换为WAV
+                                        wav_data = convert_pcm_to_wav(pcm_data)
+                                        # 添加到响应中
+                                        response_data['data']['audio'] = base64.b64encode(wav_data).decode('utf-8')
+                            except Exception as e:
+                                logger.error(f"生成语音失败: {str(e)}")
+                        
+                        yield json.dumps(response_data) + '\n\n'
+                        
+                        # 重置当前句子并增加索引
+                        current_sentence = ""
+                        sentence_index += 1
+                    
+                    # 继续发送文本块
                     yield json.dumps({
                         'event': 'chunk',
                         'data': {
                             'text': chunk
                         }
                     }) + '\n\n'
+            
+            # 处理最后一个句子（如果有）
+            if current_sentence:
+                clean_sentence = current_sentence.strip()
+                
+                response_data = {
+                    'event': 'sentence',
+                    'data': {
+                        'text': clean_sentence,
+                        'index': sentence_index
+                    }
+                }
+                
+                # 如果启用了TTS，则生成语音
+                if enable_tts and clean_sentence:
+                    try:
+                        # 处理文本，删除特殊字符和过多的标点
+                        clean_text = clean_sentence_for_tts(clean_sentence)
+                        
+                        if clean_text:
+                            # 生成语音
+                            pcm_data = tts(clean_text, vcn=voice)
+                            
+                            if pcm_data:
+                                # 转换为WAV
+                                wav_data = convert_pcm_to_wav(pcm_data)
+                                # 添加到响应中
+                                response_data['data']['audio'] = base64.b64encode(wav_data).decode('utf-8')
+                    except Exception as e:
+                        logger.error(f"生成语音失败: {str(e)}")
+                
+                yield json.dumps(response_data) + '\n\n'
             
             # 发送完成事件
             yield json.dumps({
@@ -4345,13 +4427,14 @@ def chat():
                 }
             }) + '\n\n'
             
-            logger.info(f"AI响应成功，会话ID: {final_conversation_id or conversation_id}, 回答长度: {len(full_answer)}")
+            logger.info(f"AI响应成功，会话ID: {final_conversation_id or conversation_id}, 回答长度: {len(full_answer)}, 句子数: {sentence_index+1}")
         
         # 返回流式响应
         return Response(generate(), mimetype='text/event-stream')
         
     except Exception as e:
         logger.error(f"处理聊天请求时出错: {str(e)}")
+        traceback.print_exc()  # 打印完整堆栈跟踪
         return jsonify({
             'error': f"处理请求时出错: {str(e)}"
         }), 500
@@ -4471,6 +4554,7 @@ from urllib.parse import quote
 import uuid
 import tempfile
 import os
+import re
 
 @app.route('/api/stream_voice_to_text', methods=['POST'])
 def stream_voice_to_text():
@@ -4850,12 +4934,195 @@ def generate_speech_sync(text, voice="x4_yezi"):
     logger.info(f"TTS请求成功完成，返回音频数据大小: {audio_size} 字节")
     return audio_data
 
-# 删除下面这两个异步函数，因为已经不需要了
-# async def generate_speech(text, voice="x4_yezi"):
-# ...
+# 添加全局TTS音频数据缓存
+TTS_AUDIO_CACHE = {}
+TTS_CACHE_LOCK = threading.Lock()
 
-# async def websockets.connect(url) as websocket:
-# ...
+@app.route('/api/tts_response', methods=['POST', 'GET'])
+def tts_response():
+    try:
+        # 根据请求方法分别获取会话ID
+        if request.method == 'GET':
+            session_id = request.args.get('session_id')
+        else:  # POST
+            session_id = request.json.get('session_id') if request.json else None
+            
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            
+        logger.info(f"TTS请求，会话ID: {session_id}, 方法: {request.method}")
+        
+        # 处理GET请求 - 用于EventSource连接
+        if request.method == 'GET':
+            logger.info(f"收到TTS EventSource连接请求，会话ID: {session_id}")
+            
+            # 使用生成器函数共享数据
+            def generate_events():
+                # 发送初始化事件
+                yield 'data: {"status": "connected"}\n\n'
+                
+                # 检查是否有对应的语音数据
+                audio_key = session_id
+                wait_count = 0
+                
+                # 等待数据可用，最多等待30秒
+                while wait_count < 300:  # 300 * 0.1s = 30s
+                    # 从全局缓存中获取数据
+                    with TTS_CACHE_LOCK:
+                        audio_data = TTS_AUDIO_CACHE.get(audio_key)
+                    
+                    if audio_data and isinstance(audio_data, list):
+                        # 发送数据
+                        for event_data in audio_data:
+                            event_json = json.dumps(event_data)
+                            yield f'data: {event_json}\n\n'
+                            
+                        # 发送完成事件    
+                        yield 'data: {"done": true}\n\n'
+                        
+                        # 清理数据
+                        with TTS_CACHE_LOCK:
+                            TTS_AUDIO_CACHE.pop(audio_key, None)
+                        break
+                    
+                    # 等待100毫秒再次检查
+                    time.sleep(0.1)
+                    wait_count += 1
+                
+                # 如果超时未收到数据，发送超时消息
+                if wait_count >= 300:
+                    logger.warning(f"TTS数据等待超时，会话ID: {session_id}")
+                    yield 'data: {"error": "timeout", "message": "等待TTS数据超时"}\n\n'
+            
+            # 返回流式响应
+            return Response(stream_with_context(generate_events()), 
+                          content_type='text/event-stream',
+                          headers={
+                              'Cache-Control': 'no-cache',
+                              'Connection': 'keep-alive'
+                          })
+        
+        # 处理POST请求 - 实际处理TTS请求
+        logger.info(f"收到TTS生成请求，会话ID: {session_id}")
+        
+        # 获取请求数据
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': '请求缺少文本参数'}), 400
+        
+        text = data['text']
+        voice = data.get('voice', 'xiaoyan')  # 默认使用xiaoyan音色
+        
+        # 文本分句处理
+        sentences = split_text_into_sentences(text)
+        logger.info(f"将文本分为 {len(sentences)} 个句子进行处理")
+        
+        # 创建音频数据列表，用于保存生成的结果
+        audio_data_list = []
+        
+        # 处理每个句子
+        for i, sentence in enumerate(sentences):
+            if not sentence.strip():
+                continue
+                
+            # 处理文本，删除特殊字符和过多的标点
+            clean_text = clean_sentence_for_tts(sentence)
+            if not clean_text:
+                continue
+            
+            logger.info(f"处理第 {i+1}/{len(sentences)} 个句子，长度: {len(clean_text)}")
+            
+            # 调用讯飞TTS生成语音
+            try:
+                pcm_data = tts(clean_text, vcn=voice)
+                if not pcm_data:
+                    logger.warning(f"第 {i+1} 个句子未能生成音频")
+                    continue
+                
+                # 将PCM数据转换为WAV格式
+                wav_data = convert_pcm_to_wav(pcm_data)
+                
+                # 创建事件数据
+                event_data = {
+                    'audio': base64.b64encode(wav_data).decode('utf-8'),
+                    'text': sentence,
+                    'index': i
+                }
+                
+                # 添加到列表
+                audio_data_list.append(event_data)
+            except Exception as e:
+                logger.error(f"处理句子时出错: {str(e)}")
+        
+        # 存储数据以供GET请求获取
+        with TTS_CACHE_LOCK:
+            TTS_AUDIO_CACHE[session_id] = audio_data_list
+        
+        # 返回成功响应
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'message': f'已处理 {len(audio_data_list)} 个句子'
+        })
+                      
+    except Exception as e:
+        logger.error(f"TTS响应处理错误: {str(e)}")
+        traceback.print_exc()  # 打印完整堆栈跟踪
+        return jsonify({'error': str(e)}), 500
+
+# 辅助函数：文本分句
+def split_text_into_sentences(text):
+    # 改进句子分割正则表达式，识别中英文标点符号
+    pattern = r'[^!?.。！？…]+[!?.。！？…]+'
+    sentences = re.findall(pattern, text)
+    
+    # 处理可能剩余的文本（没有结束标点的最后一部分）
+    if sentences:
+        matched_text = ''.join(sentences)
+        if len(matched_text) < len(text):
+            remainder = text[len(matched_text):].strip()
+            if remainder:
+                sentences.append(remainder)
+    else:
+        # 如果没有匹配到句子，将整个文本作为一个句子
+        if text.strip():
+            sentences = [text.strip()]
+    
+    # 合并短句
+    min_length = 15
+    merged = []
+    current = ""
+    
+    for s in sentences:
+        if len(current) + len(s) < min_length:
+            current += s
+        else:
+            if current:
+                merged.append(current)
+            current = s
+            
+    if current:
+        merged.append(current)
+        
+    return merged
+
+# 辅助函数：清理文本用于TTS
+def clean_sentence_for_tts(text):
+    # 清理文本，保留中文、英文、数字和常用标点
+    clean_text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9.,，。!?！？;:；：、""''()（）《》<>【】\s]', '', text)
+    # 删除重复的标点符号
+    clean_text = re.sub(r'([.,，。!?！？;:；：])\1+', r'\1', clean_text)
+    return clean_text.strip()
+
+
+
+
+
+
+
+
+
+
 
 
     
