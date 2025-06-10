@@ -393,4 +393,31 @@ tr {
 
 .export-btn:hover {
     background-color: #0b7dda;
+}
+
+/* 添加类型标签样式 */
+.type-label {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.type-label.zdjy_ld {
+    background-color: rgba(24, 144, 255, 0.2);
+    color: #1890ff;
+    border: 1px solid #1890ff;
+}
+
+.type-label.zdjy_gd {
+    background-color: rgba(82, 196, 26, 0.2);
+    color: #52c41a;
+    border: 1px solid #52c41a;
+}
+
+.type-label.zdjy_ld_zdjy_gd {
+    background-color: rgba(250, 173, 20, 0.2);
+    color: #faad14;
+    border: 1px solid #faad14;
 } 

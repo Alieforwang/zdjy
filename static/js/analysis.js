@@ -15,7 +15,8 @@ const violationTypeToColor = {
 // 类型映射
 const typeMapping = {
     'zdjy_ld': '流动摊位',
-    'zdjy_gd': '固定摊位'
+    'zdjy_gd': '固定摊位',
+    'zdjy_ld_zdjy_gd': '混合摊位'
 };
 
 // 实用函数 - 防抖与节流
@@ -1244,6 +1245,7 @@ function handleFiles(files) {
         
         if (data.success) {
             console.log('检测结果:', data);
+            console.log('检测类型:', data.detect_type);  // 添加调试日志
             
             // 更新检测类型显示
             const currentDetectionType = document.getElementById('currentDetectionType');
@@ -1309,7 +1311,15 @@ function handleFiles(files) {
                     ctx.strokeRect(x, y, width, height);
                     
                     // 绘制标签背景
-                    const label = `${detection.class === 'zdjy_ld' ? '流动摊位' : '固定摊位'} ${(detection.confidence * 100).toFixed(1)}%`;
+                    let label;
+                    if (detection.class === 'zdjy_ld') {
+                        label = `流动摊位 ${(detection.confidence * 100).toFixed(1)}%`;
+                    } else if (detection.class === 'zdjy_gd') {
+                        label = `固定摊位 ${(detection.confidence * 100).toFixed(1)}%`;
+                    } else {
+                        label = `${detection.class} ${(detection.confidence * 100).toFixed(1)}%`;
+                    }
+                    
                     const labelWidth = ctx.measureText(label).width + 8;
                     const labelHeight = 20;
                     
@@ -1332,14 +1342,14 @@ function handleFiles(files) {
                 resultArea.innerHTML = `
                     <div class="result-content">
                         <div class="detection-info">
-                            <div class="detection-type-result">
-                                检测结果: <span class="${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                                <span class="detection-count">(发现 ${data.detection_count} 个目标)</span>
+                            <div class="detection-result-title">
+                                <div>检测结果: <span class="type-name ${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span></div>
+                                <div class="target-count">发现 ${data.detection_count} 个目标</div>
                             </div>
                             <div class="detection-details">
                                 ${data.detections.map(d => `
-                                    <div class="detection-item ${d.class_type || ''}">
-                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                    <div class="detection-item ${d.class || ''}">
+                                        <span class="detection-name">${d.class === 'zdjy_ld' ? '流动摊位' : d.class === 'zdjy_gd' ? '固定摊位' : d.class_name || d.class || '未知类型'}</span>
                                         <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                     </div>
                                 `).join('')}
@@ -1363,14 +1373,14 @@ function handleFiles(files) {
                 resultArea.innerHTML = `
                     <div class="result-content">
                         <div class="detection-info">
-                            <div class="detection-type-result">
-                                检测结果: <span class="${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                                <span class="detection-count">(发现 ${data.detection_count} 个目标)</span>
+                            <div class="detection-result-title">
+                                <div>检测结果: <span class="type-name ${data.detect_type}">${data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span></div>
+                                <div class="target-count">发现 ${data.detection_count} 个目标</div>
                             </div>
                             <div class="detection-details">
                                 ${data.detections.map(d => `
-                                    <div class="detection-item ${d.class_type || ''}">
-                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                    <div class="detection-item ${d.class || ''}">
+                                        <span class="detection-name">${d.class === 'zdjy_ld' ? '流动摊位' : d.class === 'zdjy_gd' ? '固定摊位' : d.class_name || d.class || '未知类型'}</span>
                                         <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                     </div>
                                 `).join('')}
@@ -1503,11 +1513,14 @@ function loadLatestResult() {
         .then(data => {
             if (data.success) {
                 console.log('获取到最新分析结果:', data);
+                console.log('检测类型:', data.data.detect_type);  // 添加调试日志
                 
                 // 更新检测类型显示
                 const currentDetectionType = document.getElementById('currentDetectionType');
                 if (currentDetectionType) {
-                    currentDetectionType.textContent = data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位';
+                    const typeText = data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位';
+                    currentDetectionType.textContent = typeText;
+                    currentDetectionType.className = data.data.detect_type;
                 }
                 
                 // 显示预览图
@@ -1548,14 +1561,14 @@ function loadLatestResult() {
                     resultArea.innerHTML = `
                         <div class="result-content">
                             <div class="detection-info">
-                                <div class="detection-type-result">
-                                    检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                                    <span class="detection-count">(发现 ${data.data.detection_count || 0} 个目标)</span>
+                                <div class="detection-result-title">
+                                    <div>检测结果: <span class="type-name ${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span></div>
+                                    <div class="target-count">发现 ${data.data.detection_count} 个目标</div>
                                 </div>
                                 <div class="detection-details">
-                                    ${(data.data.detections || []).map(d => `
-                                        <div class="detection-item ${d.class_type || ''}">
-                                            <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                    ${data.data.detections.map(d => `
+                                        <div class="detection-item ${d.class || ''}">
+                                            <span class="detection-name">${typeMapping[d.class] || d.class_name || d.class || '未知类型'}</span>
                                             <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                         </div>
                                     `).join('')}
@@ -1584,14 +1597,14 @@ function loadLatestResult() {
                     resultArea.innerHTML = `
                         <div class="result-content">
                             <div class="detection-info">
-                                <div class="detection-type-result">
-                                    检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                                    <span class="detection-count">(发现 ${data.data.detection_count || 0} 个目标)</span>
+                                <div class="detection-result-title">
+                                    <div>检测结果: <span class="type-name ${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span></div>
+                                    <div class="target-count">发现 ${data.data.detection_count} 个目标</div>
                                 </div>
                                 <div class="detection-details">
-                                    ${(data.data.detections || []).map(d => `
-                                        <div class="detection-item ${d.class_type || ''}">
-                                            <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                    ${data.data.detections.map(d => `
+                                        <div class="detection-item ${d.class || ''}">
+                                            <span class="detection-name">${typeMapping[d.class] || d.class_name || d.class || '未知类型'}</span>
                                             <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                         </div>
                                     `).join('')}
@@ -1777,14 +1790,14 @@ function restoreLatestResult() {
                 resultArea.innerHTML = `
                     <div class="result-content">
                         <div class="detection-info">
-                            <div class="detection-type-result">
-                                检测结果: <span class="${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span>
-                                <span class="detection-count">(发现 ${data.data.detection_count} 个目标)</span>
+                            <div class="detection-result-title">
+                                <div>检测结果: <span class="type-name ${data.data.detect_type}">${data.data.detect_type === 'zdjy_ld' ? '流动摊位' : '固定摊位'}</span></div>
+                                <div class="target-count">发现 ${data.data.detection_count} 个目标</div>
                             </div>
                             <div class="detection-details">
                                 ${data.data.detections.map(d => `
-                                    <div class="detection-item ${d.class_type || ''}">
-                                        <span class="detection-name">${d.class_name || d.class || '未知类型'}</span>
+                                    <div class="detection-item ${d.class || ''}">
+                                        <span class="detection-name">${typeMapping[d.class] || d.class_name || d.class || '未知类型'}</span>
                                         <span class="detection-confidence">(置信度: ${(d.confidence * 100).toFixed(1)}%)</span>
                                     </div>
                                 `).join('')}

@@ -9,6 +9,13 @@ document.addEventListener('DOMContentLoaded', function() {
         'zdjy_ld_zdjy_gd': '混合摊位'
     };
     
+    // 反向类型映射（用于从中文名称获取类型代码）
+    const reverseTypeMapping = {
+        '流动摊位': 'zdjy_ld',
+        '固定摊位': 'zdjy_gd',
+        '混合摊位': 'zdjy_ld_zdjy_gd'
+    };
+    
     // 导出历史记录
     function exportHistory() {
         const dateFilter = document.getElementById('dateFilter').value;
@@ -30,6 +37,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const tbody = document.getElementById('historyTableBody');
                     tbody.innerHTML = '';
                     
+                    console.log('历史记录数据:', data);  // 添加调试日志
+                    
                     data.data.forEach(record => {
                         const tr = document.createElement('tr');
                         
@@ -37,9 +46,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         const filePath = record.file_path.replace(/\\/g, '/');
                         const resultPath = record.result_path.replace(/\\/g, '/');
                         
+                        // 获取类型代码（用于应用样式）
+                        // 优先使用服务器返回的type_code，如果没有则使用反向映射
+                        const typeCode = record.type_code || reverseTypeMapping[record.type] || '';
+                        
+                        console.log('记录类型:', record.type, '类型代码:', typeCode);  // 添加调试日志
+                        
                         tr.innerHTML = `
                             <td>${new Date(record.detect_time).toLocaleString()}</td>
-                            <td>${record.type}</td>
+                            <td><span class="type-label ${typeCode}">${record.type}</span></td>
                             <td>${record.location || '未指定'}</td>
                             <td>${record.confidence ? (record.confidence * 100).toFixed(1) + '%' : '未知'}</td>
                             <td>

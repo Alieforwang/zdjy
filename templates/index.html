@@ -483,7 +483,7 @@
             <div class="stats-grid">
                 <div class="stat-item">
                     <div class="stat-value" id="totalViolations">2,847</div>
-                    <div class="stat-label">累计违法</div>
+                    <div class="stat-label">累计检测</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="todayViolations">128</div>
@@ -491,11 +491,11 @@
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="handleRate">95.8%</div>
-                    <div class="stat-label">处理率</div>
+                    <div class="stat-label">模型检测概率</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-value" id="avgResponse">3.2min</div>
-                    <div class="stat-label">响应时间</div>
+                    <div class="stat-label">模型持续检测时间</div>
                 </div>
             </div>
             <div class="chart-container" id="realTimeMonitor"></div>
@@ -549,13 +549,7 @@
             <div class="chart-container" id="density3D"></div>
         </div>
 
-        <!-- 周边设施关联
-        <div class="dashboard-panel">
-            <div class="panel-header">
-                <h3 class="panel-title">周边设施关联</h3>
-            </div>
-            <div class="chart-container" id="facilityCorrelation"></div>
-        </div> -->
+        
 
         <!-- AI识别分析 -->
         <div class="dashboard-panel">
@@ -568,9 +562,9 @@
         <!-- 季节性趋势 -->
         <div class="dashboard-panel">
             <div class="panel-header">
-                <h3 class="panel-title">季节性趋势</h3>
+                <h3 class="panel-title">周边设施关联</h3>
             </div>
-            <div class="chart-container" id="seasonalTrend"></div>
+            <div class="chart-container" id="facilityCorrelation"></div>
         </div>
     </div>
 
@@ -712,24 +706,108 @@
             realTimeMonitor.setOption({
                 title: {
                     text: '24小时实时监控数据',
-                    textStyle: { color: '#fff' }
+                    textStyle: { 
+                        color: '#fff',
+                        fontSize: 10,
+                        fontWeight: 'normal'
+                    },
+                    left: 'center',
+                    top: 5
                 },
-                tooltip: { trigger: 'axis' },
-                grid: { top: 60, right: 30, bottom: 30, left: 60 },
+                tooltip: { 
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(0,42,84,0.8)',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    textStyle: {
+                        color: '#fff'
+                    },
+                    // formatter: function(params) {
+                    //     const time = params[0].axisValue;
+                    //     const value = params[0].value;
+                    //     return `${time}<br/>违法事件数：${value}起`;
+                    // }
+                },
+                grid: { 
+                    top: -5,  /* 减小顶部边距，使图表向上移动 */
+                    right: 30, 
+                    bottom: 40, 
+                    left: 60,
+                    containLabel: true,
+                    height: '75%'
+                },
                 xAxis: {
                     type: 'category',
                     data: Array.from({length: 24}, (_, i) => `${i}:00`),
-                    axisLabel: { color: '#fff' }
+                    axisLabel: { 
+                        color: '#fff',
+                        fontSize: 10,
+                        interval: 2,
+                        rotate: 45
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            color: 'rgba(255,255,255,0.2)'
+                        }
+                    },
+                    axisTick: {
+                        show: false
+                    },
+                    splitLine: {
+                        show: true,
+                        lineStyle: {
+                            color: 'rgba(255,255,255,0.1)',
+                            type: 'dashed'
+                        }
+                    }
                 },
                 yAxis: {
                     type: 'value',
-                    axisLabel: { color: '#fff' }
+                    // name: '违法事件数',
+                    // nameTextStyle: {
+                    //     color: '#fff',
+                    //     fontSize: 12,
+                    //     padding: [0, 0, 0, -30],
+                    //     fontWeight: 'bold'
+                    // },
+                    min: 0,
+                    max: 500,
+                    interval: 100,
+                    axisLabel: { 
+                        color: '#fff',
+                        fontSize: 10,
+                        formatter: '{value}起'
+                    },
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: 'rgba(255,255,255,0.3)',
+                            width: 2
+                        }
+                    },
+                    splitLine: {
+                        show: true,
+                        lineStyle: {
+                            color: 'rgba(255,255,255,0.1)',
+                            type: 'dashed',
+                            width: 1
+                        }
+                    },
+                    axisTick: {
+                        show: true,
+                        alignWithLabel: true,
+                        lineStyle: {
+                            color: 'rgba(255,255,255,0.3)'
+                        }
+                    }
                 },
                 series: [{
                     name: '违法事件',
                     type: 'line',
                     smooth: true,
-                    data: Array.from({length: 24}, () => Math.floor(Math.random() * 50)),
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    sampling: 'average',
+                    data: Array.from({length: 24}, () => Math.floor(Math.random() * 500)),
                     lineStyle: {
                         width: 3,
                         color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{
@@ -749,6 +827,15 @@
                             offset: 1,
                             color: 'rgba(88, 213, 255, 0.1)'
                         }])
+                    },
+                    itemStyle: {
+                        color: '#58D5FF',
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    emphasis: {
+                        scale: true,
+                        focus: 'series'
                     }
                 }]
             });
@@ -1069,14 +1156,14 @@
                     orient: 'vertical',
                     right: 10,
                     top: 'center',
-                    data: ['zdjy_ld 占道经营流动', '固定摊位摊位摊位摊位摊位'],
+                    data: ['流动摊位', '固定摊位'],
                     textStyle: {
                         color: '#fff',
                         fontSize: 10
                     }
                 },
                 series: [{
-                    name: '违法分布',
+                    name: '类型统计',
                     type: 'pie',
                     radius: ['40%', '70%'],
                     avoidLabelOverlap: false,
@@ -1101,12 +1188,11 @@
                         show: false
                     },
                     data: [
-                        { value: 80, name: 'zdjy_ld 占道经营流动' },
-                        { value: 65, name: '固定摊位摊位摊位摊位摊位' }
+                        { value: 80, name: '流动摊位' },
+                        { value: 65, name: '固定摊位' }
                     ]
                 }]
             });
-
             // 初始化天气关联分析图表
             initWeatherAnalysis();
             
@@ -1120,17 +1206,16 @@
             initDensity3D();
             
             // 初始化周边设施关联图
-            // initFacilityCorrelation();
+            initFacilityCorrelation();
             
             // 初始化AI识别分析图
             initAIAnalysis();
             
             // 初始化季节性趋势图
-            initSeasonalTrend();
+            // initSeasonalTrend();
 
             // 初始化时段分布分析
             initHourlyDistribution();
-
             // 响应式调整
             window.addEventListener('resize', () => {
                 try {
@@ -1197,8 +1282,8 @@
                 chart.setOption({
                     series: [{
                         data: [
-                            { value: data[0], name: 'zdjy_ld 占道经营流动' },
-                            { value: data[1], name: '固定摊位摊位摊位摊位摊位' }
+                            { value: data[0], name: '流动摊位' },
+                            { value: data[1], name: '固定摊位' }
                         ]
                     }]
                 });
@@ -1647,7 +1732,7 @@
                 },
                 yAxis: {
                     type: 'category',
-                    data: ['zdjy_ld 占道经营流动', '固定摊位摊位摊位摊位'],
+                    data: ['流动摊位', '固定摊位'],
                     axisLabel: { 
                         color: '#fff',
                         fontSize: 10
@@ -1655,7 +1740,7 @@
                 },
                 series: [
                     {
-                        name: '准确率',
+                        name: '占比率',
                         type: 'bar',
                         data: [95, 92],
                         itemStyle: {
@@ -1671,169 +1756,169 @@
             setTimeout(() => chart.resize(), 100);
         }
         
-        // 更新季节性趋势图
-        function initSeasonalTrend() {
-            const chart = echarts.init(document.getElementById('seasonalTrend'));
-            chart.setOption({
-                title: {
-                    textStyle: { color: '#fff' }
-                },
-                tooltip: {
-                    trigger: 'axis'
-                },
-                legend: {
-                    data: ['春季', '夏季', '秋季', '冬季'],
-                    textStyle: { 
-                        color: '#fff',
-                        fontSize: 10
-                    },
-                    bottom: 0,
-                    itemWidth: 12,
-                    itemHeight: 8
-                },
-                radar: {
-                    indicator: [
-                        { name: '早市', max: 100 },
-                        { name: '午市', max: 100 },
-                        { name: '晚市', max: 100 },
-                        { name: '夜市', max: 100 }
-                    ],
-                    center: ['50%', '50%'],
-                    radius: '60%',
-                    name: {
-                        textStyle: {
-                            color: '#fff',
-                            fontSize: 10
-                        }
-                    },
-                    splitArea: {
-                        areaStyle: {
-                            color: ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
-                        }
-                    },
-                    axisLine: {
-                        lineStyle: {
-                            color: 'rgba(255,255,255,0.2)'
-                        }
-                    },
-                    splitLine: {
-                        lineStyle: {
-                            color: 'rgba(255,255,255,0.2)'
-                        }
-                    }
-                },
-                series: [{
-                    type: 'radar',
-                    data: [
-                        {
-                            value: [80, 60, 70, 90],
-                            name: '春季',
-                            areaStyle: {
-                                color: 'rgba(124,255,178,0.3)'
-                            }
-                        },
-                        {
-                            value: [70, 80, 85, 95],
-                            name: '夏季',
-                            areaStyle: {
-                                color: 'rgba(88,213,255,0.3)'
-                            }
-                        },
-                        {
-                            value: [85, 75, 80, 85],
-                            name: '秋季',
-                            areaStyle: {
-                                color: 'rgba(43,140,254,0.3)'
-                            }
-                        },
-                        {
-                            value: [65, 55, 60, 75],
-                            name: '冬季',
-                            areaStyle: {
-                                color: 'rgba(24,141,240,0.3)'
-                            }
-                        }
-                    ]
-                }]
-            });
-            
-            setTimeout(() => chart.resize(), 100);
-        }
-
-        // // 更新周边设施关联图
-        // function initFacilityCorrelation() {
-        //     const chart = echarts.init(document.getElementById('facilityCorrelation'));
-        //     const nodes = [];
-        //     const links = [];
-        //     const categories = ['占道经营', '商圈', '学校', '地铁站', '市场'];
-            
-        //     // 生成节点
-        //     categories.forEach((cat, idx) => {
-        //         nodes.push({
-        //             name: cat,
-        //             symbolSize: 40,
-        //             category: idx
-        //         });
-                
-        //         // 生成关联
-        //         if (idx > 0) {
-        //             links.push({
-        //                 source: cat,
-        //                 target: '占道经营',
-        //                 value: Math.random() * 100
-        //             });
-        //         }
-        //     });
-            
-        //     // 设置图表选项
+        // // 更新季节性趋势图
+        // function initSeasonalTrend() {
+        //     const chart = echarts.init(document.getElementById('seasonalTrend'));
         //     chart.setOption({
         //         title: {
         //             textStyle: { color: '#fff' }
         //         },
-        //         tooltip: {},
-        //         legend: [{
-        //             data: categories.map(function (a) {
-        //                 return a;
-        //             }),
-        //             textStyle: { color: '#fff' },
-        //             bottom: 0,
-        //             itemWidth: 10,
-        //             itemHeight: 10
-        //         }],
-        //         animationDurationUpdate: 1500,
-        //         animationEasingUpdate: 'quinticInOut',
-        //         series: [{
-        //             type: 'graph',
-        //             layout: 'circular',
-        //             data: nodes,
-        //             links: links,
-        //             categories: categories.map(function (a) {
-        //                 return {
-        //                     name: a
-        //                 };
-        //             }),
-        //             roam: true,
-        //             label: {
-        //                 show: true,
-        //                 position: 'right',
+        //         tooltip: {
+        //             trigger: 'axis'
+        //         },
+        //         legend: {
+        //             data: ['春季', '夏季', '秋季', '冬季'],
+        //             textStyle: { 
         //                 color: '#fff',
         //                 fontSize: 10
         //             },
-        //             lineStyle: {
-        //                 color: 'source',
-        //                 curveness: 0.3,
-        //                 width: 1
+        //             bottom: 0,
+        //             itemWidth: 12,
+        //             itemHeight: 8
+        //         },
+        //         radar: {
+        //             indicator: [
+        //                 { name: '早市', max: 100 },
+        //                 { name: '午市', max: 100 },
+        //                 { name: '晚市', max: 100 },
+        //                 { name: '夜市', max: 100 }
+        //             ],
+        //             center: ['50%', '50%'],
+        //             radius: '60%',
+        //             name: {
+        //                 textStyle: {
+        //                     color: '#fff',
+        //                     fontSize: 10
+        //                 }
         //             },
-        //             force: {
-        //                 repulsion: 80,
-        //                 gravity: 0.1,
-        //                 edgeLength: 60
+        //             splitArea: {
+        //                 areaStyle: {
+        //                     color: ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']
+        //                 }
+        //             },
+        //             axisLine: {
+        //                 lineStyle: {
+        //                     color: 'rgba(255,255,255,0.2)'
+        //                 }
+        //             },
+        //             splitLine: {
+        //                 lineStyle: {
+        //                     color: 'rgba(255,255,255,0.2)'
+        //                 }
         //             }
+        //         },
+        //         series: [{
+        //             type: 'radar',
+        //             data: [
+        //                 {
+        //                     value: [80, 60, 70, 90],
+        //                     name: '春季',
+        //                     areaStyle: {
+        //                         color: 'rgba(124,255,178,0.3)'
+        //                     }
+        //                 },
+        //                 {
+        //                     value: [70, 80, 85, 95],
+        //                     name: '夏季',
+        //                     areaStyle: {
+        //                         color: 'rgba(88,213,255,0.3)'
+        //                     }
+        //                 },
+        //                 {
+        //                     value: [85, 75, 80, 85],
+        //                     name: '秋季',
+        //                     areaStyle: {
+        //                         color: 'rgba(43,140,254,0.3)'
+        //                     }
+        //                 },
+        //                 {
+        //                     value: [65, 55, 60, 75],
+        //                     name: '冬季',
+        //                     areaStyle: {
+        //                         color: 'rgba(24,141,240,0.3)'
+        //                     }
+        //                 }
+        //             ]
         //         }]
         //     });
             
         //     setTimeout(() => chart.resize(), 100);
         // }
+
+        // 更新周边设施关联图
+        function initFacilityCorrelation() {
+            const chart = echarts.init(document.getElementById('facilityCorrelation'));
+            const nodes = [];
+            const links = [];
+            const categories = ['占道经营', '商圈', '学校', '地铁站', '市场'];
+            
+            // 生成节点
+            categories.forEach((cat, idx) => {
+                nodes.push({
+                    name: cat,
+                    symbolSize: 40,
+                    category: idx
+                });
+                
+                // 生成关联
+                if (idx > 0) {
+                    links.push({
+                        source: cat,
+                        target: '占道经营',
+                        value: Math.random() * 100
+                    });
+                }
+            });
+            
+            // 设置图表选项
+            chart.setOption({
+                title: {
+                    textStyle: { color: '#fff' }
+                },
+                tooltip: {},
+                legend: [{
+                    data: categories.map(function (a) {
+                        return a;
+                    }),
+                    textStyle: { color: '#fff' },
+                    bottom: 0,
+                    itemWidth: 10,
+                    itemHeight: 10
+                }],
+                animationDurationUpdate: 1500,
+                animationEasingUpdate: 'quinticInOut',
+                series: [{
+                    type: 'graph',
+                    layout: 'circular',
+                    data: nodes,
+                    links: links,
+                    categories: categories.map(function (a) {
+                        return {
+                            name: a
+                        };
+                    }),
+                    roam: true,
+                    label: {
+                        show: true,
+                        position: 'right',
+                        color: '#fff',
+                        fontSize: 10
+                    },
+                    lineStyle: {
+                        color: 'source',
+                        curveness: 0.3,
+                        width: 1
+                    },
+                    force: {
+                        repulsion: 80,
+                        gravity: 0.1,
+                        edgeLength: 60
+                    }
+                }]
+            });
+            
+            setTimeout(() => chart.resize(), 100);
+        }
 
         // 更新函数实现
         function updateWeatherAnalysis(data) {
@@ -2124,5 +2209,6 @@
     
     <!-- 引入聊天AI组件 -->
     {% include 'chat_ai.html' %}
+    
 </body>
 </html>

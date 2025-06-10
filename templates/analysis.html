@@ -115,10 +115,12 @@
     
     .detection-item.zdjy_ld {
         border: 1px solid #1890ff;
+        background-color: rgba(24, 144, 255, 0.1);
     }
     
     .detection-item.zdjy_gd {
         border: 1px solid #52c41a;
+        background-color: rgba(82, 196, 26, 0.1);
     }
     
     .detection-item.other {
@@ -200,41 +202,42 @@
 
     .image-container {
         position: relative;
-        width: 100%;
+        flex: 1;
         text-align: center;
-        margin: 5px 0;
-        height: 100%;  /* 使容器填充父元素 */
-        overflow-y: auto;
+        margin: 0;
+        overflow: auto;
         scrollbar-width: thin;  /* Firefox */
         -ms-overflow-style: -ms-autohiding-scrollbar;  /* IE 和 Edge */
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 5px;
+        padding: 5px;
     }
 
     .image-container::-webkit-scrollbar {
-        width: 4px;  /* 窄滚动条 */
-        display: block;
+        width: 6px;  /* 窄滚动条 */
+        height: 6px;
     }
 
     .image-container::-webkit-scrollbar-track {
-        background: rgba(1, 22, 53, 0.3);
-        border-radius: 2px;
+        background: rgba(1, 22, 53, 0.5);
+        border-radius: 3px;
     }
 
     .image-container::-webkit-scrollbar-thumb {
-        background: rgba(64, 169, 255, 0.5);
-        border-radius: 2px;
+        background: rgba(64, 169, 255, 0.7);
+        border-radius: 3px;
     }
 
     .image-container::-webkit-scrollbar-thumb:hover {
-        background: rgba(64, 169, 255, 0.8);
+        background: rgba(64, 169, 255, 1);
     }
 
     .result-image {
         max-width: 100%;
-        width: auto;
-        height: auto;
-        max-height: 100%;  /* 允许图片填充容器 */
+        max-height: 100%;
         object-fit: contain;
-        margin: 0;
+        display: block;
+        margin: 0 auto;
     }
 
     .detection-canvas {
@@ -243,8 +246,6 @@
         left: 50%;
         transform: translateX(-50%);
         pointer-events: none;
-        max-height: 100%;
-        max-width: 100%;
     }
 
     .result-area {
@@ -253,7 +254,7 @@
         flex-direction: column;
         background: rgba(1, 22, 53, 0.3);
         border-radius: 8px;
-        padding: 5px;
+        padding: 10px;
         height: 720px;  /* 保持结果区域总高度 */
         overflow: hidden;  /* 改为hidden，让内部元素处理滚动 */
         border: 1px dashed rgba(64, 169, 255, 0.3);  /* 添加虚线边框 */
@@ -262,20 +263,25 @@
     .result-content {
         display: flex;
         flex-direction: column;
-        flex: 1;
+        height: 100%;
         overflow: hidden;
     }
 
     .detection-info {
         flex: 0 0 auto;
+        margin-bottom: 10px;
     }
 
     .detection-type-result, .detection-details {
-        margin-bottom: 5px;
+        margin-bottom: 8px;
+        background: rgba(1, 22, 53, 0.6);
+        padding: 10px;
+        border-radius: 5px;
     }
 
     .detection-details {
-        max-height: 50px;
+        max-height: 80px;
+        overflow-y: auto;
     }
 
     .empty-result {
@@ -298,25 +304,78 @@
     }
 
     .download-section {
-        margin-top: 5px;  /* 减少外边距 */
+        margin-top: 10px;
         text-align: center;
     }
 
     .download-btn {
-        padding: 6px 12px;  /* 减少内边距 */
+        padding: 8px 15px;
         background: #1890ff;
         color: white;
         border: none;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 13px;  /* 减小字体 */
+        font-size: 14px;
         display: inline-flex;
         align-items: center;
         gap: 5px;
+        transition: all 0.3s;
     }
 
     .download-btn:hover {
         background: #40a9ff;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(24, 144, 255, 0.5);
+    }
+
+    .detection-type-result .zdjy_ld {
+        color: #1890ff;
+        font-weight: bold;
+    }
+    
+    .detection-type-result .zdjy_gd {
+        color: #52c41a;
+        font-weight: bold;
+    }
+
+    /* 检测结果标题样式 */
+    .detection-result-title {
+        background-color: #001529;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        border-left: 4px solid #1890ff;
+    }
+    
+    .detection-result-title .type-name {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        margin-left: 5px;
+        font-size: 16px;
+    }
+    
+    .detection-result-title .type-name.zdjy_ld {
+        background-color: rgba(24, 144, 255, 0.2);
+        color: #1890ff;
+        border: 1px solid #1890ff;
+    }
+    
+    .detection-result-title .type-name.zdjy_gd {
+        background-color: rgba(82, 196, 26, 0.2);
+        color: #52c41a;
+        border: 1px solid #52c41a;
+    }
+    
+    .detection-result-title .target-count {
+        font-size: 14px;
+        color: #8c8c8c;
     }
     </style>
 </head>
@@ -350,12 +409,12 @@
             <div class="upload-section">
                 <h3>上传分析</h3>
                 <!-- 修改检测类型选择器为只读显示 -->
-                <div class="detection-type-info">
+                <!-- <div class="detection-type-info">
                     <p>检测类型由系统根据图像内容自动判断</p>
                     <div id="detectionTypeDisplay" class="detection-type-display">
                         当前模式: <span id="currentDetectionType">自动检测</span>
                     </div>
-                </div>
+                </div> -->
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-content">
                         <!-- 添加预览区域 -->
@@ -380,10 +439,13 @@
             <div class="analysis-result">
                 <h3>分析结果</h3>
                 <div class="result-area" id="resultArea">
+                    <!-- 初始空状态 -->
                     <div class="empty-result">
                         <span class="empty-icon">📊</span>
-                        <p>暂无分析结果</p>
+                        <p>暂无分析结果，请上传图片或视频进行分析</p>
+                        <p style="font-size: 12px; margin-top: 5px; color: #8c8c8c;">支持jpg、png、mp4等格式</p>
                     </div>
+                
                 </div>
             </div>
         </div>
@@ -515,7 +577,43 @@
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
             
-            // 现有脚本内容
+            // 图片加载错误处理函数
+            window.handleImageError = function(img, maxRetries = 3) {
+                if (!img.dataset.retryCount) {
+                    img.dataset.retryCount = 0;
+                }
+                
+                const retryCount = parseInt(img.dataset.retryCount);
+                if (retryCount < maxRetries) {
+                    img.dataset.retryCount = retryCount + 1;
+                    setTimeout(() => {
+                        img.src = img.src.split('?')[0] + '?retry=' + new Date().getTime();
+                    }, 1000);
+                } else {
+                    img.onerror = null;
+                    img.src = '/static/images/error-image.jpg';
+                    img.alt = '图片加载失败';
+                }
+            };
+            
+            // 视频加载错误处理函数
+            window.handleVideoError = function(video) {
+                console.error('视频加载失败');
+                const container = video.parentElement;
+                if (container) {
+                    container.innerHTML = '<div class="error-message">视频加载失败</div>';
+                }
+            };
+            
+            // 下载结果函数
+            window.downloadResult = function(filename) {
+                const link = document.createElement('a');
+                link.href = '/static/@results/' + filename;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
         });
     </script>
     <!-- 页面过渡动画脚本 -->

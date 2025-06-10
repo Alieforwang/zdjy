@@ -984,8 +984,10 @@ def upload_analyze():
                                         class_name = result.names[cls_id]
                                         
                                         # 检查是否为流动摊位
-                                        if '流动' in class_name:
+                                        if '流动' in class_name or class_name == 'zdjy_ld':
                                             detect_type = 'zdjy_ld'
+                                            # 一旦检测到流动摊位，立即设置类型并记录日志
+                                            logger.info(f"检测到流动摊位: {class_name}, 设置类型为zdjy_ld")
                                         
                                         # 添加到检测结果
                                         frame_detections.append({
@@ -1062,8 +1064,10 @@ def upload_analyze():
                     class_name = result.names[cls_id]
                     
                     # 检查是否为流动摊位
-                    if '流动' in class_name:
+                    if '流动' in class_name or class_name == 'zdjy_ld':
                         detect_type = 'zdjy_ld'
+                        # 一旦检测到流动摊位，立即设置类型并记录日志
+                        logger.info(f"检测到流动摊位: {class_name}, 设置类型为zdjy_ld")
                     
                     # 添加到检测结果
                     detections.append({
@@ -1324,6 +1328,7 @@ def get_history():
                 
                 # 将检测类型代码转换为中文显示名称
                 type_display = '未知'
+                type_code = detect_type  # 保存原始类型代码
                 if detect_type:
                     if detect_type == 'zdjy_gd':
                         type_display = '固定摊位'
@@ -1333,11 +1338,15 @@ def get_history():
                         type_display = '混合摊位'
                     else:
                         type_display = detect_type
+                        
+                # 记录日志，帮助调试
+                logger.info(f"历史记录类型: 原始={detect_type}, 显示={type_display}")
                 
                 records.append({
                     'id': int(row[0]),
                     'detect_time': row[8].strftime('%Y-%m-%d %H:%M:%S'),  # created_at在索引8
                     'type': type_display,  # 使用转换后的类型名称
+                    'type_code': type_code,  # 添加原始类型代码
                     'location': '未指定',  # 没有location字段，使用默认值
                     'confidence': float(row[7]) if row[7] else None,  # confidence在索引7
                     'file_path': file_path,
@@ -1591,12 +1600,15 @@ def get_latest_result():
                     {
                         "box": [100, 100, 200, 200],
                         "confidence": 0.8,
-                        "class": "流动摊位" if detect_type == 'zdjy_ld' else "固定摊位"
+                        "class": detect_type  # 使用检测类型作为类别名称
                     }
                 ],
                 'detection_count': 1
             }
         }
+        
+        # 记录日志，帮助调试
+        logger.info(f"返回检测类型: {detect_type}")
         
         # 处理文件路径
         file_path = str(record[3])
