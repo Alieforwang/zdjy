@@ -2,7 +2,7 @@
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': '252525zyh',
+    'password': '123456',
     'database': 'tiaozhanbei',
     'port': 3306,
     'charset': 'utf8mb4',
@@ -22,7 +22,8 @@ DB_CONFIG = {
 AMAP_CONFIG = {
     'web_key': '9decdfc73fd9e9f474719d5344635a96',
     'js_key': 'bfa29703d862a8c0dd480a3956015990',
-    'security_code': '0eabe65c8f32a08b8701a989c93cf45e'
+    'security_code': '0eabe65c8f32a08b8701a989c93cf45e',
+    'KEY': '9decdfc73fd9e9f474719d5344635a96'
 }
 
 # 应用配置

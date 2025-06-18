@@ -26,6 +26,8 @@
     <script src="{{ url_for('static', filename='js/libs/echarts-gl.min.js') }}"></script>
     <!-- 添加水球图扩展 -->
     <script src="{{ url_for('static', filename='js/libs/echarts-liquidfill.min.js') }}"></script>
+    <!-- 样式表 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         @font-face {
             font-family: 'ZIT';
@@ -109,6 +111,134 @@
             align-items: center;
             justify-content: space-between;
             padding: 10px;
+            position: relative;
+        }
+        
+        .time-weather-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border-radius: 10px;
+            background: linear-gradient(145deg, rgba(124, 255, 178, 0.05), rgba(88, 213, 255, 0.05));
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        /* 添加天气组件样式 - 优化版 */
+        .weather-container {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: linear-gradient(145deg, rgba(0, 84, 166, 0.3), rgba(0, 42, 84, 0.4));
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0, 150, 255, 0.3);
+            border: 1px solid rgba(88, 213, 255, 0.3);
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 340px;
+        }
+        
+        .weather-container:hover {
+            box-shadow: 0 0 20px rgba(124, 255, 178, 0.4);
+            border-color: rgba(124, 255, 178, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .weather-icon {
+            font-size: 38px;
+            color: #58d5ff;
+            margin-right: 15px;
+            text-shadow: 0 0 15px rgba(88, 213, 255, 0.7);
+            position: relative;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 21, 41, 0.4);
+            border-radius: 50%;
+            border: 2px solid rgba(88, 213, 255, 0.4);
+            padding: 10px;
+        }
+        
+        .weather-icon::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid rgba(88, 213, 255, 0.2);
+            animation: pulse-weather 3s infinite;
+        }
+        
+        @keyframes pulse-weather {
+            0% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 0.3; }
+            100% { transform: scale(1); opacity: 0.7; }
+        }
+        
+        .weather-details {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+        
+        .weather-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .weather-temp {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        
+        .weather-desc {
+            font-size: 16px;
+            font-weight: 500;
+            color: #7cffb2;
+            text-shadow: 0 0 8px rgba(124, 255, 178, 0.4);
+            margin-right: 8px;
+        }
+        
+        .weather-info {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(0, 21, 41, 0.3);
+            border-radius: 6px;
+            padding: 5px 10px;
+            margin-top: 5px;
+            border: 1px solid rgba(88, 213, 255, 0.2);
+        }
+        
+        .weather-info span {
+            display: flex;
+            align-items: center;
+        }
+        
+        .weather-info span i {
+            margin-right: 5px;
+            font-size: 12px;
+            color: #58d5ff;
+        }
+        
+        .weather-secondary-icon {
+            margin-left: 10px;
+            font-size: 18px;
+            color: rgba(124, 255, 178, 0.7);
         }
         
         /* 移除了固定定位的时间天气面板样式 */
@@ -332,10 +462,36 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
-            padding: 5px;
-            margin-bottom: 10px;
+            padding: 15px;
+            background: linear-gradient(145deg, rgba(0, 42, 84, 0.3), rgba(0, 21, 41, 0.4));
+            border-radius: 12px;
+            margin-right: 15px;
+            border: 1px solid rgba(88, 213, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 84, 166, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .time-display:hover {
+            box-shadow: 0 0 20px rgba(124, 255, 178, 0.4);
+            border-color: rgba(124, 255, 178, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .time-value {
+            font-size: 38px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 5px;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        .date-value, .week-value {
+            font-size: 16px;
+            color: #7cffb2;
+            margin-bottom: 3px;
+            text-shadow: 0 0 8px rgba(124, 255, 178, 0.4);
         }
         .weather-display {
             flex: 1;
@@ -737,6 +893,82 @@
                 font-size: 9px;
             }
         }
+
+        /* 添加天气特效样式 */
+        .weather-sunny {
+            animation: sunny-glow 3s infinite alternate;
+        }
+
+        .weather-cloudy {
+            animation: cloudy-float 5s infinite alternate;
+        }
+
+        .weather-rainy {
+            animation: rainy-drop 2s infinite;
+        }
+
+        .weather-snowy {
+            animation: snowy-float 4s infinite alternate;
+        }
+
+        .weather-stormy {
+            animation: stormy-flash 3s infinite;
+        }
+
+        .weather-foggy {
+            animation: foggy-drift 6s infinite alternate;
+        }
+
+        @keyframes sunny-glow {
+            0% { text-shadow: 0 0 10px rgba(255, 196, 0, 0.5); }
+            100% { text-shadow: 0 0 25px rgba(255, 196, 0, 0.8), 0 0 40px rgba(255, 196, 0, 0.4); }
+        }
+
+        @keyframes cloudy-float {
+            0% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-3px) scale(1.03); }
+            100% { transform: translateY(2px) scale(0.98); }
+        }
+
+        @keyframes rainy-drop {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(2px); }
+            60% { transform: translateY(-1px); }
+            100% { transform: translateY(0); }
+        }
+
+        @keyframes snowy-float {
+            0% { transform: translateY(0) rotate(0); }
+            50% { transform: translateY(-3px) rotate(5deg); }
+            100% { transform: translateY(2px) rotate(-5deg); }
+        }
+
+        @keyframes stormy-flash {
+            0% { color: #58d5ff; text-shadow: 0 0 10px rgba(88, 213, 255, 0.7); }
+            49% { color: #58d5ff; text-shadow: 0 0 10px rgba(88, 213, 255, 0.7); }
+            50% { color: #ffff00; text-shadow: 0 0 20px rgba(255, 255, 0, 0.9), 0 0 30px rgba(255, 255, 255, 0.7); }
+            52% { color: #58d5ff; text-shadow: 0 0 10px rgba(88, 213, 255, 0.7); }
+            94% { color: #58d5ff; text-shadow: 0 0 10px rgba(88, 213, 255, 0.7); }
+            95% { color: #ffff00; text-shadow: 0 0 20px rgba(255, 255, 0, 0.9), 0 0 30px rgba(255, 255, 255, 0.7); }
+            100% { color: #58d5ff; text-shadow: 0 0 10px rgba(88, 213, 255, 0.7); }
+        }
+
+        @keyframes foggy-drift {
+            0% { opacity: 0.7; transform: translateX(-3px); }
+            50% { opacity: 0.9; }
+            100% { opacity: 0.7; transform: translateX(3px); }
+        }
+
+        /* 次要天气图标样式 */
+        .secondary-weather-icon {
+            margin-left: 8px;
+            font-size: 14px;
+            opacity: 0.8;
+            vertical-align: middle;
+            color: #58d5ff;
+        }
+        
+        /* 全屏背景样式 */
     </style>
     <!-- 阻止某些问题脚本的执行 -->
     <script>
@@ -850,12 +1082,26 @@
                     <div class="date-value" id="currentDate">---- 年 -- 月 -- 日</div>
                     <div class="week-value" id="currentWeek">星期-</div>
                 </div>
-                <div class="weather-display">
-                    <div class="weather-icon" id="weatherIcon">☀️</div>
-                    <div class="weather-temp" id="weatherTemp">--℃</div>
-                    <div class="weather-desc" id="weatherDesc">晴</div>
-                    <div class="weather-extra" id="weatherExtra">湿度: --% | 风力: --级</div>
+                <div class="weather-container">
+                    <div class="weather-icon" id="weatherIcon">
+                        <i class="fas fa-sun"></i>
+                    </div>
+                    <div class="weather-details">
+                        <div class="weather-top">
+                            <div class="weather-temp" id="weatherTemp">24°C</div>
+                            <div class="weather-desc" id="weatherDesc">
+                                晴
+                                <i class="fas fa-cloud secondary-weather-icon"></i>
+                            </div>
+                        </div>
+                        <div class="weather-info">
+                            <span><i class="fas fa-tint"></i>湿度: <span id="weatherHumidity">64%</span></span>
+                            <span><i class="fas fa-wind"></i>风向: <span id="weatherWind">西南风 4级</span></span>
+                        </div>
+                    </div>
                 </div>
+                <!-- 添加隐藏的天气信息元素供weather.js使用 -->
+                <div id="weather-info" style="display: none;"></div>
             </div>
         </div>
         <!-- 实时监控面板 -->
@@ -1018,8 +1264,9 @@
     </div>
 
     <!-- 页面脚本 -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/weather.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
     <script>
         // Logout button handler
@@ -1069,30 +1316,73 @@
             
             // 更新天气信息
             function updateWeather() {
-                // 模拟天气数据
+                // 使用真实API获取天气数据
+                fetch(APP_CONFIG.API.BASE_URL + APP_CONFIG.API.ENDPOINTS.WEATHER)
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success && result.data) {
+                            const weatherData = result.data;
+                            
+                            // 根据天气类型设置图标
+                            const weatherIcons = {
+                                '晴': '☀️',
+                                '多云': '⛅',
+                                '阴': '☁️',
+                                '小雨': '🌧️',
+                                '中雨': '🌧️',
+                                '大雨': '🌧️',
+                                '阵雨': '🌦️',
+                                '雷阵雨': '⛈️',
+                                '雷阵雨伴有冰雹': '⛈️❄️',
+                                '雨夹雪': '🌨️',
+                                '小雪': '❄️',
+                                '中雪': '❄️',
+                                '大雪': '❄️',
+                                '暴雪': '❄️',
+                                '雾': '🌫️',
+                                '浮尘': '🌫️',
+                                '扬沙': '🌫️',
+                                '强沙尘暴': '🌫️',
+                                '霾': '🌫️'
+                            };
+                            
+                            // 更新DOM
+                            document.getElementById('weatherTemp').textContent = `${weatherData.temp}℃`;
+                            document.getElementById('weatherDesc').textContent = weatherData.weather || '晴';
+                            document.getElementById('weatherIcon').textContent = weatherIcons[weatherData.weather] || '☀️';
+                            document.getElementById('weatherExtra').textContent = `湿度: ${weatherData.humidity}% | 风力: ${weatherData.wind_power}级`;
+                            
+                            // 每小时更新一次天气（使用配置的间隔时间）
+                            setTimeout(updateWeather, APP_CONFIG.SYSTEM.WEATHER_REFRESH_INTERVAL);
+                        } else {
+                            console.warn('获取天气数据失败，使用备用数据');
+                            useBackupWeather();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('天气数据请求出错:', error);
+                        useBackupWeather();
+                    });
+            }
+            
+            // 当API请求失败时使用备用天气数据
+            function useBackupWeather() {
+                // 备用天气数据
                 const weatherData = {
-                    temp: Math.floor(15 + Math.random() * 10),
-                    desc: ['晴', '多云', '小雨', '阴天'][Math.floor(Math.random() * 4)],
-                    humidity: Math.floor(40 + Math.random() * 40),
-                    windLevel: Math.floor(1 + Math.random() * 5)
-                };
-                
-                // 根据天气类型设置图标
-                const weatherIcons = {
-                    '晴': '☀️',
-                    '多云': '⛅',
-                    '小雨': '🌧️',
-                    '阴天': '☁️'
+                    temp: '22',
+                    desc: '晴',
+                    humidity: '48',
+                    windLevel: '3'
                 };
                 
                 // 更新DOM
                 document.getElementById('weatherTemp').textContent = `${weatherData.temp}℃`;
                 document.getElementById('weatherDesc').textContent = weatherData.desc;
-                document.getElementById('weatherIcon').textContent = weatherIcons[weatherData.desc] || '☀️';
+                document.getElementById('weatherIcon').textContent = '☀️'; // 默认晴天图标
                 document.getElementById('weatherExtra').textContent = `湿度: ${weatherData.humidity}% | 风力: ${weatherData.windLevel}级`;
                 
-                // 每小时更新一次天气
-                setTimeout(updateWeather, 3600000);
+                // 一小时后重试
+                setTimeout(updateWeather, APP_CONFIG.SYSTEM.WEATHER_REFRESH_INTERVAL);
             }
             
             // 历史图片展示相关

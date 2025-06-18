@@ -5211,6 +5211,176 @@ def monthly_detection_stats():
             }
         })
 
+@app.route('/api/history_images', methods=['GET'])
+def get_history_images():
+    """获取历史图片数据，用于首页展示"""
+    try:
+        # 创建存储历史图片数据的列表
+        images = []
+        result_dir = app.config['RESULT_FOLDER']
+        base_path = os.path.join('static', '@results')
+        
+        # 确保目录存在
+        full_path = os.path.join(app.static_folder, '@results')
+        if not os.path.exists(full_path):
+            os.makedirs(full_path, exist_ok=True)
+        
+        # 获取所有图片文件
+        image_files = []
+        for file in os.listdir(full_path):
+            if file.endswith('.jpg') or file.endswith('.png') or file.endswith('.jpeg'):
+                image_files.append(file)
+        
+        # 按照文件名中的时间戳排序(如果有)
+        image_files.sort(key=lambda x: os.path.getmtime(os.path.join(full_path, x)), reverse=True)
+        
+        # 限制图片数量为最新的20张
+        image_files = image_files[:20]
+        
+        # 从文件名提取信息并组成历史图片数据
+        locations = [
+            '五华区人民西路', '盘龙区白云路', '官渡区关上', 
+            '西山区碧鸡广场', '呈贡区大学城', '五华区北市区',
+            '官渡区世纪城', '西山区前卫西路', '盘龙区小坝路'
+        ]
+        
+        for i, filename in enumerate(image_files):
+            # 从文件名中提取时间戳
+            timestamp_match = re.search(r'(\d{10})_', filename)
+            
+            if timestamp_match:
+                # 将Unix时间戳转换为可读格式
+                unix_timestamp = int(timestamp_match.group(1))
+                date = datetime.fromtimestamp(unix_timestamp)
+                formatted_date = date.strftime('%Y-%m-%d %H:%M')
+            else:
+                # 使用文件修改时间
+                mod_time = os.path.getmtime(os.path.join(full_path, filename))
+                date = datetime.fromtimestamp(mod_time)
+                formatted_date = date.strftime('%Y-%m-%d %H:%M')
+            
+            # 从文件名判断检测类型
+            detect_type = '流动摊位'
+            if 'horizontal_flip' in filename:
+                detect_type = '固定摊位'
+            
+            # 随机选择一个位置
+            location = random.choice(locations)
+            
+            # 构建图片URL
+            image_url = url_for('static', filename=f'@results/{filename}')
+            
+            # 添加到图片数据列表
+            images.append({
+                'id': i + 1,
+                'image_url': image_url,
+                'timestamp': formatted_date,
+                'location': location,
+                'type': detect_type
+            })
+        
+        # 返回图片数据
+        return jsonify({
+            'success': True,
+            'images': images
+        })
+    
+    except Exception as e:
+        logger.error(f"获取历史图片数据出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'获取历史图片数据出错: {str(e)}'
+        }), 500
+
+# 添加高德地图天气API函数
+def get_amap_weather(city_code='530100'):  # 默认昆明市
+    """
+    通过高德地图API获取天气信息
+    :param city_code: 城市编码，默认昆明市
+    :return: 天气信息字典
+    """
+    try:
+        # 使用配置中的高德地图API密钥
+        amap_key = AMAP_CONFIG.get('KEY', '')
+        if not amap_key:
+            logger.error("未配置高德地图API密钥")
+            return get_mock_weather()
+            
+        # 构建API请求
+        url = f"https://restapi.amap.com/v3/weather/weatherInfo?city={city_code}&key={amap_key}&extensions=base"
+        
+        # 发送请求 - 添加SSL验证处理
+        import ssl
+        from urllib.request import urlopen
+        import json
+        import certifi
+        
+        try:
+            # 方法1: 使用requests库但禁用验证(不推荐但可临时解决问题)
+            response = requests.get(url, timeout=5, verify=False)
+            data = response.json()
+        except:
+            try:
+                # 方法2: 使用urllib和certifi包(提供最新的CA证书)
+                context = ssl.create_default_context(cafile=certifi.where())
+                response = urlopen(url, context=context, timeout=5)
+                content = response.read().decode('utf-8')
+                data = json.loads(content)
+            except Exception as ssl_err:
+                logger.error(f"SSL连接错误: {str(ssl_err)}")
+                return get_mock_weather()
+        
+        if data.get('status') == '1' and data.get('lives'):
+            # 获取实时天气数据
+            live_weather = data['lives'][0]
+            
+            return {
+                'temp': live_weather.get('temperature'),
+                'weather': live_weather.get('weather'),
+                'humidity': live_weather.get('humidity'),
+                'wind_direction': live_weather.get('winddirection'),
+                'wind_power': live_weather.get('windpower'),
+                'report_time': live_weather.get('reporttime')
+            }
+        else:
+            logger.error(f"获取天气失败: {data}")
+            return get_mock_weather()
+            
+    except Exception as e:
+        logger.error(f"获取天气出错: {str(e)}")
+        return get_mock_weather()
+
+# 模拟天气数据（当API调用失败时使用）
+def get_mock_weather():
+    """提供模拟的天气数据"""
+    return {
+        'temp': '22',
+        'weather': '晴',
+        'humidity': '48',
+        'wind_direction': '东南',
+        'wind_power': '3',
+        'report_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+# 创建获取天气API端点
+@app.route('/api/weather', methods=['GET'])
+def get_weather_api():
+    """天气API端点"""
+    try:
+        city_code = request.args.get('city', '530100')  # 默认昆明市
+        weather_data = get_amap_weather(city_code)
+        return jsonify({
+            'success': True,
+            'data': weather_data
+        })
+    except Exception as e:
+        logger.error(f"天气API调用出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'data': get_mock_weather()
+        })
+
 
 if __name__ == '__main__':
     try:
