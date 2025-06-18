@@ -1,319 +1,273 @@
-# 灵瞳YOLOv8-DeepSeek多模态街景治理实时检测平台
+<div align="center">
+  <img src="assets/logo/Creative PromptX Duck Logo 4.svg" alt="PromptX Logo" width="120" height="120"/>
+  <h1>PromptX · AI应用原生专业能力增强系统</h1>
+  <p>通过MCP协议为AI应用提供专业角色、记忆管理和知识体系，一行命令，让任何 AI 客户端秒变专业选手。</p>
 
-##  项目简介
-- 本研究针对城市占道经营的实时检测与决策支持需求，提出"灵瞳—YOLOv8-DeepSeek"多模态监测平台。
-- 平台基于YOLOv8n模型实现93% mAP@0.5和平衡速度166.7 FPS的实时检测，并集成DeepSeek-R1大语言模型提供智能问答及辅助决策。
-- 采用Ollama框架与混合精度量化技术实现隐私安全的边缘部署（响应延迟≤287ms），昆明试点验证平台有效提升治理效率，具备良好扩展性。
+  <!-- Badges -->
+  <p>
+    <a href=" "><img src="https://img.shields.io/github/stars/Deepractice/PromptX?style=social" alt="Stars"/></a>
+    <a href="https://www.npmjs.com/package/dpml-prompt"><img src="https://img.shields.io/npm/v/dpml-prompt?color=orange&logo=npm" alt="npm version"/></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/Deepractice/PromptX?color=blue" alt="License"/></a>
+    <a href="https://github.com/Deepractice/PromptX/actions"><img src="https://img.shields.io/github/actions/workflow/status/Deepractice/PromptX/ci.yml?label=CI&logo=github" alt="CI Status"/></a>
+  </p>
 
-## 主要功能
-- 📷 实时图像/视频检测
-- 📊 数据统计与分析
-- 📝 历史记录管理
-- 🗺️ 地理位置展示
-- 👥 用户权限管理
-- 📈 可视化数据展示
-- 🤖 DeepSeek智能问答助手
+  <p>
+    <strong><a href="README.md">中文</a></strong> | 
+    <a href="README_EN.md">English</a> | 
+    <a href="https://github.com/Deepractice/PromptX/issues">Issues</a>
+  </p>
+</div>
 
-## 系统架构
+---
 
-### 整体架构
-本系统采用前后端分离架构，主要包含以下几个核心模块：
-- 检测引擎：基于YOLOv8的目标检测模块
-- Web服务：基于Flask的后端服务
-- 数据存储：MySQL数据库
-- 智能助手：基于DeepSeek-R1的多模态决策支持引擎
+### ✨ **一眼看懂 PromptX**
 
-### 技术栈
-- 后端：Flask
-- 前端：HTML5 + CSS3 + JavaScript
-- 数据库：MySQL
-- 深度学习：YOLOv8
-- 图像处理：OpenCV
-- 大语言模型：DeepSeek-R1-32B
+PromptX 能做什么？简单来说，它让你的 AI 助手拥有了"大脑"和"记忆"，更让你成为AI能力的创造者。
 
-### 目录结构
-```
-├── app.py              # 主应用程序
-├── config.py           # 配置文件
-├── requirements.txt    # 依赖包列表
-├── static/            # 静态文件目录
-│   ├── css/          # CSS样式文件
-│   ├── js/           # JavaScript文件
-│   ├── images/       # 图片资源
-│   └── uploads/      # 上传文件目录
-├── templates/         # HTML模板文件
-├── models/           # 模型文件目录
-└── util/             # 工具函数目录
-```
+- **🎭 专业角色扮演**: 提供覆盖不同领域的专家角色，让 AI 的回答更专业、更深入。
+- **🧠 长期记忆与知识库**: AI能够记住关键信息和你的偏好，在持续的对话和工作中提供连贯、个性化的支持。
+- **✨ AI角色创造工坊**: **2分钟内**将你的想法变成专业AI助手，从使用者到创造者的华丽转身。
+- **🔌 轻松集成**: 只需一行命令，即可为数十种主流 AI 应用（如 Claude、Cursor）无缝启用这些强大功能。
 
-## 系统要求
-- Python 3.8+
-- MySQL 5.7+
-- CUDA支持（推荐用于GPU加速）
+<br/>
 
-## 安装步骤
+### 📸 **配置成功后的使用效果**
 
-1. 克隆项目到本地
-```bash
-git clone [项目地址]
-cd [项目目录]
-```
+#### **1. 发现并激活专业角色**
+*使用 `promptx_hello` 发现可用角色，再用 `promptx_action` 激活，AI即刻变身领域专家。*
+<img src="assets/role-discovery.png" alt="角色发现与激活" width="80%">
 
-2. 创建并激活虚拟环境（推荐）
-```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-```
+#### **2. 拥有智能记忆**
+*使用 `promptx_remember` 保存关键信息，AI将在后续的交流中主动运用这些知识。*
+<img src="assets/remember.png" alt="记忆功能" width="80%">
 
-3. 安装依赖包
-```bash
-pip install -r requirements.txt
-```
+---
 
-4. 配置数据库
-- 创建MySQL数据库
-- 修改配置文件中的数据库连接信息
+## ⚠️ **项目状态说明**
 
-5. 初始化系统
-```bash
-python app.py
-```
+PromptX 目前处于 **初始开发阶段**，我们正在积极完善功能和修复问题。在达到正式稳定版本之前，您可能会遇到一些使用上的问题或不稳定情况。
 
-## 使用说明
+**我们诚恳地请求您的理解和支持！** 🙏
 
-### 系统登录
-- 默认管理员账号：admin
-- 默认密码：admin
+### 📞 **遇到问题？获取帮助！**
 
-### 主要功能模块
-1. **实时检测**
-   - 支持图片上传检测
-   - 支持视频文件检测
-   - 支持实时视频流检测
+如果您在使用过程中遇到任何问题，请通过以下方式联系我们：
 
-2. **数据分析**
-   - 检测趋势分析
-   - 类型分布统计
-   - 置信度分析
+- 🐛 **提交 Issue**: [GitHub Issues](https://github.com/Deepractice/PromptX/issues) - 详细描述问题，我们会尽快回复
+- 💬 **直接联系**: 添加开发者微信 `deepracticex` 获取即时帮助
+- 📧 **邮件联系**: 发送邮件至 `sean@deepracticex.com` 获取技术支持
+- 📱 **技术交流群**: 扫描下方二维码加入我们的技术交流群
 
-3. **历史记录**
-   - 检测结果查询
-   - 结果图片/视频查看
-   - 数据导出功能
+您的反馈对我们非常宝贵，帮助我们快速改进产品质量！ ✨
 
-4. **智能助手系统**
-   - 城市管理法规解读
-   - 占道经营分类标准
-   - 治理措施建议
-   - 数据分析解读
-   - 趋势预测与方案比较
+---
 
-5. **系统管理**
-   - 用户管理
-   - 权限配置
-   - 系统设置
+## 🚀 **一键启动，30秒完成配置**
 
-## 智能助手系统
+打开配置文件，将下面的 `promptx` 配置代码复制进去。这是最简单的 **零配置模式**，PromptX 会自动为您处理一切。
 
-### 概述
-智能助手基于DeepSeek-R1大语言模型构建多模态决策支持引擎，采用"感知-认知-决策"三阶段架构，为系统提供智能增强服务。系统深度融合领域知识，提供技术指导、故障诊断、性能优化及数据解读等核心功能，助力用户实现高效系统运维与智能化决策。
-
-不熟悉系统的用户可以通过智能助手了解占道经营定义、相关法律法规、结合系统的实时检测和数据统计功能，帮助相关部门进行智能化、人情化决策。
-
-### 技术架构
-
-系统采用本地部署方案，具体实现如下：
-
-#### 部署方案
-基于Ollama和Dify开源框架构建，核心模型采用deepseek-r1-32b。通过混合精度量化与层间融合技术，实现大模型本地化部署，确保数据隐私与实时响应：
-
-1. **隐私计算保障**
-   - 基于同态加密构建模型数据安全通道
-   - 满足GB/T 35273-2020个人信息安全规范
-
-2. **实时响应优化**
-   - 采用动态批处理与流式推理技术
-   - 实现平均响应延迟≤287ms
-
-#### 知识增强机制
-通过三级知识增强机制提升模型能力：
-
-1. **结构化知识嵌入**
-   - 构建街景治理知识图谱
-   - 采用TransR算法实现知识向量化
-
-2. **非结构化数据增强**
-   - 基于RAG架构构建检索系统
-   - 对历史案例数据建立向量索引库
-
-3. **对齐强化训练**
-   - 采用DPO方法进行指令微调
-   - 提升模型与业务需求的语义对齐度
-
-#### 部署教程链接
-- Dify与Ollama本地部署详见： [知乎专栏教程](https://zhuanlan.zhihu.com/p/28744712219)
-
-#### 对话智能体创建
-使用Dify控制台或Ollama CLI创建对话型智能体：
-1. 登录Dify控制台或启动Ollama环境
-2. 选择模型 `DeepSeek-R1-32B`
-3. 定义对话意图、槽位和示例对话
-4. 完成部署并获取 `agent_id` 与 `api_token`
-
-#### 智能体API接入
-1. 在 `config.py` 中配置：
-```python
-AGENT_API_URL = "http://localhost:3000/api/agent/{agent_id}/chat"
-AGENT_API_TOKEN = "your_api_token_here"
-```
-2. 在 `templates/chat_ai.html` 中调用：
-```html
-<script>
-async function sendMessage(msg) {
-  const res = await fetch(AGENT_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${AGENT_API_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ message: msg })
-  });
-  const data = await res.json();
-  appendChat(data.reply);
+```json
+{
+  "mcpServers": {
+    "promptx": {
+      "command": "node",
+      "args": ["D:\\software\\desk\\PromptX-main\\src\\bin\\promptx.js", "mcp-server"]
+    }
+  }
 }
-</script>
 ```
 
-## 低内存环境部署指南
+**🎯 就这么简单！** 保存文件并重启您的AI应用，PromptX 就已成功激活。
 
-适用于2核心2G内存服务器的优化部署方案。
+> **💡 提示：** 配置中特意指定了官方镜像源 `registry.npmjs.org`，这可以避免因使用非官方镜像导致的安装问题。如果您发现安装很慢，建议使用代理工具加速，而不是切换到其他镜像源。
 
-### 系统要求
-- CPU: 2核心
-- 内存: 2GB
-- 操作系统: Linux (推荐Ubuntu 18.04或更高版本)
+### 🌐 **高级配置：HTTP 模式支持**
 
-### 快速部署
+除了上述本地模式外，PromptX 还支持 **HTTP 模式**，适用于远程部署或特殊网络环境：
+
 ```bash
-# 克隆代码仓库
-git clone <代码仓库URL>
-cd zdjy
-
-# 执行部署脚本
-chmod +x deploy.sh
-./deploy.sh
+# 启动 HTTP 模式服务器
+npx -f -y dpml-prompt@beta mcp-server --transport http --port 3000
 ```
 
-### 性能优化设置
+然后在客户端配置中使用：
+```json
+{
+  "mcpServers": {
+    "promptx": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
 
-1. **内存优化**
-   - 使用全局单例模型实例
-   - 数据库连接池优化
-   - 图像处理优化
-   - 服务器配置优化
-
-2. **自动化运维**
-   - 内存监控自动重启
-   - 日志分级管理
-
-### 模型优化策略
-针对低内存环境的模型优化建议：
-
-1. **模型裁剪**
-   - 使用YOLOv8提供的模型剪枝功能
-
-2. **模型量化**
-   - 将模型量化为INT8，显著减少内存占用
-
-3. **延迟加载**
-   - 需要时才加载模型到内存
-
-## 运维工具
-
-### 自动化运维脚本
-系统提供了一套完整的自动化运维脚本：
-
-1. **部署脚本 (deploy.sh)**
-   - 系统部署与更新
-   - 数据库备份与恢复
-   - 系统健康检查
-
-2. **监控脚本 (monitor.sh)**
-   - 系统资源监控
-   - 服务自动恢复
-
-3. **数据库连接池监控 (db_monitor.sh)**
-   - 检测数据库连接池状态
-   - 必要时重启应用服务
-
-## 注意事项
-1. 首次运行时请确保已正确配置数据库连接信息
-2. 确保系统有足够的存储空间用于保存上传的图片和视频文件
-3. 建议使用支持GPU的环境以获得更好的检测性能
-4. 定期清理uploads目录下的临时文件
-
-## 常见问题
-1. 如遇到数据库连接错误，请检查数据库配置信息
-2. 如遇到模型加载错误，请确认models目录下是否存在模型文件
-3. 上传文件失败时，请检查目录权限和存储空间
+📖 **[完整安装配置指南](https://github.com/Deepractice/PromptX/wiki/PromptX-MCP-Install)** - 包含各种客户端的详细配置方法和故障排除
 
 
+### 不知道MCP是怎么？  [点击查看 MCP幼儿园教程 BiliBili](https://www.bilibili.com/video/BV1HFd6YhErb)
 
+目前所有支持 MCP 协议的 AI 客户端都可以使用 PromptX。主要包括：**Claude Desktop**、**Cursor**、**Windsurf**、**Cline**、**Zed**、**Continue** 等主流 AI 编程工具，以及更多正在接入中的应用。
 
+---
 
-# 数据库连接池监控脚本
+### ⚙️ **工作原理**
 
-## 项目说明
+PromptX 作为您和AI应用之间的"专业能力中间件"，通过标准的 [MCP协议](https://github.com/metacontroller/mcp) 进行通信。
 
-此项目包含用于监控和修复数据库连接池维护线程的脚本。当数据库连接池维护线程停止工作时，脚本会自动检测并执行必要的操作来恢复正常运行。
+```mermaid
+graph TD
+    subgraph "Your AI App (Claude,Cursor,etc.)"
+        A[👨‍💻 User Interaction]
+    end
 
-## 功能特点
+    subgraph "PromptX MCP Server"
+        C{PromptX Engine}
+        D[🎭 Role Library]
+        E[🧠 Memory & Knowledge]
+    end
 
-- 自动检测数据库连接池维护线程状态
-- 当维护线程超过2小时未执行时发出警告
-- 自动尝试重置数据库连接池
-- 必要时重启应用服务
-- 自动清理旧日志文件
-- 详细的日志记录
-- 支持Linux和Windows系统
+    A -- "Calls 'promptx_...' tools" --> B(MCP Protocol)
+    B --> C
+    C -- "Accesses" --> D
+    C -- "Accesses" --> E
 
-## 脚本文件
+    subgraph "Enhanced Response"
+        F[✨ Professional Output]
+    end
+    C --> F
+```
 
-- `db_monitor.sh` - Linux/Unix系统的Bash脚本
-- `db_monitor.bat` - Windows系统的批处理脚本
+当您调用 `promptx_...` 系列工具时，AI应用会将请求通过MCP协议发送给 PromptX。PromptX 引擎会加载相应的专业角色、检索相关记忆，然后返回一个经过专业能力增强的结果给AI应用，最终呈现给您。
 
-## 使用方法
+---
 
-### Linux/Unix系统
+**🎯 配置完成后，您的AI应用将自动获得6个专业工具：**
+- `promptx_init`: 🏗️ **系统初始化** - 自动准备工作环境。
+- `promptx_hello`: 👋 **角色发现** - 浏览所有可用的专家角色。
+- `promptx_action`: ⚡ **角色激活** - 一键变身指定领域的专家。**（含女娲🎨角色创造顾问）**
+- `promptx_learn`: 📚 **知识学习** - 让AI学习特定的知识或技能。
+- `promptx_recall`: 🔍 **记忆检索** - 从记忆库中查找历史信息。
+- `promptx_remember`: 💾 **经验保存** - 将重要信息存入长期记忆。
 
-1. 确保脚本具有执行权限：
-   ```bash
-   chmod +x db_monitor.sh
-   ```
+📖 **[查看完整MCP集成指南](docs/mcp-integration-guide.md)**
 
-2. 手动执行脚本：
-   ```bash
-   ./db_monitor.sh
-   ```
+---
 
-3. 添加到crontab定期执行（每10分钟）：
-   ```bash
-   crontab -e
-   ```
-   添加以下行：
-   ```
-   */10 * * * * /路径/到/db_monitor.sh >> /dev/null 2>&1
-   ```
+## 🎨 **女娲创造工坊 - 让每个人都成为AI角色设计师**
 
-### Windows系统
+<div align="center">
+  <img src="assets/nuwa-logo.png" alt="女娲创造工坊" width="120" style="border-radius: 50%; margin: 15px 0 25px 0;">
+</div>
 
-1. 手动执行脚本：
-   - 双击`db_monitor.bat`文件，或
-   
+#### **💫 从想法到现实，只需2分钟**
 
-## 联系方式
-如有任何问题或建议，请联系系统管理员。
-   
+你有没有想过：如果我能为特定工作场景定制一个专业AI助手会怎样？**女娲让这个想法变成现实。**
+
+> *"每个想法都值得拥有专属的AI助手，技术的门槛不应该限制创意的飞翔。"*
+
+#### **🎯 核心价值转换**
+
+- **🚀 零门槛创造**: 无需学习复杂技术，用自然语言描述需求即可
+- **⚡ 极速交付**: 从想法到可用角色，全程2分钟
+- **🎭 专业品质**: 自动生成符合DPML标准的专业AI角色
+- **🔄 即插即用**: 创建完成立即可以激活使用
+- **💝 掌控感**: 从使用者到创造者的华丽转身
+
+#### **✨ 使用场景示例**
+
+<div align="center">
+
+| 🎯 **用户需求** | ⚡ **女娲生成** | 🚀 **立即可用** |
+|---|---|---|
+| 👩‍💼 "我需要一个懂小红书营销的AI助手" | 小红书营销专家角色 | `激活小红书营销专家` |
+| 👨‍💻 "我想要一个Python异步编程专家" | Python异步编程导师角色 | `激活Python异步编程导师` |
+| 🎨 "给我一个UI/UX设计顾问" | UI/UX设计专家角色 | `激活UI/UX设计专家` |
+| 📊 "需要一个数据分析师助手" | 数据分析专家角色 | `激活数据分析专家` |
+
+</div>
+
+#### **🎪 体验女娲创造力 - 4步创造专属AI助手**
+
+<div align="center">
+  <div align="center">
+  <img src="assets/nuwa-demo/step1-action-nuwa.jpg" alt="第1步：激活女娲角色创造顾问" width="80%" style="margin: 10px 0;">
+  <img src="assets/nuwa-demo/step2-require-nuwa.jpg" alt="第2步：向女娲描述你的需求" width="80%" style="margin: 10px 0;">
+  <img src="assets/nuwa-demo/step3-modify-requirement.jpg" alt="第3步：女娲理解并完善需求" width="80%" style="margin: 10px 0;">
+  <img src="assets/nuwa-demo/step4-action-bew-role.jpg" alt="第4步：激活新创建的专属角色" width="80%" style="margin: 10px 0;">
+</div>
+</div>
+
+```bash
+# 1️⃣ 激活女娲角色创造顾问
+"我要女娲帮我创建一个角色"
+
+# 2️⃣ 描述你的需求（自然语言即可）
+"我需要一个[领域]的专业助手，主要用于[具体场景]"
+
+# 3️⃣ 等待2分钟，女娲为你生成专业角色
+# 女娲会创建角色文件、注册到系统、完成质量检查
+
+# 4️⃣ 立即激活使用你的专属AI助手
+"激活刚刚创建的角色"
+```
+
+#### **🌟 女娲的设计哲学**
+
+- **🎯 无界创造**: 让任何有想法的人都能创造AI助手，打破技术壁垒
+- **⚡ 即时满足**: 满足数字时代对即时性的需求
+- **🧠 成长引导**: 不只是工具使用，更是引导用户理解AI能力边界
+- **🌱 生态共建**: 每个用户创造的角色都可能成为他人的灵感源泉
+
+---
+
+## 📋 **实践案例: Legacy Lands Library**
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/LegacyLands/legacy-lands-library/main/logo.png" alt="Legacy Lands Library Logo" width="120" style="border-radius: 10px; margin: 15px 0 25px 0;">
+</div>
+
+#### 📖 项目概述
+
+**项目名称：** Legacy Lands Library  
+**项目地址：** https://github.com/LegacyLands/legacy-lands-library  
+**项目简介：** legacy-lands-library 是一个面向现代 Minecraft 服务端插件开发的开发工具库。它旨在为开发者提供一个跨平台、生产就绪的基础设施。
+
+#### 🏢 组织信息
+
+**组织名称：** 遗迹之地制作组 (Legacy Lands)  
+**官方网站：** https://www.legacylands.cn/  
+**组织简介：** 遗迹之地 (Legacy Lands) 是一个专注于构建大型 Minecraft 文明模拟体验的创新团队。参与开源社区，为 Minecraft 服务端插件等领域开发提供优雅、高效且可靠的解决方案。
+
+> #### **💡 核心开发者使用心得**
+> "使用 PromptX 的开发体验真的非常不一样。我们团队基于 Claude Code 并结合 PromptX，**一位开发者仅三天内就完成了超过一万一千行的高质量 Java 代码。**
+>
+> 这套工作流的价值在实际开发中体现得淋漓尽致。PromptX 解决了 AI 使用时的许多痛点，时刻确保代码风格的统一和质量的达标，大大降低了新成员的学习成本。过去那些需要反复沟通、依靠文档传承的最佳实践，现在能够自然而然地融入到每一次代码生成中。"
+
+#### **📚 相关资源**
+
+- **AI集成标准与实践指南：** https://github.com/LegacyLands/legacy-lands-library/blob/main/AI_CODE_STANDARDS_ZHCN.md
+
+---
+
+## ⭐ **Star增长趋势**
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Deepractice/PromptX&type=Date)](https://star-history.com/#Deepractice/PromptX&Date)
+
+---
+
+### **🤝 贡献与交流**
+
+我们欢迎任何形式的贡献和反馈！
+
+- 🌿 **[分支策略](docs/BRANCHING.md)** - 分支管理和发布流程  
+- 🚀 **[发布流程](docs/RELEASE.md)** - 版本管理和发布文档
+
+扫码加入技术交流群：
+
+<img src="assets/qrcode.jpg" alt="技术交流群" width="200">
+
+---
+
+## 📄 **许可证**
+
+[MIT License](LICENSE) - 让AI专业能力触手可及

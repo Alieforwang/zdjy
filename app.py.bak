@@ -5126,91 +5126,18 @@ def clean_sentence_for_tts(text):
     clean_text = re.sub(r'([.,，。!?！？;:；：])\1+', r'\1', clean_text)
     return clean_text.strip()
 
-@app.route('/api/monthly_detection_stats', methods=['GET'])
-def monthly_detection_stats():
-    """
-    获取每月检测数据的API端点
-    返回过去12个月的检测数量数据，按摊位类型分类
-    """
-    try:
-        # 获取当前年份和月份
-        now = datetime.now()
-        current_year = now.year
-        current_month = now.month
-        
-        # 初始化过去12个月的数据结构
-        monthly_data = {
-            "flowing": [0] * 12,  # 流动摊位
-            "fixed": [0] * 12     # 固定摊位
-        }
-        
-        # 连接数据库
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 查询过去12个月的数据
-        for i in range(12):
-            # 计算要查询的月份
-            month = current_month - i
-            year = current_year
-            if month <= 0:
-                month += 12
-                year -= 1
-            
-            # 计算该月的开始和结束时间
-            start_date = f"{year}-{month:02d}-01 00:00:00"
-            
-            # 计算下个月的第一天作为结束时间
-            next_month = month + 1
-            next_year = year
-            if next_month > 12:
-                next_month = 1
-                next_year += 1
-            end_date = f"{next_year}-{next_month:02d}-01 00:00:00"
-            
-            # 查询流动摊位数据
-            cursor.execute("""
-                SELECT COUNT(*) FROM detections 
-                WHERE timestamp >= ? AND timestamp < ? 
-                AND detection_type LIKE '%流动%'
-            """, (start_date, end_date))
-            flowing_count = cursor.fetchone()[0] or 0
-            
-            # 查询固定摊位数据
-            cursor.execute("""
-                SELECT COUNT(*) FROM detections 
-                WHERE timestamp >= ? AND timestamp < ? 
-                AND detection_type LIKE '%固定%'
-            """, (start_date, end_date))
-            fixed_count = cursor.fetchone()[0] or 0
-            
-            # 存储数据（逆序存储，使最新的月份在数组最后）
-            monthly_data["flowing"][11-i] = flowing_count
-            monthly_data["fixed"][11-i] = fixed_count
-        
-        conn.close()
-        
-        # 如果数据库中没有数据，生成模拟数据
-        if sum(monthly_data["flowing"]) == 0 and sum(monthly_data["fixed"]) == 0:
-            monthly_data["flowing"] = [80, 85, 90, 78, 82, 84, 90, 95, 89, 92, 96, 98]
-            monthly_data["fixed"] = [45, 52, 60, 65, 58, 62, 68, 71, 75, 68, 64, 70]
-        
-        return jsonify({
-            "success": True, 
-            "monthlyData": monthly_data
-        })
-        
-    except Exception as e:
-        print(f"获取月度检测数据时出错: {str(e)}")
-        # 返回模拟数据作为后备
-        return jsonify({
-            "success": True,
-            "monthlyData": {
-                "flowing": [80, 85, 90, 78, 82, 84, 90, 95, 89, 92, 96, 98],
-                "fixed": [45, 52, 60, 65, 58, 62, 68, 71, 75, 68, 64, 70]
-            }
-        })
 
+
+
+
+
+
+
+
+
+
+
+    
 
 if __name__ == '__main__':
     try:
