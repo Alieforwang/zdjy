@@ -255,15 +255,14 @@
             background: none;
             border: none;
             color: #3a5998;
-            font-size: 20px;
             cursor: pointer;
             padding: 8px;
-            margin-right: 5px;
             border-radius: 4px;
             transition: background-color 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
+            margin-right: 5px;
         }
         
         .coze-voice-btn:hover {
@@ -275,10 +274,9 @@
             animation: pulse 1.5s infinite;
         }
         
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+        .coze-voice-btn.recording img {
+            filter: hue-rotate(300deg) saturate(3);
+            animation: pulse 1.5s infinite;
         }
         
         .coze-chat-input input::placeholder {
@@ -870,6 +868,12 @@
             font-size: 14px;
             color: #666;
         }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -988,8 +992,10 @@ class CozeChat {
                         </div>
                         <div class="coze-chat-box" id="coze-chat-box"></div>
                         <div class="coze-chat-input">
-                            <button class="coze-voice-btn" id="coze-voice-btn" title="语音输入">🎤</button>
                             <input type="text" id="coze-user-input" placeholder="请输入您的问题..." autocomplete="off">
+                            <button class="coze-voice-btn" id="coze-voice-btn" title="语音输入">
+                                <img src="{{ url_for('static', filename='images/luying.png') }}" alt="录音" style="width: 20px; height: 20px;">
+                            </button>
                             <button id="coze-send-btn">发送</button>
                         </div>
                         
@@ -2063,8 +2069,8 @@ class CozeChat {
             const voiceBtn = document.getElementById('coze-voice-btn');
             if (voiceBtn) {
                 voiceBtn.classList.add('recording');
-                voiceBtn.textContent = '⏺';
                 voiceBtn.title = '点击停止录音';
+                // 不需要修改innerHTML，因为录音状态通过CSS类来控制
             }
             
             this.audioChunks = [];
@@ -2133,7 +2139,7 @@ class CozeChat {
             const voiceBtn = document.getElementById('coze-voice-btn');
             if (voiceBtn) {
                 voiceBtn.classList.remove('recording');
-                voiceBtn.textContent = '🎤';
+                voiceBtn.innerHTML = `<img src="{{ url_for('static', filename='images/luying.png') }}" alt="录音" style="width: 20px; height: 20px;">`;
                 voiceBtn.title = '语音输入';
             }
         }

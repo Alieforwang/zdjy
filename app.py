@@ -5644,9 +5644,9 @@ def get_mock_forecast():
     today = datetime.now()
     weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
     
-    # 生成未来7天的模拟数据
+    # 生成未来4天的模拟数据（包括今天）
     forecasts = []
-    for i in range(0, 7):  # 从今天开始，包括今天
+    for i in range(0, 4):  # 从今天开始，包括今天，共4天
         next_day = today + timedelta(days=i)
         day_of_week = weekdays[next_day.weekday()]
         

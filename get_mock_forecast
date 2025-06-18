@@ -1,0 +1,41 @@
+def get_mock_forecast():
+    """获取模拟的天气预报数据"""
+    today = datetime.now()
+    weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    
+    # 生成未来7天的模拟数据
+    forecasts = []
+    for i in range(0, 7):  # 从今天开始，包括今天
+        next_day = today + timedelta(days=i)
+        day_of_week = weekdays[next_day.weekday()]
+        
+        # 根据日期生成一致的随机天气数据
+        # 使用日期作为随机种子，使得每天的天气预报保持一致
+        seed = int(f"{next_day.year}{next_day.month:02d}{next_day.day:02d}")
+        random.seed(seed)
+        
+        weather_types = ['晴', '多云', '阴', '小雨', '中雨']
+        weather_weights = [0.4, 0.3, 0.1, 0.1, 0.1]  # 权重，使晴天和多云更常见
+        weather_type = random.choices(weather_types, weights=weather_weights)[0]
+        
+        # 生成合理的温度范围
+        base_high = 25  # 基础高温
+        seasonal_var = 5  # 季节变化
+        daily_var = 3    # 日变化
+        
+        # 使用正弦函数模拟季节变化
+        day_of_year = next_day.timetuple().tm_yday
+        seasonal_effect = seasonal_var * math.sin((day_of_year - 80) * 2 * math.pi / 365)
+        
+        high_temp = round(base_high + seasonal_effect + random.uniform(-daily_var, daily_var))
+        low_temp = high_temp - random.randint(5, 10)  # 日夜温差5-10度
+        
+        forecasts.append({
+            'date': f"{next_day.month}/{next_day.day}",
+            'day': day_of_week,
+            'weather': weather_type,
+            'high': str(high_temp),
+            'low': str(low_temp)
+        })
+    
+    return forecasts 

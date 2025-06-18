@@ -1275,10 +1275,10 @@
                 <!-- 左侧时间显示 -->
                 <div class="time-weather-left" style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding-left: 20px;">
                     <div class="time-display" style="border: none; box-shadow: none; background: transparent;">
-                        <div class="time-value" id="currentTime" style="font-family: 'YJSZ', sans-serif; font-size: 64px; color: #7cffb2; text-shadow: 0 0 15px rgba(124, 255, 178, 0.6); line-height: 1.1;">--:--:--</div>
-                        <div class="date-value" id="currentDate" style="font-size: 20px; color: #ffffff; margin: 8px 0;">---- 年 -- 月 -- 日</div>
-                        <div class="week-value" id="currentWeek" style="font-size: 18px; color: #ffffff;">星期-</div>
-                    </div>
+                        <div class="time-value" id="currentTime" style="font-family: 'YJSZ', sans-serif; font-size: 64px; color: #7cffb2; text-shadow: 0 0 15px rgba(124, 255, 178, 0.6); line-height: 1.1; width: 100%; text-align: center; min-width: 280px;">--:--:--</div>
+                        <div class="date-value" id="currentDate" style="font-size: 20px; color: #ffffff; margin: 8px 0; text-align: center;">---- 年 -- 月 -- 日</div>
+                        <div class="week-value" id="currentWeek" style="font-size: 18px; color: #ffffff; text-align: center;">星期-</div>
+                </div>
                 </div>
                 
                 <!-- 中间实时天气详细信息 -->
@@ -1391,7 +1391,7 @@
         <!-- MAP分析图表面板 -->
         <div class="dashboard-panel">
             <div class="panel-header">
-                <h3 class="panel-title">平均精确度(MAP)分析</h3>
+                <h3 class="panel-title">平均精确度分析</h3>
             </div>
             <div class="chart-container" id="mapChart"></div>
         </div>
@@ -1423,11 +1423,12 @@
         </div>
         
 
+        <!-- 天气相关分析图表 -->
         <div class="dashboard-panel">
             <div class="panel-header">
-                <h3 class="panel-title">周边设施关联</h3>
+                <h3 class="panel-title">天气相关分析</h3>
             </div>
-            <div class="chart-container" id="facilityCorrelation"></div>
+            <div class="chart-container" id="weatherCorrelation"></div>
         </div>
     </div>
     
@@ -1517,13 +1518,11 @@
                 const now = new Date();
                 const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
                 
-                // 格式化时间
-                const timeString = now.toLocaleTimeString('zh-CN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                });
+                // 格式化时间，确保每个部分都是两位数
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const timeString = `${hours}:${minutes}:${seconds}`;
                 
                 // 格式化日期
                 const dateString = `${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日`;
@@ -1563,39 +1562,35 @@
                             // 更新天气图标样式
                             updateWeatherIconStyle(weatherData.weather);
                             
-                            // 获取天气预报数据 - 只查询两天
-                            fetch(APP_CONFIG.API.BASE_URL + APP_CONFIG.API.ENDPOINTS.WEATHER_FORECAST + '?days=2')
+                            // 获取天气预报数据 - 只查询4天
+                            fetch(APP_CONFIG.API.BASE_URL + APP_CONFIG.API.ENDPOINTS.WEATHER_FORECAST)
                                 .then(response => response.json())
                                 .then(forecastResult => {
-                                    if (forecastResult.success && forecastResult.data && forecastResult.data.forecasts) {
-                                        const forecasts = forecastResult.data.forecasts.slice(0, 2); // 确保只取前两天
-                                        // 只显示未来两天的预报
-                                        for (let i = 0; i < forecasts.length; i++) {
+                                    if (forecastResult.success && forecastResult.forecast) {
+                                        const forecasts = forecastResult.forecast.slice(0, 4); // 确保只取前4天
+                                        // 显示最多4天的预报
+                                        for (let i = 0; i < Math.min(forecasts.length, 4); i++) {
                                             const forecast = forecasts[i];
                                             const dayElement = document.getElementById(`forecast-date-${i+1}`);
                                             const iconElement = document.getElementById(`forecast-icon-${i+1}`);
                                             const tempElement = document.getElementById(`forecast-temp-${i+1}`);
                                             
                                             if (dayElement && iconElement && tempElement) {
-                                                // 简化日期显示格式为"月/日"
-                                                const dateParts = forecast.date.split('-');
-                                                if (dateParts.length >= 3) {
-                                                    dayElement.textContent = `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`;
-                                                    
-                                                    // 设置星期几
-                                                    const forecastDate = new Date(forecast.date);
-                                                    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-                                                    const weekday = `周${weekdays[forecastDate.getDay()]}`;
-                                                    const dayNameElement = dayElement.previousElementSibling;
-                                                    if (dayNameElement) {
-                                                        dayNameElement.textContent = weekday;
-                                                    }
-                                                } else {
-                                                    dayElement.textContent = forecast.date;
+                                                // 日期显示格式为"月/日"
+                                                dayElement.textContent = forecast.date;
+                                                
+                                                // 设置星期几
+                                                const dayNameElement = dayElement.previousElementSibling;
+                                                if (dayNameElement) {
+                                                    dayNameElement.textContent = forecast.day;
                                                 }
                                                 
-                                                iconElement.innerHTML = `<i class="fas ${getWeatherIconClass(forecast.dayWeather)}"></i>`;
-                                                tempElement.textContent = `${forecast.dayTemp}°/${forecast.nightTemp}°`;
+                                                // 设置天气图标
+                                                const weatherIconClass = getWeatherIconClass(forecast.weather);
+                                                iconElement.innerHTML = `<i class="fas ${weatherIconClass}"></i>`;
+                                                
+                                                // 设置温度
+                                                tempElement.textContent = `${forecast.high}°/${forecast.low}°`;
                                             }
                                         }
                                     }
@@ -1911,16 +1906,17 @@
             // 单独为FPS和MAP图表启动更快的更新频率
             setInterval(() => {
                 try {
-                    // 更频繁地更新FPS仪表盘，模拟实时FPS监测
-                    const fpsGauge = echarts.getInstanceByDom(document.getElementById('fpsGauge'));
-                    if (fpsGauge) {
-                        updateFPSGauge(fpsGauge);
-                    }
+                    // 获取当前时间戳，确保两个图表使用相同的时间
+                    const now = Date.now();
                     
-                    // 更新MAP图表
+                    // 获取图表实例
+                    const fpsGauge = echarts.getInstanceByDom(document.getElementById('fpsGauge'));
                     const mapChart = echarts.getInstanceByDom(document.getElementById('mapChart'));
-                    if (mapChart) {
-                        updateMAPChart(mapChart);
+                    
+                    // 同步更新FPS仪表盘和MAP图表
+                    if (fpsGauge && mapChart) {
+                        updateFPSGauge(fpsGauge, now);
+                        updateMAPChart(mapChart, now);
                     }
                 } catch(e) {
                     console.log('Error updating FPS/MAP in fast interval:', e);
@@ -1929,10 +1925,11 @@
         });
 
         // 更新FPS仪表盘
-        function updateFPSGauge(gauge) {
+        function updateFPSGauge(gauge, timestamp) {
             if (!gauge) return;
             
-            const now = Date.now();
+            // 使用传入的时间戳，如果没有则使用当前时间
+            const now = timestamp || Date.now();
             
             // 如果状态未初始化，创建初始状态
             if (!gauge.fpsState) {
@@ -2003,7 +2000,7 @@
                     }
                     break;
                     
-                default: // idle
+                default:
                     // 空闲状态，FPS在基准值附近轻微波动
                     fps = state.baseValue + (Math.random() * 6 - 3);
                     statusText = '空闲';
@@ -2046,11 +2043,11 @@
         }
         
         // 更新MAP图表
-        function updateMAPChart(chart) {
+        function updateMAPChart(chart, timestamp) {
             if (!chart) return;
             
-            // 获取当前时间
-            const now = new Date();
+            // 使用传入的时间戳，如果没有则使用当前时间
+            const now = timestamp ? new Date(timestamp) : new Date();
             const timeStr = now.getHours() + ':' + 
                 now.getMinutes().toString().padStart(2, '0') + ':' + 
                 now.getSeconds().toString().padStart(2, '0');
@@ -2714,8 +2711,8 @@
             
             // 摊位密度3D图已移除
             
-            // 初始化周边设施关联图
-            initFacilityCorrelation();
+            // 初始化天气相关分析图表
+            initWeatherAnalysis();
             
             // 响应式调整
             window.addEventListener('resize', () => {
@@ -2727,7 +2724,7 @@
                     // 确保所有图表都能响应窗口变化
                     const chartIds = [
                         'realTimeMonitor', 'multiDimensionalAnalysis', 'monthlyDetection', 
-                        'typeRatio', 'facilityCorrelation'
+                        'typeRatio', 'weatherCorrelation'
                     ];
                     
                     chartIds.forEach(id => {
@@ -2914,7 +2911,7 @@
                     trigger: 'axis',
                     formatter: function(params) {
                         const map = params[0].value;
-                        return `时间: ${params[0].name}<br/>MAP: ${map}%`;
+                        return `时间: ${params[0].name}<br/>平均精确率: ${map}%`;
                     },
                     backgroundColor: 'rgba(0,42,84,0.8)',
                     borderColor: 'rgba(255,255,255,0.2)'
@@ -2941,7 +2938,12 @@
                 },
                 yAxis: {
                     type: 'value',
-                    name: 'MAP(%)',
+                    name: '平均精确率(%)',
+                    nameTextStyle: {
+                        color: '#fff',
+                        fontSize: 10,
+                        padding: [0, 0, 0, -10]
+                    },
                     min: 40,
                     max: 100,
                     interval: 10,
@@ -2949,11 +2951,6 @@
                         color: '#fff',
                         fontSize: 10,
                         formatter: '{value}%'
-                    },
-                    nameTextStyle: {
-                        color: '#fff',
-                        fontSize: 10,
-                        padding: [0, 0, 0, -10]
                     },
                     splitLine: {
                         lineStyle: { 
@@ -3018,83 +3015,274 @@
 
 
         
-        // 更新周边设施关联图
-        function initFacilityCorrelation() {
-            const chart = echarts.init(document.getElementById('facilityCorrelation'));
-            const nodes = [];
-            const links = [];
-            const categories = ['占道经营', '商圈', '学校', '地铁站', '市场'];
+        // 更新天气相关分析图表
+        function initWeatherAnalysis() {
+            // 使用ECharts库创建图表实例
+            const chart = echarts.init(document.getElementById('weatherCorrelation'));
             
-            // 生成节点
-            categories.forEach((cat, idx) => {
-                nodes.push({
-                    name: cat,
-                    symbolSize: 40,
-                    category: idx
-                });
-                
-                // 生成关联
-                if (idx > 0) {
-                    links.push({
-                        source: cat,
-                        target: '占道经营',
-                        value: Math.random() * 100
-                    });
-                }
-            });
+            // 设置加载状态，提供良好的用户体验
+            chart.showLoading();
             
-            // 设置图表选项
-            chart.setOption({
-                title: {
-                    textStyle: { color: '#fff' }
-                },
-                tooltip: {},
-                legend: [{
-                    data: categories.map(function (a) {
-                        return a;
-                    }),
-                    textStyle: { color: '#fff' },
-                    bottom: 0,
-                    itemWidth: 10,
-                    itemHeight: 10
-                }],
-                animationDurationUpdate: 1500,
-                animationEasingUpdate: 'quinticInOut',
-                series: [{
-                    type: 'graph',
-                    layout: 'circular',
-                    data: nodes,
-                    links: links,
-                    categories: categories.map(function (a) {
-                        return {
-                            name: a
+            // 从市场时段分布API获取基础数据
+            fetch('/api/market_period_distribution')
+                .then(response => response.json())
+                .then(marketData => {
+                    if (marketData.success && marketData.data && marketData.data.data) {
+                        const marketPeriods = marketData.data.data;
+                        let totalFixed = 0;
+                        let totalMobile = 0;
+                        marketPeriods.forEach(period => {
+                            totalFixed += period.zdjy_gd || 0;
+                            totalMobile += period.zdjy_ld || 0;
+                        });
+                        const weatherTypes = ['晴天', '多云', '阴天', '小雨', '大雨'];
+                        const weatherFactors = {
+                            '晴天': { fixed: 1.0, mobile: 1.0 },
+                            '多云': { fixed: 0.95, mobile: 0.9 },
+                            '阴天': { fixed: 0.85, mobile: 0.7 },
+                            '小雨': { fixed: 0.6, mobile: 0.4 },
+                            '大雨': { fixed: 0.3, mobile: 0.15 }
                         };
-                    }),
-                    roam: true,
-                    label: {
-                        show: true,
-                        position: 'right',
-                        color: '#fff',
-                        fontSize: 10
-                    },
-                    lineStyle: {
-                        color: 'source',
-                        curveness: 0.3,
-                        width: 1
-                    },
-                    force: {
-                        repulsion: 80,
-                        gravity: 0.1,
-                        edgeLength: 60
+                        const fixedData = [];
+                        const mobileData = [];
+                        const trendData = [];
+                        let lastTotal = null;
+                        weatherTypes.forEach(weather => {
+                            const factor = weatherFactors[weather];
+                            const randomVariation = (min, max) => Math.random() * (max - min) + min;
+                            const fixedCount = Math.round(totalFixed * factor.fixed * randomVariation(0.95, 1.05));
+                            const mobileCount = Math.round(totalMobile * factor.mobile * randomVariation(0.9, 1.1));
+                            fixedData.push(fixedCount);
+                            mobileData.push(mobileCount);
+                            const total = fixedCount + mobileCount;
+                            // 趋势为总数的变化率（与前一项对比），首项为0
+                            if (lastTotal === null) {
+                                trendData.push(0);
+                    } else {
+                                trendData.push(Number(((total - lastTotal) / lastTotal * 100).toFixed(1)));
+                            }
+                            lastTotal = total;
+                        });
+            chart.setOption({
+                tooltip: {
+                    trigger: 'axis',
+                                axisPointer: { type: 'shadow' },
+                    backgroundColor: 'rgba(0,21,41,0.8)',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                                textStyle: { color: '#fff' }
+                },
+                legend: {
+                                data: ['固定摊位', '流动摊位', '趋势'],
+                                textStyle: { color: '#fff', fontSize: 12 },
+                    top: 10,
+                    right: 10
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '25%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: weatherTypes,
+                                axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                                axisLabel: { color: '#fff', fontSize: 12 }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '摊位数量',
+                                    nameTextStyle: { color: '#fff', fontSize: 12, padding: [0, 0, 0, -30] },
+                                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+                                    axisLabel: { color: '#fff', fontSize: 12 }
+                                },
+                                {
+                                    type: 'value',
+                                    name: '趋势(%)',
+                                    nameTextStyle: { color: '#fddd60', fontSize: 12, padding: [0, 0, 0, 30] },
+                                    position: 'right',
+                                    axisLine: { lineStyle: { color: '#fddd60' } },
+                                    splitLine: { show: false },
+                                    axisLabel: { color: '#fddd60', fontSize: 12, formatter: '{value}%' }
+                                }
+                            ],
+                            series: [
+                                {
+                                    name: '固定摊位',
+                                    type: 'bar',
+                                    data: fixedData,
+                                    barGap: 0,
+                                    label: { show: true, position: 'top', color: '#7cffb2' },
+                                    itemStyle: {
+                                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                            {offset: 0, color: '#7cffb2'},
+                                            {offset: 1, color: '#18ab55'}
+                                        ]),
+                                        borderRadius: [4, 4, 0, 0]
+                                    }
+                                },
+                                {
+                                    name: '流动摊位',
+                                    type: 'bar',
+                                    data: mobileData,
+                                    label: { show: true, position: 'top', color: '#58D5FF' },
+                                    itemStyle: {
+                                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                            {offset: 0, color: '#58D5FF'},
+                                            {offset: 1, color: '#2378f7'}
+                                        ]),
+                                        borderRadius: [4, 4, 0, 0]
+                                    }
+                                },
+                                {
+                                    name: '趋势',
+                                    type: 'line',
+                                    yAxisIndex: 1,
+                                    data: trendData,
+                                    smooth: true,
+                                    symbol: 'circle',
+                                    symbolSize: 8,
+                                    lineStyle: {
+                                        width: 3,
+                                        color: '#fddd60',
+                                        shadowColor: 'rgba(253, 221, 96, 0.5)',
+                                        shadowBlur: 10
+                                    },
+                                    itemStyle: {
+                                        color: '#fddd60',
+                                        borderColor: '#fff',
+                                        borderWidth: 2
+                                    },
+                                    label: { show: true, position: 'top', color: '#fddd60', formatter: '{c}%' },
+                                    z: 10
+                                }
+                            ]
+                        });
+                    } else {
+                        useDefaultWeatherData(chart);
                     }
-                }]
-            });
-            
+                    chart.hideLoading();
+                })
+                .catch(error => {
+                    useDefaultWeatherData(chart);
+                    chart.hideLoading();
+                });
             setTimeout(() => chart.resize(), 100);
         }
 
-        // 更新函数实现
-        // 月度检测数据的更新函数已在initMonthlyDetection中定义
+        // 使用默认数据的辅助函数
+        function useDefaultWeatherData(chart) {
+            const weatherTypes = ['晴天', '多云', '阴天', '小雨', '大雨'];
+            const fixedData = [85, 78, 65, 42, 25];
+            const mobileData = [120, 135, 95, 65, 30];
+            const trendData = [0];
+            for (let i = 1; i < weatherTypes.length; i++) {
+                const last = fixedData[i-1] + mobileData[i-1];
+                const curr = fixedData[i] + mobileData[i];
+                trendData.push(Number(((curr - last) / last * 100).toFixed(1)));
+            }
+            chart.setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    backgroundColor: 'rgba(0,21,41,0.8)',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    textStyle: { color: '#fff' }
+                },
+                legend: {
+                    data: ['固定摊位', '流动摊位', '趋势'],
+                    textStyle: { color: '#fff', fontSize: 12 },
+                    top: 10,
+                    right: 10
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '25%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: weatherTypes,
+                    axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                    axisLabel: { color: '#fff', fontSize: 12 }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '摊位数量',
+                        nameTextStyle: { color: '#fff', fontSize: 12, padding: [0, 0, 0, -30] },
+                        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.3)' } },
+                        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.1)', type: 'dashed' } },
+                        axisLabel: { color: '#fff', fontSize: 12 }
+                    },
+                    {
+                        type: 'value',
+                        name: '趋势(%)',
+                        nameTextStyle: { color: '#fddd60', fontSize: 12, padding: [0, 0, 0, 30] },
+                        position: 'right',
+                        axisLine: { lineStyle: { color: '#fddd60' } },
+                        splitLine: { show: false },
+                        axisLabel: { color: '#fddd60', fontSize: 12, formatter: '{value}%' }
+                    }
+                ],
+                series: [
+                    {
+                        name: '固定摊位',
+                        type: 'bar',
+                        data: fixedData,
+                        barGap: 0,
+                        label: { show: true, position: 'top', color: '#7cffb2' },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {offset: 0, color: '#7cffb2'},
+                                {offset: 1, color: '#18ab55'}
+                            ]),
+                            borderRadius: [4, 4, 0, 0]
+                        }
+                    },
+                    {
+                        name: '流动摊位',
+                        type: 'bar',
+                        data: mobileData,
+                        label: { show: true, position: 'top', color: '#58D5FF' },
+                        itemStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                {offset: 0, color: '#58D5FF'},
+                                {offset: 1, color: '#2378f7'}
+                            ]),
+                            borderRadius: [4, 4, 0, 0]
+                        }
+                    },
+                    {
+                        name: '趋势',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: trendData,
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 8,
+                        lineStyle: {
+                            width: 3,
+                            color: '#fddd60',
+                            shadowColor: 'rgba(253, 221, 96, 0.5)',
+                            shadowBlur: 10
+                        },
+                        itemStyle: {
+                            color: '#fddd60',
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        },
+                        label: { show: true, position: 'top', color: '#fddd60', formatter: '{c}%' },
+                        z: 10
+                    }
+                ]
+            });
+        }
 
 
 
@@ -3219,7 +3407,7 @@
                                         updateTypeRatio([totalLd, totalGd]);
                                     } else {
                                         // 如果API调用失败，使用默认数据
-                                        updateMultiDimensionalAnalysis(window.realData.typeDistribution);
+                            updateMultiDimensionalAnalysis(window.realData.typeDistribution);
                                     }
                                 })
                                 .catch(e => {
@@ -3287,14 +3475,14 @@
                             console.log('Error updating MAP chart:', e);
                         }
                         
-                        
+
                         
                         try {
                             if (typeof updateFacilityCorrelation === 'function') {
-                                updateFacilityCorrelation(window.realData.areaData);
+                                updateWeatherAnalysis(window.realData.areaData);
                             }
                         } catch(e) {
-                            console.log('Error updating facility correlation:', e);
+                            console.log('Error updating weather analysis:', e);
                         }
                     } else {
                         console.error('Failed to get real stats:', data.message);
@@ -3365,39 +3553,29 @@
             
             // 月度检测数据有自己的更新机制，使用API请求，这里可以移除
             
-            
-            
             try {
-                // 更新FPS仪表盘
+                // 获取当前时间戳，确保两个图表使用相同的时间
+                const now = Date.now();
+                
+                // 更新FPS仪表盘和MAP图表，使用相同的时间戳
                 const fpsGauge = echarts.getInstanceByDom(document.getElementById('fpsGauge'));
-                if (fpsGauge) {
-                    updateFPSGauge(fpsGauge);
-                }
-            } catch(e) {
-                console.log('Error updating FPS gauge:', e);
-            }
-            
-            try {
-                // 更新MAP图表
                 const mapChart = echarts.getInstanceByDom(document.getElementById('mapChart'));
-                if (mapChart) {
-                    updateMAPChart(mapChart);
+                
+                if (fpsGauge && mapChart) {
+                    updateFPSGauge(fpsGauge, now);
+                    updateMAPChart(mapChart, now);
                 }
             } catch(e) {
-                console.log('Error updating MAP chart:', e);
+                console.log('Error updating FPS/MAP charts:', e);
             }
-            
-            
             
             try {
                 if (typeof updateFacilityCorrelation === 'function') {
-                    updateFacilityCorrelation(newData.areaData);
+                    updateWeatherAnalysis(newData.areaData);
                 }
             } catch(e) {
-                console.log('Error updating facility correlation:', e);
+                console.log('Error updating weather analysis:', e);
             }
-            
-
         }
     </script>
 

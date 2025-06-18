@@ -133,9 +133,9 @@ function useMockForecastData() {
   // 生成未来三天的日期和星期
   const forecasts = [];
   
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 0; i < 3; i++) {
     const date = new Date();
-    date.setDate(today.getDate() + i);
+    date.setDate(today.getDate() + i + 1); // 从明天开始，共3天
     const dayOfWeek = days[date.getDay()];
     
     // 生成随机天气数据
@@ -273,8 +273,8 @@ function updateForecastUI(forecasts) {
     // 清空现有内容
     forecastContainer.innerHTML = '';
     
-    // 最多显示7天预报
-    const displayCount = Math.min(7, forecasts.length);
+    // 最多显示4天预报
+    const displayCount = Math.min(4, forecasts.length);
     
     for (let i = 0; i < displayCount; i++) {
       const forecast = forecasts[i];
