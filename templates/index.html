@@ -33,6 +33,12 @@
             font-family: 'ZIT';
             src: url("{{ url_for('static', filename='zit/biaot.ttf') }}") format('truetype');
         }
+
+        @font-face {
+            font-family: 'YJSZ';
+            src: url("{{ url_for('static', filename='zit/yjsz.TTF') }}") format('truetype');
+        }
+
         body {
             background-color: #002a54;
             color: white;
@@ -99,32 +105,26 @@
         /* 时间和天气容器样式 */
         .time-weather-container {
             grid-column: span 2;
-            grid-row: 1;  /* 只占据第一行 */
+            grid-row: 1;
             position: relative;
-            margin-right: 5px; /* 添加右侧外边距 */
+            margin-right: 5px;
+            background: transparent; /* 透明背景 */
+            border: none; /* 移除边框 */
+            box-shadow: none; /* 移除阴影 */
         }
         .time-weather-wrapper {
             display: flex;
-            flex-direction: row;
             height: 100%;
             width: 100%;
-            align-items: center;
+            align-items: stretch;
             justify-content: space-between;
-            padding: 10px;
             position: relative;
+            background: transparent;
+            padding: 10px;
         }
         
         .time-weather-wrapper::before {
-            content: '';
-            position: absolute;
-            top: 5px;
-            left: 5px;
-            right: 5px;
-            bottom: 5px;
-            border-radius: 10px;
-            background: linear-gradient(145deg, rgba(124, 255, 178, 0.05), rgba(88, 213, 255, 0.05));
-            z-index: -1;
-            pointer-events: none;
+            display: none; /* 隐藏伪元素 */
         }
         
         /* 添加天气组件样式 - 优化版 */
@@ -132,18 +132,16 @@
             display: flex;
             align-items: center;
             padding: 12px;
-            background: linear-gradient(145deg, rgba(0, 84, 166, 0.3), rgba(0, 42, 84, 0.4));
+            background: transparent; /* 透明背景 */
             border-radius: 12px;
-            box-shadow: 0 0 15px rgba(0, 150, 255, 0.3);
-            border: 1px solid rgba(88, 213, 255, 0.3);
+            border: none;
+            box-shadow: none; /* 移除阴影 */
             transition: all 0.3s ease;
             width: 100%;
             max-width: 340px;
         }
         
         .weather-container:hover {
-            box-shadow: 0 0 20px rgba(124, 255, 178, 0.4);
-            border-color: rgba(124, 255, 178, 0.4);
             transform: translateY(-2px);
         }
         
@@ -160,7 +158,7 @@
             justify-content: center;
             background: rgba(0, 21, 41, 0.4);
             border-radius: 50%;
-            border: 2px solid rgba(88, 213, 255, 0.4);
+            border: none; /* 移除边框 */
             padding: 10px;
         }
         
@@ -181,6 +179,89 @@
             0% { transform: scale(1); opacity: 0.7; }
             50% { transform: scale(1.1); opacity: 0.3; }
             100% { transform: scale(1); opacity: 0.7; }
+        }
+        
+        /* 天气特效样式 */
+        .weather-sunny .fas {
+            color: #ffb258;
+            text-shadow: 0 0 20px rgba(255, 178, 88, 0.8);
+            animation: sunny-pulse 3s infinite alternate;
+        }
+        
+        .weather-cloudy .fas {
+            color: #b5c8d6;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            animation: cloudy-float 5s ease-in-out infinite;
+        }
+        
+        .weather-rainy .fas {
+            color: #58a9ff;
+            text-shadow: 0 0 15px rgba(88, 169, 255, 0.7);
+            animation: rainy-shake 3s infinite;
+        }
+        
+        .weather-snowy .fas {
+            color: #e8f0ff;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+            animation: snowy-fall 5s infinite;
+        }
+        
+        .weather-stormy .fas {
+            color: #ffcc33;
+            text-shadow: 0 0 20px rgba(255, 204, 51, 0.9);
+            animation: stormy-flash 3s infinite;
+        }
+        
+        .weather-foggy .fas {
+            color: #c0c0c0;
+            text-shadow: 0 0 15px rgba(192, 192, 192, 0.6);
+            animation: foggy-float 8s infinite;
+        }
+        
+        /* 天气动画关键帧 */
+        @keyframes sunny-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes cloudy-float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+            100% { transform: translateY(0); }
+        }
+        
+        @keyframes rainy-shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-2px) rotate(-2deg); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(2px) rotate(2deg); }
+            100% { transform: translateX(0); }
+        }
+        
+        @keyframes snowy-fall {
+            0% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(3px) rotate(5deg); }
+            100% { transform: translateY(0) rotate(0deg); }
+        }
+        
+        @keyframes stormy-flash {
+            0% { opacity: 1; }
+            25% { opacity: 1; }
+            26% { opacity: 0.3; }
+            27% { opacity: 1; }
+            80% { opacity: 1; }
+            81% { opacity: 0.3; }
+            82% { opacity: 1; }
+            83% { opacity: 0.5; }
+            84% { opacity: 1; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes foggy-float {
+            0% { opacity: 0.6; transform: translateX(0); }
+            50% { opacity: 1; transform: translateX(3px); }
+            100% { opacity: 0.6; transform: translateX(0); }
         }
         
         .weather-details {
@@ -458,6 +539,7 @@
             text-shadow: 0 0 5px rgba(124, 255, 178, 0.3);
         }
         
+        /* 时间显示组件样式 - 移除边框和背景 */
         .time-display {
             flex: 1;
             display: flex;
@@ -465,17 +547,15 @@
             align-items: flex-start;
             justify-content: center;
             padding: 15px;
-            background: linear-gradient(145deg, rgba(0, 42, 84, 0.3), rgba(0, 21, 41, 0.4));
+            background: transparent; /* 透明背景 */
             border-radius: 12px;
-            margin-right: 15px;
-            border: 1px solid rgba(88, 213, 255, 0.3);
-            box-shadow: 0 0 15px rgba(0, 84, 166, 0.3);
+            margin-bottom: 10px;
+            border: none;
+            box-shadow: none; /* 移除阴影 */
             transition: all 0.3s ease;
         }
 
         .time-display:hover {
-            box-shadow: 0 0 20px rgba(124, 255, 178, 0.4);
-            border-color: rgba(124, 255, 178, 0.4);
             transform: translateY(-2px);
         }
 
@@ -969,6 +1049,124 @@
         }
         
         /* 全屏背景样式 */
+        .weather-info span i {
+            margin-right: 5px;
+            font-size: 12px;
+            color: #58d5ff;
+        }
+        
+        /* 天气预测样式 */
+        .weather-forecast {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: space-between;
+        }
+        
+        .forecast-item {
+            flex: 1;
+            min-width: 100px;
+            background: linear-gradient(145deg, rgba(0, 84, 166, 0.2), rgba(0, 21, 41, 0.3));
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .forecast-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(124, 255, 178, 0.2);
+        }
+        
+        .forecast-day {
+            font-size: 14px;
+            color: #ffffff;
+            margin-bottom: 5px;
+        }
+        
+        .forecast-date {
+            font-size: 12px;
+            color: #7cffb2;
+            margin-bottom: 8px;
+        }
+        
+        .forecast-icon {
+            font-size: 24px;
+            color: #58d5ff;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(88, 213, 255, 0.6);
+        }
+        
+        .forecast-temp {
+            font-size: 14px;
+            color: #ffffff;
+        }
+        
+        /* 时间天气左侧容器 */
+        .time-weather-left {
+            display: flex;
+            flex-direction: column;
+            width: 50%;
+        }
+        
+        /* 修复时间天气组件布局 */
+        .time-weather-left {
+            display: flex;
+            flex-direction: column;
+            width: 60%;
+            height: 100%;
+            justify-content: space-between;
+        }
+        
+        /* 调整时间组件样式 */
+        .time-display {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 15px;
+            background: linear-gradient(145deg, rgba(0, 42, 84, 0.3), rgba(0, 21, 41, 0.4));
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+            transition: all 0.3s ease;
+        }
+        
+        .time-display:hover {
+            box-shadow: 0 0 20px rgba(124, 255, 178, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        /* 调整天气组件样式 */
+        .weather-container {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: linear-gradient(145deg, rgba(0, 84, 166, 0.3), rgba(0, 21, 41, 0.4));
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+            transition: all 0.3s ease;
+        }
+        
+        .weather-container:hover {
+            box-shadow: 0 0 20px rgba(124, 255, 178, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        /* 调整整体容器的样式 */
+        .time-weather-wrapper {
+            display: flex;
+            height: 100%;
+            width: 100%;
+            align-items: stretch;
+            justify-content: space-between;
+            position: relative;
+            background: transparent;
+            padding: 10px;
+        }
     </style>
     <!-- 阻止某些问题脚本的执行 -->
     <script>
@@ -1073,30 +1271,58 @@
     <div class="main-container">
         <!-- 时间和天气面板 -->
         <div class="dashboard-panel time-weather-container">
-            <!-- <div class="panel-header">
-                <h3 class="panel-title">当前时间与天气</h3>
-            </div> -->
-            <div class="time-weather-wrapper">
-                <div class="time-display">
-                    <div class="time-value" id="currentTime">--:--:--</div>
-                    <div class="date-value" id="currentDate">---- 年 -- 月 -- 日</div>
-                    <div class="week-value" id="currentWeek">星期-</div>
-                </div>
-                <div class="weather-container">
-                    <div class="weather-icon" id="weatherIcon">
-                        <i class="fas fa-sun"></i>
+            <div class="time-weather-wrapper" style="display: flex; justify-content: space-between;">
+                <!-- 左侧时间显示 -->
+                <div class="time-weather-left" style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding-left: 20px;">
+                    <div class="time-display" style="border: none; box-shadow: none; background: transparent;">
+                        <div class="time-value" id="currentTime" style="font-family: 'YJSZ', sans-serif; font-size: 64px; color: #7cffb2; text-shadow: 0 0 15px rgba(124, 255, 178, 0.6); line-height: 1.1;">--:--:--</div>
+                        <div class="date-value" id="currentDate" style="font-size: 20px; color: #ffffff; margin: 8px 0;">---- 年 -- 月 -- 日</div>
+                        <div class="week-value" id="currentWeek" style="font-size: 18px; color: #ffffff;">星期-</div>
                     </div>
-                    <div class="weather-details">
-                        <div class="weather-top">
-                            <div class="weather-temp" id="weatherTemp">24°C</div>
-                            <div class="weather-desc" id="weatherDesc">
-                                晴
-                                <i class="fas fa-cloud secondary-weather-icon"></i>
+                </div>
+                
+                <!-- 中间实时天气详细信息 -->
+                <div class="current-weather-container" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 15px;">
+                    <div class="current-weather" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                        <div class="weather-icon" id="weatherIcon" style="font-size: 48px; margin: 10px 0; color: #58d5ff;">
+                            <i class="fas fa-cloud"></i>
+                        </div>
+                        <div class="weather-temp" id="weatherTemp" style="font-size: 36px; color: #7cffb2; font-weight: bold; margin-bottom: 5px;">22°C</div>
+                        <div class="weather-desc" id="weatherDesc" style="font-size: 18px; color: #ffffff; margin-bottom: 10px;">阴</div>
+                        <div class="weather-info" style="width: 100%; background: rgba(0, 21, 41, 0.4); border-radius: 8px; padding: 10px; margin-top: 5px;">
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: center; color: #ffffff; font-size: 14px;">
+                                    <span><i class="fas fa-tint" style="color: #58d5ff; margin-right: 5px;"></i>湿度: <span id="weatherHumidity">71%</span></span>
+                                </div>
+                                <div style="display: flex; justify-content: center; color: #ffffff; font-size: 14px;">
+                                    <span><i class="fas fa-wind" style="color: #58d5ff; margin-right: 5px;"></i>风向: <span id="weatherWind">西南风 4级</span></span>
+                                </div>
                             </div>
                         </div>
-                        <div class="weather-info">
-                            <span><i class="fas fa-tint"></i>湿度: <span id="weatherHumidity">64%</span></span>
-                            <span><i class="fas fa-wind"></i>风向: <span id="weatherWind">西南风 4级</span></span>
+                    </div>
+                </div>
+                
+                <!-- 右侧天气预报 -->
+                <div class="weather-forecast-container" style="flex: 2; display: flex; flex-direction: column;">
+                    <div class="weather-forecast" style="display: flex; justify-content: space-around; height: 100%; margin-top: 26px;">
+                        <!-- 明天 -->
+                        <div class="forecast-item" style="flex: 1; background: rgba(0, 42, 84, 0.5); border-radius: 10px; padding: 10px; margin: 0 5px; display: flex; flex-direction: column; align-items: center;">
+                            <div class="forecast-day" style="font-weight: bold; color: #ffffff;">周四</div>
+                            <div class="forecast-date" id="forecast-date-1" style="color: #7cffb2; font-size: 14px;">6/19</div>
+                            <div class="forecast-icon" id="forecast-icon-1" style="font-size: 32px; margin: 10px 0; color: #58d5ff;">
+                                <i class="fas fa-cloud-rain"></i>
+                            </div>
+                            <div class="forecast-temp" id="forecast-temp-1" style="font-size: 18px; color: #ffffff; font-weight: bold;">22°/18°</div>
+                        </div>
+                        
+                        <!-- 后天 -->
+                        <div class="forecast-item" style="flex: 1; background: rgba(0, 42, 84, 0.5); border-radius: 10px; padding: 10px; margin: 0 5px; display: flex; flex-direction: column; align-items: center;">
+                            <div class="forecast-day" style="font-weight: bold; color: #ffffff;">周五</div>
+                            <div class="forecast-date" id="forecast-date-2" style="color: #7cffb2; font-size: 14px;">6/20</div>
+                            <div class="forecast-icon" id="forecast-icon-2" style="font-size: 32px; margin: 10px 0; color: #58d5ff;">
+                                <i class="fas fa-cloud-showers-heavy"></i>
+                            </div>
+                            <div class="forecast-temp" id="forecast-temp-2" style="font-size: 18px; color: #ffffff; font-weight: bold;">21°/17°</div>
                         </div>
                     </div>
                 </div>
@@ -1323,34 +1549,60 @@
                         if (result.success && result.data) {
                             const weatherData = result.data;
                             
-                            // 根据天气类型设置图标
-                            const weatherIcons = {
-                                '晴': '☀️',
-                                '多云': '⛅',
-                                '阴': '☁️',
-                                '小雨': '🌧️',
-                                '中雨': '🌧️',
-                                '大雨': '🌧️',
-                                '阵雨': '🌦️',
-                                '雷阵雨': '⛈️',
-                                '雷阵雨伴有冰雹': '⛈️❄️',
-                                '雨夹雪': '🌨️',
-                                '小雪': '❄️',
-                                '中雪': '❄️',
-                                '大雪': '❄️',
-                                '暴雪': '❄️',
-                                '雾': '🌫️',
-                                '浮尘': '🌫️',
-                                '扬沙': '🌫️',
-                                '强沙尘暴': '🌫️',
-                                '霾': '🌫️'
-                            };
+                            // 获取当前日期
+                            const now = new Date();
+                            const currentDate = `${now.getMonth() + 1}/${now.getDate()}`;
                             
-                            // 更新DOM
-                            document.getElementById('weatherTemp').textContent = `${weatherData.temp}℃`;
+                            // 更新DOM - 今天的天气信息
+                            document.getElementById('weatherTemp').textContent = `${weatherData.temp}°C`;
                             document.getElementById('weatherDesc').textContent = weatherData.weather || '晴';
-                            document.getElementById('weatherIcon').textContent = weatherIcons[weatherData.weather] || '☀️';
-                            document.getElementById('weatherExtra').textContent = `湿度: ${weatherData.humidity}% | 风力: ${weatherData.wind_power}级`;
+                            document.getElementById('weatherIcon').innerHTML = `<i class="fas ${getWeatherIconClass(weatherData.weather)}"></i>`;
+                            document.getElementById('weatherHumidity').textContent = `${weatherData.humidity}%`;
+                            document.getElementById('weatherWind').textContent = `${weatherData.wind_direction} ${weatherData.wind_power}级`;
+                            
+                            // 更新天气图标样式
+                            updateWeatherIconStyle(weatherData.weather);
+                            
+                            // 获取天气预报数据 - 只查询两天
+                            fetch(APP_CONFIG.API.BASE_URL + APP_CONFIG.API.ENDPOINTS.WEATHER_FORECAST + '?days=2')
+                                .then(response => response.json())
+                                .then(forecastResult => {
+                                    if (forecastResult.success && forecastResult.data && forecastResult.data.forecasts) {
+                                        const forecasts = forecastResult.data.forecasts.slice(0, 2); // 确保只取前两天
+                                        // 只显示未来两天的预报
+                                        for (let i = 0; i < forecasts.length; i++) {
+                                            const forecast = forecasts[i];
+                                            const dayElement = document.getElementById(`forecast-date-${i+1}`);
+                                            const iconElement = document.getElementById(`forecast-icon-${i+1}`);
+                                            const tempElement = document.getElementById(`forecast-temp-${i+1}`);
+                                            
+                                            if (dayElement && iconElement && tempElement) {
+                                                // 简化日期显示格式为"月/日"
+                                                const dateParts = forecast.date.split('-');
+                                                if (dateParts.length >= 3) {
+                                                    dayElement.textContent = `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`;
+                                                    
+                                                    // 设置星期几
+                                                    const forecastDate = new Date(forecast.date);
+                                                    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+                                                    const weekday = `周${weekdays[forecastDate.getDay()]}`;
+                                                    const dayNameElement = dayElement.previousElementSibling;
+                                                    if (dayNameElement) {
+                                                        dayNameElement.textContent = weekday;
+                                                    }
+                                                } else {
+                                                    dayElement.textContent = forecast.date;
+                                                }
+                                                
+                                                iconElement.innerHTML = `<i class="fas ${getWeatherIconClass(forecast.dayWeather)}"></i>`;
+                                                tempElement.textContent = `${forecast.dayTemp}°/${forecast.nightTemp}°`;
+                                            }
+                                        }
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('获取天气预报数据失败:', error);
+                                });
                             
                             // 每小时更新一次天气（使用配置的间隔时间）
                             setTimeout(updateWeather, APP_CONFIG.SYSTEM.WEATHER_REFRESH_INTERVAL);
@@ -1365,21 +1617,76 @@
                     });
             }
             
+            // 获取天气图标类名
+            function getWeatherIconClass(weather) {
+                const iconMap = {
+                    '晴': 'fa-sun',
+                    '多云': 'fa-cloud-sun',
+                    '阴': 'fa-cloud',
+                    '小雨': 'fa-cloud-rain',
+                    '中雨': 'fa-cloud-showers-heavy',
+                    '大雨': 'fa-cloud-showers-heavy',
+                    '阵雨': 'fa-cloud-sun-rain',
+                    '雷阵雨': 'fa-bolt',
+                    '雷阵雨伴有冰雹': 'fa-cloud-meatball',
+                    '雨夹雪': 'fa-snowflake',
+                    '小雪': 'fa-snowflake',
+                    '中雪': 'fa-snowflake',
+                    '大雪': 'fa-snowflake',
+                    '暴雪': 'fa-snowflake',
+                    '雾': 'fa-smog',
+                    '浮尘': 'fa-smog',
+                    '扬沙': 'fa-wind',
+                    '强沙尘暴': 'fa-wind',
+                    '霾': 'fa-smog'
+                };
+                
+                return iconMap[weather] || 'fa-sun';
+            }
+            
+            // 更新天气图标样式
+            function updateWeatherIconStyle(weather) {
+                const weatherIcon = document.getElementById('weatherIcon');
+                
+                // 移除所有天气相关类
+                weatherIcon.classList.remove('weather-sunny', 'weather-cloudy', 'weather-rainy', 'weather-snowy', 'weather-stormy', 'weather-foggy');
+                
+                // 根据天气类型添加对应样式
+                if (weather.includes('晴')) {
+                    weatherIcon.classList.add('weather-sunny');
+                } else if (weather.includes('云') || weather.includes('阴')) {
+                    weatherIcon.classList.add('weather-cloudy');
+                } else if (weather.includes('雨') && !weather.includes('雪')) {
+                    weatherIcon.classList.add('weather-rainy');
+                } else if (weather.includes('雪') || weather.includes('冰雹')) {
+                    weatherIcon.classList.add('weather-snowy');
+                } else if (weather.includes('雷')) {
+                    weatherIcon.classList.add('weather-stormy');
+                } else if (weather.includes('雾') || weather.includes('霾') || weather.includes('尘')) {
+                    weatherIcon.classList.add('weather-foggy');
+                }
+            }
+            
             // 当API请求失败时使用备用天气数据
             function useBackupWeather() {
                 // 备用天气数据
                 const weatherData = {
                     temp: '22',
-                    desc: '晴',
+                    weather: '晴',
                     humidity: '48',
-                    windLevel: '3'
+                    wind_direction: '东南风',
+                    wind_power: '3'
                 };
                 
                 // 更新DOM
                 document.getElementById('weatherTemp').textContent = `${weatherData.temp}℃`;
-                document.getElementById('weatherDesc').textContent = weatherData.desc;
-                document.getElementById('weatherIcon').textContent = '☀️'; // 默认晴天图标
-                document.getElementById('weatherExtra').textContent = `湿度: ${weatherData.humidity}% | 风力: ${weatherData.windLevel}级`;
+                document.getElementById('weatherDesc').textContent = weatherData.weather;
+                document.getElementById('weatherIcon').innerHTML = `<i class="fas fa-sun"></i>`;
+                document.getElementById('weatherHumidity').textContent = `${weatherData.humidity}%`;
+                document.getElementById('weatherWind').textContent = `${weatherData.wind_direction} ${weatherData.wind_power}级`;
+                
+                // 更新天气图标样式
+                updateWeatherIconStyle(weatherData.weather);
                 
                 // 一小时后重试
                 setTimeout(updateWeather, APP_CONFIG.SYSTEM.WEATHER_REFRESH_INTERVAL);
@@ -1860,7 +2167,7 @@
                     // }
                 },
                 grid: { 
-                    top: -5,  /* 减小顶部边距，使图表向上移动 */
+                    top: 20,  /* 减小顶部边距，使图表向上移动 */
                     right: 30, 
                     bottom: 40, 
                     left: 60,
@@ -2877,13 +3184,55 @@
                         }
                         
                         try {
-                            updateMultiDimensionalAnalysis(window.realData.typeDistribution);
+                            // 获取早午晚市分布数据
+                            fetch('/api/market_period_distribution')
+                                .then(response => response.json())
+                                .then(marketData => {
+                                    if (marketData.success && marketData.data && marketData.data.data) {
+                                        const marketPeriods = marketData.data.data;
+                                        // 提取流动摊位和固定摊位数据
+                                        const ldData = marketPeriods.map(item => item.zdjy_ld);
+                                        const gdData = marketPeriods.map(item => item.zdjy_gd);
+                                        
+                                        // 更新图表
+                                        const chart = echarts.getInstanceByDom(document.getElementById('multiDimensionalAnalysis'));
+                                        if (chart) {
+                                            chart.setOption({
+                                                series: [
+                                                    {
+                                                        // 流动摊位
+                                                        name: '流动摊位',
+                                                        data: ldData
+                                                    },
+                                                    {
+                                                        // 固定摊位
+                                                        name: '固定摊位',
+                                                        data: gdData
+                                                    }
+                                                ]
+                                            });
+                                        }
+                                        
+                                        // 更新类型比例图
+                                        const totalLd = ldData.reduce((sum, val) => sum + val, 0);
+                                        const totalGd = gdData.reduce((sum, val) => sum + val, 0);
+                                        updateTypeRatio([totalLd, totalGd]);
+                                    } else {
+                                        // 如果API调用失败，使用默认数据
+                                        updateMultiDimensionalAnalysis(window.realData.typeDistribution);
+                                    }
+                                })
+                                .catch(e => {
+                                    console.log('Error fetching market period distribution:', e);
+                                    // 如果API调用失败，使用默认数据
+                                    updateMultiDimensionalAnalysis(window.realData.typeDistribution);
+                                });
                         } catch(e) {
                             console.log('Error updating multi dimensional analysis:', e);
                         }
                         
                         try {
-                            updateTypeRatio([window.realData.typeDistribution[0], window.realData.typeDistribution[1]]);
+                            // 类型比例图现在在市场分布API调用中更新
                         } catch(e) {
                             console.log('Error updating type ratio:', e);
                         }
@@ -2938,9 +3287,7 @@
                             console.log('Error updating MAP chart:', e);
                         }
                         
-
                         
-
                         
                         try {
                             if (typeof updateFacilityCorrelation === 'function') {

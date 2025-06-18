@@ -27,7 +27,9 @@ const weatherIconMap = {
 
 // 天气数据缓存
 let weatherData = null;
+let forecastData = null;
 let lastWeatherUpdate = 0;
+let lastForecastUpdate = 0;
 
 /**
  * 获取天气数据
@@ -63,6 +65,9 @@ function fetchWeatherData(callback) {
         weatherData = data.data;
         lastWeatherUpdate = now;
         if (callback) callback(weatherData);
+        
+        // 获取成功后，尝试获取天气预报数据
+        fetchForecastData();
       } else {
         console.warn('天气API返回错误:', data.message);
         if (callback) callback(null);
@@ -72,6 +77,86 @@ function fetchWeatherData(callback) {
       console.error('获取天气数据出错:', error);
       if (callback) callback(null);
     });
+}
+
+/**
+ * 获取天气预报数据
+ */
+function fetchForecastData() {
+  // 检查缓存，避免频繁请求
+  const now = Date.now();
+  if (forecastData && (now - lastForecastUpdate) < window.APP_CONFIG.SYSTEM.WEATHER_REFRESH_INTERVAL) {
+    updateForecastUI(forecastData);
+    return;
+  }
+
+  // 如果配置中没有天气预报API端点，使用模拟数据
+  const forecastApiUrl = window.APP_CONFIG.API.BASE_URL + (window.APP_CONFIG.API.ENDPOINTS.WEATHER_FORECAST || '/api/weather_forecast');
+  
+  // 添加随机参数防止缓存
+  const url = `${forecastApiUrl}?_t=${now}`;
+  
+  console.log('正在获取天气预报数据...');
+  
+  // 发送请求
+  fetch(url)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP状态码 ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success && data.forecast) {
+        console.log('天气预报数据获取成功:', data.forecast);
+        forecastData = data.forecast;
+        lastForecastUpdate = now;
+        updateForecastUI(forecastData);
+      } else {
+        console.warn('天气预报API返回错误，使用模拟数据');
+        useMockForecastData();
+      }
+    })
+    .catch(error => {
+      console.error('获取天气预报数据出错:', error);
+      useMockForecastData();
+    });
+}
+
+/**
+ * 使用模拟的天气预报数据
+ */
+function useMockForecastData() {
+  const today = new Date();
+  const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  
+  // 生成未来三天的日期和星期
+  const forecasts = [];
+  
+  for (let i = 1; i <= 3; i++) {
+    const date = new Date();
+    date.setDate(today.getDate() + i);
+    const dayOfWeek = days[date.getDay()];
+    
+    // 生成随机天气数据
+    const weatherTypes = ['晴', '多云', '阴', '小雨', '中雨'];
+    const weatherType = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+    const highTemp = Math.floor(Math.random() * 10) + 20; // 20-30度
+    const lowTemp = highTemp - Math.floor(Math.random() * 8) - 3; // 高温减3-10度
+    
+    forecasts.push({
+      date: `${date.getMonth() + 1}/${date.getDate()}`,
+      day: dayOfWeek,
+      weather: weatherType,
+      high: highTemp,
+      low: lowTemp
+    });
+  }
+  
+  forecastData = forecasts;
+  lastForecastUpdate = Date.now();
+  
+  updateForecastUI(forecastData);
 }
 
 /**
@@ -127,6 +212,11 @@ function updateWeatherUI(data) {
       
       // 根据天气类型添加特殊效果
       addWeatherEffects(weatherType);
+      
+      // 获取天气预报数据
+      if (!forecastData) {
+        fetchForecastData();
+      }
     } else {
       console.warn('未找到天气显示元素');
       
@@ -166,6 +256,50 @@ function updateWeatherUI(data) {
     }
   } catch (e) {
     console.error('更新天气UI出错:', e);
+  }
+}
+
+/**
+ * 更新页面天气预报显示
+ * @param {Array} forecasts - 天气预报数据数组
+ */
+function updateForecastUI(forecasts) {
+  if (!forecasts || !Array.isArray(forecasts) || forecasts.length === 0) return;
+  
+  try {
+    const forecastContainer = document.querySelector('.weather-forecast');
+    if (!forecastContainer) return;
+    
+    // 清空现有内容
+    forecastContainer.innerHTML = '';
+    
+    // 最多显示7天预报
+    const displayCount = Math.min(7, forecasts.length);
+    
+    for (let i = 0; i < displayCount; i++) {
+      const forecast = forecasts[i];
+      const weatherType = forecast.weather || '晴';
+      const iconClass = weatherIconMap[weatherType] || 'fa-sun';
+      
+      const forecastItem = document.createElement('div');
+      forecastItem.className = 'forecast-item';
+      
+      // 为今天添加特殊标记
+      const dayLabel = i === 0 ? '今天' : forecast.day || '明天';
+      
+      forecastItem.innerHTML = `
+        <div class="forecast-day">${dayLabel}</div>
+        <div class="forecast-date">${forecast.date}</div>
+        <div class="forecast-icon"><i class="fas ${iconClass}"></i></div>
+        <div class="forecast-temp">${forecast.high}°/${forecast.low}°</div>
+      `;
+      
+      forecastContainer.appendChild(forecastItem);
+    }
+    
+    console.log('天气预报UI更新成功');
+  } catch (e) {
+    console.error('更新天气预报UI出错:', e);
   }
 }
 
@@ -357,6 +491,8 @@ function initWeatherModule() {
   window.weatherAPI = {
     fetchWeatherData,
     updateWeatherUI,
+    fetchForecastData,
+    updateForecastUI,
     updateMAPChart
   };
   

@@ -23,7 +23,12 @@ AMAP_CONFIG = {
     'web_key': '9decdfc73fd9e9f474719d5344635a96',
     'js_key': 'bfa29703d862a8c0dd480a3956015990',
     'security_code': '0eabe65c8f32a08b8701a989c93cf45e',
-    'KEY': '9decdfc73fd9e9f474719d5344635a96'
+    'KEY': '9decdfc73fd9e9f474719d5344635a96',
+    'SSL_VERIFY': False,  # 是否验证SSL证书
+    'REQUEST_TIMEOUT': 10,  # 请求超时时间(秒)
+    'MAX_RETRIES': 3,  # 最大重试次数
+    'RETRY_BACKOFF_FACTOR': 0.5,  # 重试间隔因子
+    'USE_HTTP_FALLBACK': True  # 当HTTPS失败时是否尝试HTTP
 }
 
 # 应用配置

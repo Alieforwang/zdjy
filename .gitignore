@@ -39,8 +39,8 @@ __pycache__/
 *.sqlite
 *.sqlite3
 
-#忽略md文件
-*.md
+# #忽略md文件
+# *.md
 
 # 忽略会话文件
 /sessions/ 

@@ -9,7 +9,8 @@ const API_CONFIG = {
     ANALYSIS: '/api/analyze',
     STATS: '/api/stats',
     CHART_DATA: '/api/chart_data',
-    WEATHER: '/api/weather' // 添加天气API端点
+    WEATHER: '/api/weather', // 添加天气API端点
+    WEATHER_FORECAST: '/api/weather_forecast' // 添加天气预报API端点
   }
 };
 
@@ -61,6 +62,7 @@ window.initConfig = function() {
   // 标记配置已加载
   window.configLoaded = true;
   console.log('配置文件加载成功');
+  console.log('系统初始化完成，配置已应用，版本号: 1.0.3');
   
   // 触发配置加载完成事件，通知其他模块可以开始初始化
   document.dispatchEvent(new CustomEvent('config-loaded'));

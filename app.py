@@ -53,6 +53,7 @@ import wave
 import sys
 import os
 import re  # 添加正则表达式模块导入
+import math  # 添加math模块导入
 
 # 添加项目根目录到系统路径，以便导入project_dify中的模块
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -474,12 +475,29 @@ def init_detection_tables():
             )
         ''')
         
+        # 创建分析记录表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS analysis_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                file_type TEXT,
+                file_path TEXT,
+                result_path TEXT,
+                result_folder TEXT DEFAULT 'static/@results',
+                detect_type TEXT,
+                location TEXT,
+                confidence REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         conn.commit()
         conn.close()
-        logger.info("检测结果表初始化成功")
+        logger.info("数据库表初始化成功")
         
     except Exception as e:
-        logger.error(f"初始化检测结果表失败: {str(e)}")
+        logger.error(f"初始化数据库表失败: {str(e)}")
+        logger.error(traceback.format_exc())
 
 # 创建模型实例 - 自动选择设备(GPU优先)
 try:
@@ -5306,28 +5324,94 @@ def get_amap_weather(city_code='530100'):  # 默认昆明市
             logger.error("未配置高德地图API密钥")
             return get_mock_weather()
             
+        # 从配置中获取SSL和请求参数
+        ssl_verify = AMAP_CONFIG.get('SSL_VERIFY', True)
+        timeout = AMAP_CONFIG.get('REQUEST_TIMEOUT', 10)
+        max_retries = AMAP_CONFIG.get('MAX_RETRIES', 3)
+        backoff_factor = AMAP_CONFIG.get('RETRY_BACKOFF_FACTOR', 0.5)
+        use_http_fallback = AMAP_CONFIG.get('USE_HTTP_FALLBACK', True)
+            
         # 构建API请求
-        url = f"https://restapi.amap.com/v3/weather/weatherInfo?city={city_code}&key={amap_key}&extensions=base"
+        url = f"https://restapi.amap.com/v3/weather/weatherInfo"
+        params = {
+            'key': amap_key,
+            'city': city_code,
+            'extensions': 'base'
+        }
         
-        # 发送请求 - 添加SSL验证处理
-        import ssl
-        from urllib.request import urlopen
-        import json
-        import certifi
+        # 创建会话并配置重试策略
+        session = requests.Session()
         
-        try:
-            # 方法1: 使用requests库但禁用验证(不推荐但可临时解决问题)
-            response = requests.get(url, timeout=5, verify=False)
-            data = response.json()
-        except:
+        # 配置重试策略
+        import urllib3
+        from urllib3.util.retry import Retry
+        retry_strategy = Retry(
+            total=max_retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
+        adapter = requests.adapters.HTTPAdapter(max_retries=retry_strategy)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        
+        # 尝试多种方法获取天气数据
+        logger.info("高德天气API: 尝试获取天气数据")
+        
+        # 根据配置决定是否验证SSL
+        if not ssl_verify:
+            logger.info("高德天气API: 已配置为不验证SSL")
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             try:
-                # 方法2: 使用urllib和certifi包(提供最新的CA证书)
-                context = ssl.create_default_context(cafile=certifi.where())
-                response = urlopen(url, context=context, timeout=5)
-                content = response.read().decode('utf-8')
-                data = json.loads(content)
-            except Exception as ssl_err:
-                logger.error(f"SSL连接错误: {str(ssl_err)}")
+                response = session.get(url, params=params, timeout=timeout, verify=False)
+                data = response.json()
+                logger.info("高德天气API: 禁用SSL验证后请求成功")
+            except Exception as req_err:
+                logger.error(f"高德天气API: 禁用SSL验证后请求失败: {str(req_err)}")
+                if use_http_fallback:
+                    try:
+                        # 尝试HTTP请求
+                        logger.warning("高德天气API: 尝试使用HTTP请求")
+                        http_url = "http://restapi.amap.com/v3/weather/weatherInfo"
+                        response = session.get(http_url, params=params, timeout=timeout)
+                        data = response.json()
+                        logger.info("高德天气API: HTTP请求成功")
+                    except Exception as http_err:
+                        logger.error(f"高德天气API: HTTP请求也失败: {str(http_err)}")
+                        return get_mock_weather()
+                else:
+                    return get_mock_weather()
+        else:
+            # 标准请求（验证SSL）
+            try:
+                response = session.get(url, params=params, timeout=timeout)
+                data = response.json()
+                logger.info("高德天气API: 标准请求成功")
+            except requests.exceptions.SSLError as ssl_err:
+                logger.warning(f"高德天气API: SSL验证失败: {str(ssl_err)}")
+                try:
+                    # 禁用SSL验证重试
+                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                    response = session.get(url, params=params, timeout=timeout, verify=False)
+                    data = response.json()
+                    logger.info("高德天气API: 禁用SSL验证后请求成功")
+                except Exception as req_err:
+                    logger.error(f"高德天气API: 禁用SSL验证后请求仍然失败: {str(req_err)}")
+                    if use_http_fallback:
+                        try:
+                            # 尝试HTTP请求
+                            logger.warning("高德天气API: 尝试使用HTTP请求")
+                            http_url = "http://restapi.amap.com/v3/weather/weatherInfo"
+                            response = session.get(http_url, params=params, timeout=timeout)
+                            data = response.json()
+                            logger.info("高德天气API: HTTP请求成功")
+                        except Exception as http_err:
+                            logger.error(f"高德天气API: HTTP请求也失败: {str(http_err)}")
+                            return get_mock_weather()
+                    else:
+                        return get_mock_weather()
+            except Exception as e:
+                logger.error(f"高德天气API: 请求失败: {str(e)}")
                 return get_mock_weather()
         
         if data.get('status') == '1' and data.get('lives'):
@@ -5362,24 +5446,335 @@ def get_mock_weather():
         'report_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
-# 创建获取天气API端点
 @app.route('/api/weather', methods=['GET'])
 def get_weather_api():
     """天气API端点"""
     try:
         city_code = request.args.get('city', '530100')  # 默认昆明市
         weather_data = get_amap_weather(city_code)
-        return jsonify({
-            'success': True,
-            'data': weather_data
-        })
+        
+        if weather_data:
+            return jsonify({
+                'success': True,
+                'data': weather_data
+            })
+        else:
+            # 如果获取失败，返回假数据
+            mock_data = get_mock_weather()
+            return jsonify({
+                'success': True,
+                'data': mock_data
+            })
     except Exception as e:
-        logger.error(f"天气API调用出错: {str(e)}")
+        app.logger.error(f"获取天气API出错: {str(e)}")
         return jsonify({
             'success': False,
-            'message': str(e),
-            'data': get_mock_weather()
+            'message': f"获取天气数据失败: {str(e)}"
         })
+
+@app.route('/api/weather_forecast', methods=['GET'])
+def get_weather_forecast_api():
+    """天气预报API端点"""
+    try:
+        city_code = request.args.get('city', '530100')  # 默认昆明市
+        
+        # 尝试从高德API获取天气预报
+        forecast_data = get_amap_forecast(city_code)
+        
+        if forecast_data:
+            return jsonify({
+                'success': True,
+                'forecast': forecast_data
+            })
+        else:
+            # 如果获取失败，返回模拟数据
+            mock_forecast = get_mock_forecast()
+            return jsonify({
+                'success': True,
+                'forecast': mock_forecast
+            })
+    except Exception as e:
+        app.logger.error(f"获取天气预报API出错: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"获取天气预报数据失败: {str(e)}"
+        })
+
+def get_amap_forecast(city_code):
+    """从高德地图API获取天气预报数据"""
+    try:
+        # 使用配置中的高德地图API密钥
+        amap_key = AMAP_CONFIG.get('KEY', '')
+        if not amap_key:
+            app.logger.error("未配置高德地图API密钥")
+            return get_mock_forecast()
+        
+        # 从配置中获取SSL和请求参数
+        ssl_verify = AMAP_CONFIG.get('SSL_VERIFY', True)
+        timeout = AMAP_CONFIG.get('REQUEST_TIMEOUT', 10)
+        max_retries = AMAP_CONFIG.get('MAX_RETRIES', 3)
+        backoff_factor = AMAP_CONFIG.get('RETRY_BACKOFF_FACTOR', 0.5)
+        use_http_fallback = AMAP_CONFIG.get('USE_HTTP_FALLBACK', True)
+        
+        # 构建请求参数
+        url = "https://restapi.amap.com/v3/weather/weatherInfo"
+        params = {
+            'key': amap_key,
+            'city': city_code,
+            'extensions': 'all',  # 获取预报数据
+            'output': 'JSON'
+        }
+        
+        # 创建会话并配置重试策略
+        session = requests.Session()
+        
+        # 配置重试策略
+        import urllib3
+        from urllib3.util.retry import Retry
+        retry_strategy = Retry(
+            total=max_retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
+        adapter = requests.adapters.HTTPAdapter(max_retries=retry_strategy)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        
+        # 尝试多种方法获取天气数据
+        app.logger.info("高德天气API: 尝试获取天气预报数据")
+        
+        # 根据配置决定是否验证SSL
+        if not ssl_verify:
+            app.logger.info("高德天气API: 已配置为不验证SSL")
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            try:
+                response = session.get(url, params=params, timeout=timeout, verify=False)
+                data = response.json()
+                app.logger.info("高德天气API: 禁用SSL验证后请求预报成功")
+            except Exception as req_err:
+                app.logger.error(f"高德天气API: 禁用SSL验证后请求预报失败: {str(req_err)}")
+                if use_http_fallback:
+                    try:
+                        # 尝试HTTP请求
+                        app.logger.warning("高德天气API: 尝试使用HTTP请求获取预报")
+                        http_url = "http://restapi.amap.com/v3/weather/weatherInfo"
+                        response = session.get(http_url, params=params, timeout=timeout)
+                        data = response.json()
+                        app.logger.info("高德天气API: HTTP请求预报成功")
+                    except Exception as http_err:
+                        app.logger.error(f"高德天气API: HTTP请求预报也失败: {str(http_err)}")
+                        return get_mock_forecast()
+                else:
+                    return get_mock_forecast()
+        else:
+            # 标准请求（验证SSL）
+            try:
+                response = session.get(url, params=params, timeout=timeout)
+                data = response.json()
+                app.logger.info("高德天气API: 标准请求预报成功")
+            except requests.exceptions.SSLError as ssl_err:
+                app.logger.warning(f"高德天气API: SSL验证失败: {str(ssl_err)}")
+                try:
+                    # 禁用SSL验证重试
+                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                    response = session.get(url, params=params, timeout=timeout, verify=False)
+                    data = response.json()
+                    app.logger.info("高德天气API: 禁用SSL验证后请求预报成功")
+                except Exception as req_err:
+                    app.logger.error(f"高德天气API: 禁用SSL验证后请求预报仍然失败: {str(req_err)}")
+                    if use_http_fallback:
+                        try:
+                            # 尝试HTTP请求
+                            app.logger.warning("高德天气API: 尝试使用HTTP请求获取预报")
+                            http_url = "http://restapi.amap.com/v3/weather/weatherInfo"
+                            response = session.get(http_url, params=params, timeout=timeout)
+                            data = response.json()
+                            app.logger.info("高德天气API: HTTP请求预报成功")
+                        except Exception as http_err:
+                            app.logger.error(f"高德天气API: HTTP请求预报也失败: {str(http_err)}")
+                            return get_mock_forecast()
+                    else:
+                        return get_mock_forecast()
+            except Exception as e:
+                app.logger.error(f"高德天气API: 请求预报失败: {str(e)}")
+                return get_mock_forecast()
+        
+        # 解析返回数据
+        if data.get('status') == '1' and 'forecasts' in data and len(data['forecasts']) > 0:
+            forecasts_raw = data['forecasts'][0]['casts']
+            forecasts = []
+            
+            # 处理日期和星期
+            weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+            
+            # 包含今天的数据，获取全部预报（高德API最多提供4天，包括今天）
+            for i, forecast in enumerate(forecasts_raw):
+                # 解析日期和星期
+                date_parts = forecast['date'].split('-')
+                if len(date_parts) >= 2:
+                    month_day = f"{int(date_parts[1])}/{int(date_parts[2])}" if len(date_parts) > 2 else date_parts[1]
+                else:
+                    month_day = forecast['date']
+                
+                # 从星期几的数字转换为中文
+                day_of_week = weekdays[int(forecast.get('week', 0)) % 7]
+                
+                # 添加到结果中
+                forecasts.append({
+                    'date': month_day,
+                    'day': day_of_week,
+                    'weather': forecast['dayweather'],
+                    'high': forecast['daytemp'],
+                    'low': forecast['nighttemp']
+                })
+                
+                # 高德API最多提供4天预报
+                if len(forecasts) >= 4:
+                    break
+            
+            return forecasts
+        return None
+    except Exception as e:
+        app.logger.error(f"获取高德天气预报出错: {str(e)}")
+        return None
+
+def get_mock_forecast():
+    """获取模拟的天气预报数据"""
+    today = datetime.now()
+    weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    
+    # 生成未来7天的模拟数据
+    forecasts = []
+    for i in range(0, 7):  # 从今天开始，包括今天
+        next_day = today + timedelta(days=i)
+        day_of_week = weekdays[next_day.weekday()]
+        
+        # 根据日期生成一致的随机天气数据
+        # 使用日期作为随机种子，使得每天的天气预报保持一致
+        seed = int(f"{next_day.year}{next_day.month:02d}{next_day.day:02d}")
+        random.seed(seed)
+        
+        weather_types = ['晴', '多云', '阴', '小雨', '中雨']
+        weather_weights = [0.4, 0.3, 0.1, 0.1, 0.1]  # 权重，使晴天和多云更常见
+        weather_type = random.choices(weather_types, weights=weather_weights)[0]
+        
+        # 生成合理的温度范围
+        base_high = 25  # 基础高温
+        seasonal_var = 5  # 季节变化
+        daily_var = 3    # 日变化
+        
+        # 使用正弦函数模拟季节变化
+        day_of_year = next_day.timetuple().tm_yday
+        seasonal_effect = seasonal_var * math.sin((day_of_year - 80) * 2 * math.pi / 365)
+        
+        high_temp = round(base_high + seasonal_effect + random.uniform(-daily_var, daily_var))
+        low_temp = high_temp - random.randint(5, 10)  # 日夜温差5-10度
+        
+        forecasts.append({
+            'date': f"{next_day.month}/{next_day.day}",
+            'day': day_of_week,
+            'weather': weather_type,
+            'high': str(high_temp),
+            'low': str(low_temp)
+        })
+    
+    return forecasts
+
+@app.route('/api/market_period_distribution', methods=['GET'])
+def get_market_period_distribution():
+    """
+    获取早市/午市/夜市时段的摊位分布统计
+    早市（6:00–9:00）、午市（11:00–14:00）、夜市（17:00–22:00）
+    """
+    try:
+        # 使用MySQL数据库连接
+        db = DBM.DatabaseManager()
+        db.connect()
+        
+        # SQL查询，按时间段和摊位类型统计数量
+        query = """
+        SELECT 
+            CASE 
+                WHEN HOUR(created_at) BETWEEN 6 AND 9 THEN '早市'
+                WHEN HOUR(created_at) BETWEEN 11 AND 14 THEN '午市'
+                WHEN HOUR(created_at) BETWEEN 17 AND 22 THEN '夜市'
+                ELSE '其他时段'
+            END AS market_period,
+            detect_type,
+            COUNT(*) as count
+        FROM 
+            analysis_records
+        WHERE 
+            (HOUR(created_at) BETWEEN 6 AND 9) 
+            OR (HOUR(created_at) BETWEEN 11 AND 14)
+            OR (HOUR(created_at) BETWEEN 17 AND 22)
+        GROUP BY 
+            market_period, detect_type
+        ORDER BY 
+            CASE market_period
+                WHEN '早市' THEN 1
+                WHEN '午市' THEN 2
+                WHEN '夜市' THEN 3
+                ELSE 4
+            END
+        """
+        
+        # 执行查询
+        results = db.query_data(query)
+        
+        # 关闭连接
+        db.disconnect()
+        
+        # 初始化结果数据结构
+        market_periods = ['早市', '午市', '夜市']
+        distribution = {
+            '早市': {'zdjy_ld': 0, 'zdjy_gd': 0},
+            '午市': {'zdjy_ld': 0, 'zdjy_gd': 0},
+            '夜市': {'zdjy_ld': 0, 'zdjy_gd': 0}
+        }
+        
+        # 填充查询结果
+        if results:
+            for row in results:
+                period = row[0]  # 市场时段
+                detect_type = row[1]  # 摊位类型
+                count = int(row[2])  # 数量
+                
+                # 确保类型是有效的
+                if detect_type in ['zdjy_ld', 'zdjy_gd'] and period in market_periods:
+                    distribution[period][detect_type] = count
+        
+        # 构建响应数据
+        response_data = {
+            'market_periods': market_periods,
+            'data': [
+                {
+                    'period': period,
+                    'zdjy_ld': distribution[period]['zdjy_ld'],
+                    'zdjy_gd': distribution[period]['zdjy_gd'],
+                    'total': distribution[period]['zdjy_ld'] + distribution[period]['zdjy_gd']
+                }
+                for period in market_periods
+            ],
+            'types': {
+                'zdjy_ld': '流动摊位',
+                'zdjy_gd': '固定摊位'
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': response_data
+        })
+        
+    except Exception as e:
+        logger.error(f"获取市场时段分布数据时出错: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': f"获取数据失败: {str(e)}"
+        }), 500
 
 
 if __name__ == '__main__':
@@ -5458,4 +5853,7 @@ accesslog = "access.log"
 errorlog = "error.log"
 loglevel = "warning"
 """
+
+import threading
+amap_weather_semaphore = threading.Semaphore(3)
 
