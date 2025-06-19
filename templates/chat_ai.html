@@ -269,13 +269,45 @@
             background-color: #f5f5f5;
         }
         
+        /* 修改录音按钮的样式，增强脉冲效果 */
         .coze-voice-btn.recording {
             color: #d32f2f;
             animation: pulse 1.5s infinite;
+            background-color: rgba(255, 0, 0, 0.15);
+            box-shadow: 0 0 12px rgba(255, 0, 0, 0.6);
+            position: relative;
         }
         
+        /* 添加闪烁红点 */
+        .coze-voice-btn.recording::before {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff3b30;
+            top: 2px;
+            right: 2px;
+            animation: blink 1s infinite;
+        }
+        
+        /* 添加外部脉动边框 */
+        .coze-voice-btn.recording::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+            border: 2px solid rgba(255, 0, 0, 0.7);
+            animation: pulse-border 1.5s infinite;
+            left: 0;
+            top: 0;
+            box-sizing: border-box;
+        }
+        
+        /* 图标也跟随脉动 */
         .coze-voice-btn.recording img {
-            filter: hue-rotate(300deg) saturate(3);
+            filter: hue-rotate(300deg) saturate(4);
             animation: pulse 1.5s infinite;
         }
         
@@ -869,10 +901,39 @@
             color: #666;
         }
 
+        /* 改进现有pulse动画 */
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(211, 47, 47, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+            }
+        }
+
+        /* 边框脉动动画 */
+        @keyframes pulse-border {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        /* 闪烁动画 */
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
         }
     </style>
 </head>
@@ -900,7 +961,8 @@ class CozeChat {
         ttsEnabled: false,     // 是否启用语音朗读
         ttsChunkSize: 100,     // 每次发送合成的文字长度
         ttsVoice: "x4_yezi",   // 讯飞发音人
-        ttsAutoplay: true      // 自动播放
+        ttsAutoplay: true,     // 自动播放
+        isTTSPlaying: false    // 是否正在播放TTS
     };
 
     constructor(options = {}) {
@@ -1095,10 +1157,32 @@ class CozeChat {
     
     // 绑定事件
     bindEvents() {
-        this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.elements.userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMessage();
+        // 发送按钮的事件处理
+        this.elements.sendBtn.addEventListener('click', () => {
+            console.log("发送按钮点击事件触发");
+            console.log("当前音频播放状态:", this.isAudioPlaying ? "正在播放" : "未播放");
+            
+            // 检查是否正在播放TTS
+            if (this.isAudioPlaying) {
+                console.log("当前正在播放TTS，执行暂停操作");
+                this.pauseAudio(); // 如果正在播放，则暂停播放
+            } else {
+                console.log("当前未播放TTS，执行发送消息操作");
+                this.sendMessage(); // 否则发送消息
+            }
         });
+        
+        this.elements.userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                console.log("Enter键按下，当前音频播放状态:", this.isAudioPlaying ? "正在播放" : "未播放");
+                if (this.isAudioPlaying) {
+                    this.pauseAudio();
+                } else {
+                    this.sendMessage();
+                }
+            }
+        });
+        
         this.elements.chatIcon.addEventListener('click', () => this.toggleChat());
         this.elements.closeBtn.addEventListener('click', () => this.toggleChat());
         
@@ -2059,7 +2143,7 @@ class CozeChat {
         }
     }
 
-    // 开始录音
+    // 修改开始录音方法，添加录音计时器
     async startRecording() {
         try {
             // 获取用户媒体设备
@@ -2070,7 +2154,40 @@ class CozeChat {
             if (voiceBtn) {
                 voiceBtn.classList.add('recording');
                 voiceBtn.title = '点击停止录音';
-                // 不需要修改innerHTML，因为录音状态通过CSS类来控制
+                
+                // 创建容器元素
+                const recordingContainer = document.createElement('div');
+                recordingContainer.className = 'recording-indicator';
+                recordingContainer.style.cssText = 'position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #d32f2f; white-space: nowrap; text-align: center;';
+                
+                // 添加状态文本
+                const statusText = document.createElement('div');
+                statusText.textContent = '录音中';
+                recordingContainer.appendChild(statusText);
+                
+                // 添加计时器
+                const timerDiv = document.createElement('div');
+                timerDiv.className = 'recording-timer';
+                timerDiv.textContent = '00:00';
+                timerDiv.style.marginTop = '2px';
+                recordingContainer.appendChild(timerDiv);
+                
+                voiceBtn.appendChild(recordingContainer);
+                
+                // 启动计时器
+                this.recordingStartTime = Date.now();
+                this.recordingTimer = setInterval(() => {
+                    const elapsedSeconds = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+                    const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+                    const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+                    timerDiv.textContent = `${minutes}:${seconds}`;
+                    
+                    // 当接近30秒限制时改变颜色
+                    if (elapsedSeconds >= 25) {
+                        timerDiv.style.color = '#ff0000';
+                        timerDiv.style.fontWeight = 'bold';
+                    }
+                }, 1000);
             }
             
             this.audioChunks = [];
@@ -2103,15 +2220,46 @@ class CozeChat {
             this.stream = stream;
             
             console.log("开始录音 (16kHz PCM格式)");
+            
+            // 添加自动停止录音功能 - 30秒后自动停止
+            this.recordingTimeout = setTimeout(() => {
+                if (this.isRecording) {
+                    console.log("录音时间达到上限，自动停止录音");
+                    this.stopRecording();
+                    
+                    // 显示提示
+                    const chatBox = document.getElementById('coze-chat-box');
+                    if (chatBox) {
+                        const noticeDiv = document.createElement('div');
+                        noticeDiv.style.cssText = 'text-align: center; padding: 10px; color: #666; font-size: 12px;';
+                        noticeDiv.textContent = '录音已达到30秒上限，自动停止';
+                        chatBox.appendChild(noticeDiv);
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                }
+            }, 30000);  // 30秒
+            
         } catch (error) {
             console.error('无法获取麦克风: ', error);
             alert('无法访问麦克风，请确保您已授权浏览器访问麦克风。');
             this.isRecording = false;
         }
     }
-    
-    // 停止录音
+
+    // 修改停止录音方法，清除计时器
     stopRecording() {
+        // 清除自动停止计时器
+        if (this.recordingTimeout) {
+            clearTimeout(this.recordingTimeout);
+            this.recordingTimeout = null;
+        }
+        
+        // 清除录音计时器
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+        
         if (this.isRecording) {
             // 断开音频处理
             if (this.processor && this.mediaStreamSource) {
@@ -2138,6 +2286,12 @@ class CozeChat {
             // 重置UI
             const voiceBtn = document.getElementById('coze-voice-btn');
             if (voiceBtn) {
+                // 移除录音中指示
+                const indicator = voiceBtn.querySelector('.recording-indicator');
+                if (indicator) {
+                    voiceBtn.removeChild(indicator);
+                }
+                
                 voiceBtn.classList.remove('recording');
                 voiceBtn.innerHTML = `<img src="/static/images/luying.png" alt="录音" style="width: 20px; height: 20px;">`;
                 voiceBtn.title = '语音输入';
@@ -2753,14 +2907,20 @@ class CozeChat {
     playAudioForSentence(text, audioBase64) {
         console.log(`收到句子音频: ${text.substring(0, 20)}...`);
         
+        // 设置状态为正在播放
+        this.isAudioPlaying = true;
+        
+        // 显示暂停图标
+        this.updateSendButtonState();
+        
         // 将音频添加到队列
         this.audioQueue.push({
             text: text,
             audio: audioBase64
         });
         
-        // 如果当前没有音频播放，则开始播放队列
-        if (!this.isAudioPlaying) {
+        // 如果当前没有活跃的音频播放，则开始播放队列
+        if (!this.currentAudio) {
             this.playNextAudio();
         }
     }
@@ -2771,11 +2931,17 @@ class CozeChat {
         if (this.audioQueue.length === 0) {
             this.isAudioPlaying = false;
             this.currentAudio = null;
+            
+            // 恢复发送按钮
+            this.updateSendButtonState();
             return;
         }
         
         // 标记为正在播放
         this.isAudioPlaying = true;
+        
+        // 更新发送按钮状态为暂停
+        this.updateSendButtonState();
         
         // 获取并移除队列中第一个音频
         const audioItem = this.audioQueue.shift();
@@ -2806,6 +2972,9 @@ class CozeChat {
             URL.revokeObjectURL(audioUrl);
             this.currentAudio = null;
             
+            // 更新发送按钮状态
+            this.updateSendButtonState();
+            
             // 继续尝试播放下一个
             setTimeout(() => this.playNextAudio(), 300);
         });
@@ -2816,9 +2985,51 @@ class CozeChat {
             URL.revokeObjectURL(audioUrl);
             this.currentAudio = null;
             
+            // 更新发送按钮状态
+            this.updateSendButtonState();
+            
             // 继续尝试播放下一个
             setTimeout(() => this.playNextAudio(), 300);
         });
+    }
+
+    // 添加日志到暂停音频的方法
+    pauseAudio() {
+        console.log("执行pauseAudio方法 - 开始暂停音频");
+        
+        if (this.currentAudio) {
+            // 停止当前音频播放
+            this.currentAudio.pause();
+            console.log("已暂停当前正在播放的音频");
+            this.currentAudio = null;
+        }
+        
+        // 清空音频队列
+        const queueLength = this.audioQueue.length;
+        this.audioQueue = [];
+        console.log(`已清空音频队列，共移除 ${queueLength} 个待播放项`);
+        
+        // 重置播放状态
+        this.isAudioPlaying = false;
+        console.log("已将isAudioPlaying设置为false");
+        
+        // 恢复发送按钮
+        this.updateSendButtonState();
+        
+        console.log("已暂停音频播放，完成状态重置");
+    }
+
+    // 更新发送按钮状态的方法
+    updateSendButtonState() {
+        if (this.isAudioPlaying) {
+            // 如果正在播放，显示暂停图标
+            this.elements.sendBtn.innerHTML = `<img src="/static/images/zanting.png" alt="暂停" style="width: 20px; height: 20px;">`;
+            console.log("显示暂停按钮");
+        } else {
+            // 否则显示发送文本
+            this.elements.sendBtn.textContent = "发送";
+            console.log("显示发送按钮");
+        }
     }
 }
 
