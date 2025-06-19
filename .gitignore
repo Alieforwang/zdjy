@@ -9,7 +9,7 @@
 # 忽略图片文件
 *.jpg
 *.jpeg
-*.png
+
 *.gif
 *.bmp
 *.tiff

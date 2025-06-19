@@ -189,13 +189,12 @@
         
         .coze-chat-controls button {
             background: none;
+            background-color: transparent;
+            color: #3a5998;
             border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 5px;
+            padding: 10px 15px;
             border-radius: 4px;
-            transition: background-color 0.3s;
+            cursor: pointer;
         }
         
         .coze-chat-controls button:hover {
@@ -253,6 +252,7 @@
         
         .coze-voice-btn {
             background: none;
+            background-color: transparent;
             border: none;
             color: #3a5998;
             cursor: pointer;
@@ -284,10 +284,11 @@
         }
         
         .coze-chat-input button {
-            padding: 10px 15px;
-            background-color: #3a5998;
-            color: white;
+            background: none;
+            background-color: transparent;
+            color: #3a5998;
             border: none;
+            padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
         }
@@ -994,7 +995,7 @@ class CozeChat {
                         <div class="coze-chat-input">
                             <input type="text" id="coze-user-input" placeholder="请输入您的问题..." autocomplete="off">
                             <button class="coze-voice-btn" id="coze-voice-btn" title="语音输入">
-                                <img src="{{ url_for('static', filename='images/luying.png') }}" alt="录音" style="width: 20px; height: 20px;">
+                                <img src="/static/images/luying.png" alt="录音" style="width: 20px; height: 20px;">
                             </button>
                             <button id="coze-send-btn">发送</button>
                         </div>
@@ -2139,7 +2140,7 @@ class CozeChat {
             const voiceBtn = document.getElementById('coze-voice-btn');
             if (voiceBtn) {
                 voiceBtn.classList.remove('recording');
-                voiceBtn.innerHTML = `<img src="{{ url_for('static', filename='images/luying.png') }}" alt="录音" style="width: 20px; height: 20px;">`;
+                voiceBtn.innerHTML = `<img src="/static/images/luying.png" alt="录音" style="width: 20px; height: 20px;">`;
                 voiceBtn.title = '语音输入';
             }
         }
