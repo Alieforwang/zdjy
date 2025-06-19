@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 主应用服务
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: always
+    ports:
+      - "8888:8888"
+    volumes:
+      - ../models:/app/models  # 模型文件
+      - app_uploads:/app/static/uploads  # 上传文件
+      - app_results:/app/static/@results  # 结果文件
+      - app_sessions:/app/sessions  # 会话文件
+      - app_logs:/app/logs  # 日志文件
+    depends_on:
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=123456
+      - DB_NAME=tiaozhanbei
+
+  # MySQL服务
+  mysql:
+    image: mysql:8.0
+    restart: always
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../2025.6.18.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=tiaozhanbei
+      - MYSQL_USER=zdjy
+      - MYSQL_PASSWORD=zdjy123
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+volumes:
+  mysql_data:
+  app_uploads:
+  app_results:
+  app_sessions:
+  app_logs: 
