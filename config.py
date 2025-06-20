@@ -6,15 +6,15 @@ DB_CONFIG = {
     'database': 'tiaozhanbei',
     'port': 3306,
     'charset': 'utf8mb4',
-    'pool_size': 10,
-    'pool_name': 'mysql_pool',
+    'pool_size': 30,
+    'pool_name': 'mypool',
     'pool_reset_session': True,
     'autocommit': True,
     'use_pure': True,
-    'connection_timeout': 60,
+    'connection_timeout': 30,
     'buffered': True,
-    'get_warnings': False,
-    'raise_on_warnings': False,
+    'get_warnings': True,
+    'raise_on_warnings': True,
     'time_zone': '+8:00'
 }
 

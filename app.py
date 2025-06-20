@@ -261,19 +261,19 @@ def setup_db_connection_maintenance():
     from util.DBUtil import reset_connection_pool
     
     def reset_pool_periodically():
-        # 每小时重置一次连接池，避免连接池耗尽问题
+        # 每30分钟重置一次连接池，避免连接池耗尽问题
         import threading
         last_success = time.time()  # 记录上次成功重置的时间
         
         while True:
             try:
-                # 检查距离上次成功重置是否已经超过30分钟
+                # 检查距离上次成功重置是否已经超过15分钟
                 current_time = time.time()
-                # 如果上次重置失败，且已经过了30分钟，则尝试更频繁地重置
-                if current_time - last_success > 1800:  # 30分钟
-                    sleep_time = 600  # 10分钟
+                # 如果上次重置失败，且已经过了15分钟，则尝试更频繁地重置
+                if current_time - last_success > 900:  # 15分钟
+                    sleep_time = 300  # 5分钟
                 else:
-                    sleep_time = 3600  # 1小时
+                    sleep_time = 1800  # 30分钟
                 
                 # 睡眠指定时间
                 logger.info(f"下次数据库连接池维护将在 {sleep_time} 秒后进行")
@@ -287,8 +287,8 @@ def setup_db_connection_maintenance():
                 )
                 reset_thread.start()
                 
-                # 等待重置完成，但最多等待2分钟
-                reset_thread.join(timeout=120)
+                # 等待重置完成，但最多等待1分钟
+                reset_thread.join(timeout=60)
                 
                 # 如果线程仍在运行，说明重置超时
                 if reset_thread.is_alive():
@@ -299,7 +299,7 @@ def setup_db_connection_maintenance():
             except Exception as e:
                 logger.error(f"连接池维护线程异常: {str(e)}")
                 # 发生异常时，短暂休眠后继续
-                time.sleep(60)
+                time.sleep(30)  # 减少异常后的等待时间
     
     def _do_reset_with_timeout():
         """带超时保护的重置连接池操作"""
@@ -5209,8 +5209,8 @@ def monthly_detection_stats():
         }
         
         # 连接数据库
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        db = DBM.DatabaseManager()
+        db.connect()
         
         # 查询过去12个月的数据
         for i in range(12):
@@ -5222,37 +5222,40 @@ def monthly_detection_stats():
                 year -= 1
             
             # 计算该月的开始和结束时间
-            start_date = f"{year}-{month:02d}-01 00:00:00"
+            start_date = datetime(year, month, 1).strftime('%Y-%m-%d')
             
             # 计算下个月的第一天作为结束时间
-            next_month = month + 1
-            next_year = year
-            if next_month > 12:
+            if month == 12:
+                next_year = year + 1
                 next_month = 1
-                next_year += 1
-            end_date = f"{next_year}-{next_month:02d}-01 00:00:00"
+            else:
+                next_year = year
+                next_month = month + 1
+            end_date = datetime(next_year, next_month, 1).strftime('%Y-%m-%d')
             
             # 查询流动摊位数据
-            cursor.execute("""
-                SELECT COUNT(*) FROM detections 
-                WHERE timestamp >= ? AND timestamp < ? 
-                AND detection_type LIKE '%流动%'
-            """, (start_date, end_date))
-            flowing_count = cursor.fetchone()[0] or 0
+            flowing_query = """
+                SELECT COUNT(*) FROM analysis_records 
+                WHERE created_at >= %s AND created_at < %s 
+                AND detect_type = 'zdjy_ld'
+            """
+            flowing_result = db.query_data(flowing_query, (start_date, end_date))
+            flowing_count = int(flowing_result[0][0]) if flowing_result else 0
             
             # 查询固定摊位数据
-            cursor.execute("""
-                SELECT COUNT(*) FROM detections 
-                WHERE timestamp >= ? AND timestamp < ? 
-                AND detection_type LIKE '%固定%'
-            """, (start_date, end_date))
-            fixed_count = cursor.fetchone()[0] or 0
+            fixed_query = """
+                SELECT COUNT(*) FROM analysis_records 
+                WHERE created_at >= %s AND created_at < %s 
+                AND detect_type = 'zdjy_gd'
+            """
+            fixed_result = db.query_data(fixed_query, (start_date, end_date))
+            fixed_count = int(fixed_result[0][0]) if fixed_result else 0
             
             # 存储数据（逆序存储，使最新的月份在数组最后）
             monthly_data["flowing"][11-i] = flowing_count
             monthly_data["fixed"][11-i] = fixed_count
         
-        conn.close()
+        db.disconnect()
         
         # 如果数据库中没有数据，生成模拟数据
         if sum(monthly_data["flowing"]) == 0 and sum(monthly_data["fixed"]) == 0:
