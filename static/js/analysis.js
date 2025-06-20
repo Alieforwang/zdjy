@@ -1200,7 +1200,10 @@ function handleFiles(files) {
     formData.append('file', file);
     
     const resultArea = document.getElementById('resultArea');
-    resultArea.innerHTML = '<div class="loading">正在分析中...<div class="spinner"></div></div>';
+    resultArea.innerHTML = '<div class="loading">正在分析中...<span class="loading-spinner"></span></div>';
+    
+    // 显示处理状态提示
+    showProcessingInfo(file.type.startsWith('video/'));
     
     // 预览图片
     const previewContainer = document.getElementById('previewContainer');
@@ -1695,29 +1698,94 @@ function handleVideoError(video) {
         return;
     }
     
-    // 显示错误信息，但保留视频元素，让用户可以重试
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.innerHTML = `
-        <p>视频加载失败</p>
-        <button onclick="retryVideo(this.parentElement.previousElementSibling)">重试加载</button>
+    // 创建友好的错误提示
+    const errorContainer = document.createElement('div');
+    errorContainer.className = 'error-container';
+    
+    // 检查视频路径是否包含特定关键词以判断可能的错误原因
+    const isEncodingIssue = originalSrc.includes('result_');
+    const possibleIssue = isEncodingIssue ? 
+        '视频处理过程中可能遇到编解码器问题 (OpenH264/avc1)。' : 
+        '视频加载失败，请检查视频格式是否支持。';
+
+    errorContainer.innerHTML = `
+        <h4><span class="error-icon">⚠️</span> 视频加载失败</h4>
+        <p>${possibleIssue}</p>
+        <div class="error-details">
+            <p>错误详情: ${video.error ? video.error.message : '未知错误'}</p>
+            <p>视频路径: ${originalSrc}</p>
+            <p>可能的原因: </p>
+            <ul>
+                <li>视频文件可能损坏或不存在</li>
+                <li>编解码器不兼容 (如缺少OpenH264库)</li>
+                <li>浏览器不支持该视频格式</li>
+                <li>视频过大导致加载超时</li>
+            </ul>
+        </div>
+        ${isEncodingIssue ? `
+        <div class="error-solution">
+            <p><strong>解决方案:</strong></p>
+            <ol>
+                <li>如果您使用Firefox浏览器，可能需要安装OpenH264库。请访问 <a href="https://github.com/cisco/openh264/releases" target="_blank">OpenH264官方下载页面</a> 下载安装对应版本。</li>
+                <li>如果您使用Chrome或Edge浏览器，可以尝试在设置中启用H.264编解码器支持。</li>
+                <li>也可以尝试使用其他浏览器访问此页面。</li>
+                <li>或者等待几分钟后再次尝试，服务器可能正在处理视频转码。</li>
+            </ol>
+        </div>
+        ` : ''}
+        <div class="error-actions">
+            <button onclick="retryVideo(this.parentElement.parentElement.previousElementSibling)" class="retry-btn">重试加载</button>
+        </div>
     `;
     
-    // 如果已有错误消息，则不重复添加
-    if (!video.parentElement.querySelector('.error-message')) {
-        video.parentElement.appendChild(errorDiv);
+    // 隐藏视频元素
+    video.style.display = 'none';
+    
+    // 如果已有错误消息，则替换
+    const existingError = video.parentElement.querySelector('.error-container');
+    if (existingError) {
+        existingError.parentElement.replaceChild(errorContainer, existingError);
+    } else {
+        video.parentElement.appendChild(errorContainer);
     }
+    
+    // 记录到控制台
+    console.error('视频加载失败，已显示错误信息');
 }
 
 // 重试加载视频
 function retryVideo(video) {
     if (!video) return;
     
+    // 显示视频元素
+    video.style.display = 'block';
+    
+    // 清除视频错误状态
+    video.error = null;
+    
     // 添加时间戳避免缓存
     const src = video.src.split('?')[0] + '?t=' + new Date().getTime();
     console.log('重试加载视频:', src);
     
-    video.src = src;
+    // 如果之前疑似是编解码问题，尝试切换源(可能服务器会有替代版本)
+    if (src.includes('result_') && video.dataset.triedAlternative !== 'true') {
+        // 标记已尝试替代版本
+        video.dataset.triedAlternative = 'true';
+        
+        // 尝试使用替代版本（如mp4改为webm，或者找寻备份版本）
+        const basePath = src.split('result_')[0];
+        const fileId = src.split('result_')[1].split('_')[0];
+        const timestamp = new Date().getTime();
+        
+        // 尝试找寻其他编码版本
+        const alternativeSrc = `${basePath}result_${fileId}_alt.mp4?t=${timestamp}`;
+        
+        console.log('尝试加载替代版本:', alternativeSrc);
+        video.src = alternativeSrc;
+    } else {
+        video.src = src;
+    }
+    
     video.load(); // 重新加载视频
     
     // 添加事件监听器以在加载完成时记录成功信息
@@ -1726,7 +1794,7 @@ function retryVideo(video) {
     };
     
     // 移除错误信息
-    const errorMessage = video.parentElement.querySelector('.error-message');
+    const errorMessage = video.parentElement.querySelector('.error-container');
     if (errorMessage) {
         errorMessage.remove();
     }
@@ -1888,5 +1956,28 @@ function restoreFromLocalStorage() {
             // 如果状态超过24小时，清除它
             localStorage.removeItem('analysisState');
         }
+    }
+}
+
+// 显示处理状态提示
+function showProcessingInfo(isVideo) {
+    // 仅对视频显示编解码器提示
+    if (!isVideo) return;
+    
+    const resultArea = document.getElementById('resultArea');
+    const loadingDiv = resultArea.querySelector('.loading');
+    
+    if (loadingDiv) {
+        const processingInfo = document.createElement('div');
+        processingInfo.className = 'processing-info';
+        processingInfo.style.fontSize = '12px';
+        processingInfo.style.color = '#b7c4d5';
+        processingInfo.style.marginTop = '10px';
+        processingInfo.innerHTML = `
+            <p>视频处理可能需要较长时间，请耐心等待。</p>
+            <p>如果长时间未响应，可能是编解码器问题，可尝试使用其他格式的视频。</p>
+        `;
+        
+        loadingDiv.appendChild(processingInfo);
     }
 }
