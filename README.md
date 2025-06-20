@@ -1,5 +1,90 @@
 # 灵瞳YOLOv8-DeepSeek多模态街景治理实时检测平台
 
+基于YOLOv8和DeepSeek多模态大模型的街景治理实时检测平台，支持实时视频分析、多模态理解和智能决策。
+
+## 项目特点
+
+- **多模态融合**：结合视觉检测与语言理解能力
+- **实时处理**：高效处理视频流，实现实时检测
+- **智能分析**：自动识别街景问题并提供处理建议
+- **易于部署**：支持Docker一键部署，自动适配CPU/GPU环境
+
+## 快速部署
+
+### Windows环境
+
+```bash
+# 进入docker目录
+cd docker
+
+# 运行启动脚本
+start.bat
+```
+
+### Linux环境
+
+```bash
+# 步骤1：初始化环境（仅首次运行需要）
+cd docker
+chmod +x setup.sh
+./setup.sh
+
+# 步骤2：启动所有服务
+docker compose up -d
+```
+
+## 系统要求
+
+- **操作系统**：Windows 10/11 或 Linux
+- **Docker**：最新版Docker和Docker Compose
+- **硬件**：
+  - 最低配置：4核CPU，8GB内存
+  - 推荐配置：8核CPU，16GB内存，NVIDIA GPU (CUDA 11.7+)
+
+## 目录结构
+
+```
+project/
+├── app.py                # 主应用入口
+├── config.py             # 配置文件
+├── yolov8.py             # YOLOv8检测模块
+├── models/               # 模型文件目录
+├── docker/               # Docker部署文件
+├── static/               # 静态资源
+├── templates/            # 前端模板
+└── scripts/              # 辅助脚本
+```
+
+## 使用说明
+
+1. 访问 http://localhost 打开Web界面
+2. 上传图片或视频进行分析
+3. 查看检测结果和处理建议
+
+## 开发指南
+
+### 环境设置
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux
+venv\Scripts\activate     # Windows
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 运行开发服务器
+
+```bash
+python app.py
+```
+
+## 许可证
+
+本项目采用MIT许可证
+
 ##  项目简介
 - 本研究针对城市占道经营的实时检测与决策支持需求，提出"灵瞳—YOLOv8-DeepSeek"多模态监测平台。
 - 平台基于YOLOv8n模型实现93% mAP@0.5和平衡速度166.7 FPS的实时检测，并集成DeepSeek-R1大语言模型提供智能问答及辅助决策。

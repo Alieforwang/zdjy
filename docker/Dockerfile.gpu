@@ -13,7 +13,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MPLCONFIGDIR=/tmp/matplotlib_config \
     YOLO_CONFIG_DIR=/tmp/ultralytics_config \
-    PIP_INDEX_URL=$PIP_INDEX_URL
+    NVIDIA_VISIBLE_DEVICES=all \
+    PIP_INDEX_URL=$PIP_INDEX_URL \
+    APT_MIRROR=$APT_MIRROR
 
 # 配置apt源
 RUN if [ -n "$APT_MIRROR" ]; then \
@@ -32,17 +34,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     git \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建必要的目录
 RUN mkdir -p /app/static/uploads /app/static/@results /app/static/temp \
     /tmp/matplotlib_config /tmp/ultralytics_config /app/logs /app/sessions
 
-# 复制项目依赖
-COPY requirements.txt .
+# 复制requirements.txt但排除torch相关依赖（我们将单独安装）
+COPY requirements.txt /app/requirements.txt
+RUN grep -v "torch\|torchvision\|torchaudio" /app/requirements.txt > /app/requirements_notorch.txt
 
-# 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt -i $PIP_INDEX_URL
+# 安装Python依赖（除了PyTorch）
+RUN pip install --no-cache-dir -r requirements_notorch.txt -i $PIP_INDEX_URL
+
+# 复制PyTorch安装脚本
+COPY docker/scripts/install_torch.sh /app/install_torch.sh
+RUN chmod +x /app/install_torch.sh
+
+# 执行PyTorch安装脚本
+RUN /app/install_torch.sh
 
 # 复制启动脚本并设置权限
 COPY docker/scripts/entrypoint.sh /entrypoint.sh
@@ -51,7 +62,7 @@ RUN chmod +x /entrypoint.sh
 # 复制项目代码
 COPY . .
 
-# 设置权限
+# 设置权限（如果存在这些脚本）
 RUN for script in monitor.sh deploy.sh install.sh db_monitor.sh crontab_setup.sh; do \
     if [ -f "/app/$script" ]; then chmod +x /app/$script; fi \
     done
@@ -63,4 +74,4 @@ EXPOSE 8888
 ENTRYPOINT ["/entrypoint.sh"]
 
 # 启动命令
-CMD ["gunicorn", "-c", "gunicorn_config.py", "app:app"] 
+CMD ["gunicorn", "-c", "gunicorn_config.py", "app:app"]

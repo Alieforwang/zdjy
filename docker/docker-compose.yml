@@ -1,51 +1,94 @@
 version: '3.8'
 
 services:
+  # GPU检测服务（仅初始化时使用）
+  detect-gpu:
+    profiles: ["init"]
+    image: alpine:latest
+    entrypoint: 
+      - sh
+      - -c
+      - |
+        if command -v nvidia-smi >/dev/null 2>&1; then
+          echo "GPU_MODE=Dockerfile.gpu" > .env.gpu
+          echo "NVIDIA_DRIVER=nvidia" >> .env.gpu
+          echo "NVIDIA_COUNT=all" >> .env.gpu
+          echo "NVIDIA_CAPABILITIES=gpu" >> .env.gpu
+          echo "NVIDIA_VISIBLE_DEVICES=all" >> .env.gpu
+          echo "检测到NVIDIA GPU，将使用GPU版本"
+        else
+          echo "GPU_MODE=Dockerfile" > .env.gpu
+          echo "NVIDIA_DRIVER=none" >> .env.gpu
+          echo "NVIDIA_COUNT=0" >> .env.gpu
+          echo "NVIDIA_CAPABILITIES=" >> .env.gpu
+          echo "NVIDIA_VISIBLE_DEVICES=none" >> .env.gpu
+          echo "未检测到NVIDIA GPU，将使用CPU版本"
+        fi
+
   # 主应用服务
   app:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: ${GPU_MODE:-Dockerfile}
+      args:
+        - PIP_INDEX_URL=${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        - APT_MIRROR=${APT_MIRROR:-mirrors.tuna.tsinghua.edu.cn}
     restart: always
-    ports:
-      - "8888:8888"
     volumes:
-      - ../models:/app/models  # 模型文件
-      - app_uploads:/app/static/uploads  # 上传文件
-      - app_results:/app/static/@results  # 结果文件
-      - app_sessions:/app/sessions  # 会话文件
-      - app_logs:/app/logs  # 日志文件
+      - ../models:/app/models
+      - ../scripts/init:/app/scripts/init
+      - app-data:/app/static
+    environment:
+      - DB_HOST=${DB_HOST:-mysql}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-123456}
+      - DB_NAME=${DB_NAME:-tiaozhanbei}
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
     depends_on:
       - mysql
-    environment:
-      - DB_HOST=mysql
-      - DB_USER=root
-      - DB_PASSWORD=123456
-      - DB_NAME=tiaozhanbei
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: ${NVIDIA_DRIVER:-none}
+              count: ${NVIDIA_COUNT:-0}
+              capabilities: ["gpu"]
+    ports:
+      - "${APP_PORT:-8888}:8888"
 
   # MySQL服务
   mysql:
     image: mysql:8.0
     restart: always
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ../2025.6.18.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
-      - MYSQL_ROOT_PASSWORD=123456
-      - MYSQL_DATABASE=tiaozhanbei
-      - MYSQL_USER=zdjy
-      - MYSQL_PASSWORD=zdjy123
-    command: --default-authentication-plugin=mysql_native_password
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-123456}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-tiaozhanbei}
+      - MYSQL_USER=${MYSQL_USER:-zdjy}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-zdjy123}
+      - TZ=Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../sql:/docker-entrypoint-initdb.d
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # Nginx反向代理
+  nginx:
+    image: nginx:stable-alpine
+    restart: always
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/html:/usr/share/nginx/html
+    depends_on:
+      - app
 
 volumes:
-  mysql_data:
-  app_uploads:
-  app_results:
-  app_sessions:
-  app_logs: 
+  mysql-data:
+  app-data:

@@ -6,7 +6,7 @@ SETLOCAL
 REM 显示帮助信息
 :show_help
 IF "%1"=="" (
-    ECHO 智能识别系统 Docker 快速操作脚本
+    ECHO 灵瞳YOLOv8-DeepSeek多模态街景治理实时检测平台Docker 快速操作脚本
     ECHO.
     ECHO 用法: docker.bat [命令]
     ECHO.
