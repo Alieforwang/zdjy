@@ -972,7 +972,15 @@ class CozeChat {
         // 初始化音频队列 - 用于按句子顺序播放TTS音频
         this.audioQueue = [];
         this.isAudioPlaying = false;
+        this.isPlayingAudio = false;  // 添加新的播放状态标志
         this.currentAudio = null;
+        
+        // 语音识别累积结果存储
+        this.recognitionResults = {
+            accumulatedText: "",  // 累积的识别文本
+            segments: [],         // 所有识别片段
+            lastTimestamp: 0      // 最后识别时间戳
+        };
         
         this.currentConversationId = null;
         this.conversations = []; // 存储所有会话
@@ -2307,6 +2315,13 @@ class CozeChat {
         }
         
         try {
+            // 重置识别结果存储对象
+            this.recognitionResults = {
+                accumulatedText: "",
+                segments: [],
+                lastTimestamp: Date.now()
+            };
+            
             // 合并音频数据缓冲区
             const audioBuffers = this.audioChunks.map(buffer => new Int16Array(buffer));
             let totalLength = 0;
@@ -2371,7 +2386,6 @@ class CozeChat {
             // 读取响应流
             const reader = response.body.getReader();
             const decoder = new TextDecoder('utf-8');
-            let completeText = "";
             
             // 处理响应流
             while (true) {
@@ -2424,15 +2438,40 @@ class CozeChat {
                                             }
                                         }
                                         if (text) {
-                                            completeText = text;
-                                            resultSpan.textContent = completeText;
+                                            // 保存当前识别片段
+                                            const segmentInfo = {
+                                                text: text,
+                                                timestamp: Date.now(),
+                                                isPartial: true
+                                            };
+                                            
+                                            // 添加到识别片段列表
+                                            this.recognitionResults.segments.push(segmentInfo);
+                                            
+                                            // 更新累积文本 - 智能合并识别片段
+                                            this.updateAccumulatedText();
+                                            
+                                            // 显示当前累积的文本结果
+                                            resultSpan.textContent = this.recognitionResults.accumulatedText;
                                         }
                                     }
                                 }
                             } catch (e) {
                                 // 如果不是JSON格式，则直接使用文本
-                                completeText = jsonData.text;
-                                resultSpan.textContent = completeText;
+                                const segmentInfo = {
+                                    text: jsonData.text,
+                                    timestamp: Date.now(),
+                                    isPartial: true
+                                };
+                                
+                                // 添加到识别片段列表
+                                this.recognitionResults.segments.push(segmentInfo);
+                                
+                                // 更新累积文本
+                                this.updateAccumulatedText();
+                                
+                                // 显示当前累积的文本结果
+                                resultSpan.textContent = this.recognitionResults.accumulatedText;
                             }
                             
                             // 滚动到底部
@@ -2440,7 +2479,14 @@ class CozeChat {
                         } else if (jsonData.error) {
                             resultSpan.innerHTML = `<span style="color: red;">错误: ${jsonData.error}</span>`;
                         } else if (jsonData.status === "completed") {
-                            resultSpan.textContent = completeText || "识别完成";
+                            // 标记最后一个片段为完整的
+                            if (this.recognitionResults.segments.length > 0) {
+                                this.recognitionResults.segments[this.recognitionResults.segments.length - 1].isPartial = false;
+                            }
+                            
+                            // 最终更新累积文本
+                            this.updateAccumulatedText();
+                            resultSpan.textContent = this.recognitionResults.accumulatedText || "识别完成";
                         }
                     } catch (e) {
                         console.error('解析事件数据失败:', e, data);
@@ -2453,14 +2499,23 @@ class CozeChat {
             this.elements.userInput.disabled = false;
             this.elements.sendBtn.disabled = false;
             
-            if (completeText && completeText.trim()) {
-                // 将结果放入输入框并发送
-                this.elements.userInput.value = completeText.trim();
+            if (this.recognitionResults.accumulatedText.trim()) {
+                // 将结果放入输入框，不自动发送
+                this.elements.userInput.value = this.recognitionResults.accumulatedText.trim();
                 
-                // 延迟发送消息
-                setTimeout(() => {
-                    this.sendMessage();
-                }, 500);
+                // 添加提示信息
+                resultSpan.innerHTML = `
+                    <span style="color:#3a5998;">语音识别完成，累积结果已填入输入框，您可以编辑后点击发送按钮提交。</span>
+                    <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                        共识别 ${this.recognitionResults.segments.length} 个语音片段
+                    </div>
+                `;
+                
+                // 聚焦输入框，方便用户编辑
+                this.elements.userInput.focus();
+                
+                // 选中全部文本，便于用户快速编辑
+                this.elements.userInput.select();
             } else {
                 resultSpan.textContent = "未能识别出有效文字，请重试。";
             }
@@ -2474,6 +2529,83 @@ class CozeChat {
             // 清空录音数据
             this.audioChunks = [];
         }
+    }
+    
+    // 智能更新累积文本 - 避免重复内容
+    updateAccumulatedText() {
+        if (this.recognitionResults.segments.length === 0) {
+            this.recognitionResults.accumulatedText = "";
+            return;
+        }
+        
+        // 按时间顺序排序所有片段
+        const sortedSegments = [...this.recognitionResults.segments].sort((a, b) => a.timestamp - b.timestamp);
+        
+        // 保存上一个累积的文本长度，用于判断变化
+        const prevLength = this.recognitionResults.accumulatedText.length;
+        
+        // 基于识别片段智能重建累积文本
+        let result = "";
+        let prevSegText = "";
+        
+        for (let i = 0; i < sortedSegments.length; i++) {
+            const segment = sortedSegments[i];
+            const currentText = segment.text;
+            
+            // 如果是第一段，直接使用
+            if (i === 0) {
+                result = currentText;
+                prevSegText = currentText;
+                continue;
+            }
+            
+            // 检测当前段落与上一段是否存在重叠
+            const overlap = this.findMaxOverlap(prevSegText, currentText);
+            
+            if (overlap > 0) {
+                // 有重叠，只添加非重叠部分
+                result += currentText.substring(overlap);
+            } else {
+                // 无重叠或修正，添加空格和完整文本
+                if (result && !result.endsWith("，") && !result.endsWith("。") && 
+                    !result.endsWith("？") && !result.endsWith("！") && !result.endsWith(" ")) {
+                    result += " ";
+                }
+                result += currentText;
+            }
+            
+            prevSegText = currentText;
+        }
+        
+        // 更新累积文本
+        this.recognitionResults.accumulatedText = result;
+        
+        // 输出调试信息
+        if (result.length !== prevLength) {
+            console.log(`识别文本已更新: "${result}"`);
+        }
+    }
+    
+    // 查找两个字符串之间的最大重叠长度
+    findMaxOverlap(str1, str2) {
+        // 空字符串处理
+        if (!str1 || !str2) return 0;
+        
+        // 计算可能的重叠部分 - 检查str1的末尾和str2的开头
+        const maxOverlapLength = Math.min(str1.length, str2.length);
+        
+        // 从最大可能重叠长度开始向下检查
+        for (let i = maxOverlapLength; i > 0; i--) {
+            const str1End = str1.substring(str1.length - i);
+            const str2Start = str2.substring(0, i);
+            
+            // 如果找到重叠，返回重叠长度
+            if (str1End === str2Start) {
+                return i;
+            }
+        }
+        
+        return 0;
     }
 
     // 添加TTS播放队列和音频播放器管理
@@ -2920,7 +3052,7 @@ class CozeChat {
         });
         
         // 如果当前没有活跃的音频播放，则开始播放队列
-        if (!this.currentAudio) {
+        if (!this.isPlayingAudio) {
             this.playNextAudio();
         }
     }
@@ -2931,6 +3063,7 @@ class CozeChat {
         if (this.audioQueue.length === 0) {
             this.isAudioPlaying = false;
             this.currentAudio = null;
+            this.isPlayingAudio = false;
             
             // 恢复发送按钮
             this.updateSendButtonState();
@@ -2939,58 +3072,71 @@ class CozeChat {
         
         // 标记为正在播放
         this.isAudioPlaying = true;
+        this.isPlayingAudio = true;
         
         // 更新发送按钮状态为暂停
         this.updateSendButtonState();
         
-        // 获取并移除队列中第一个音频
-        const audioItem = this.audioQueue.shift();
-        
-        // 解码音频数据
-        const audioData = Uint8Array.from(atob(audioItem.audio), c => c.charCodeAt(0));
-        const audioBlob = new Blob([audioData], { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        // 创建音频元素
-        this.currentAudio = new Audio(audioUrl);
-        
-        // 记录音频句子，用于调试
-        console.log(`正在播放: ${audioItem.text.substring(0, 20)}...`);
-        
-        // 设置事件监听
-        this.currentAudio.addEventListener('ended', () => {
-            console.log('音频播放完成，准备播放下一个');
-            URL.revokeObjectURL(audioUrl);
-            this.currentAudio = null;
+        try {
+            // 获取并移除队列中第一个音频
+            const audioItem = this.audioQueue.shift();
             
-            // 播放下一个音频
-            setTimeout(() => this.playNextAudio(), 300);
-        });
-        
-        this.currentAudio.addEventListener('error', (e) => {
-            console.error('音频播放错误:', e);
-            URL.revokeObjectURL(audioUrl);
-            this.currentAudio = null;
+            // 解码音频数据
+            const audioData = Uint8Array.from(atob(audioItem.audio), c => c.charCodeAt(0));
+            const audioBlob = new Blob([audioData], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
             
-            // 更新发送按钮状态
+            // 创建音频元素
+            this.currentAudio = new Audio(audioUrl);
+            
+            // 记录音频句子，用于调试
+            console.log(`正在播放: ${audioItem.text.substring(0, 20)}...`);
+            
+            // 设置事件监听
+            this.currentAudio.addEventListener('ended', () => {
+                console.log('音频播放完成，准备播放下一个');
+                URL.revokeObjectURL(audioUrl);
+                this.currentAudio = null;
+                
+                // 播放下一个音频
+                setTimeout(() => this.playNextAudio(), 300);
+            });
+            
+            this.currentAudio.addEventListener('error', (e) => {
+                console.error('音频播放错误:', e);
+                URL.revokeObjectURL(audioUrl);
+                this.currentAudio = null;
+                this.isPlayingAudio = false;
+                
+                // 更新发送按钮状态
+                this.updateSendButtonState();
+                
+                // 继续尝试播放下一个
+                setTimeout(() => this.playNextAudio(), 300);
+            });
+            
+            // 开始播放
+            this.currentAudio.play().catch(e => {
+                console.error('音频播放失败:', e);
+                URL.revokeObjectURL(audioUrl);
+                this.currentAudio = null;
+                this.isPlayingAudio = false;
+                
+                // 更新发送按钮状态
+                this.updateSendButtonState();
+                
+                // 继续尝试播放下一个
+                setTimeout(() => this.playNextAudio(), 300);
+            });
+        } catch (error) {
+            console.error('音频处理失败:', error);
+            this.currentAudio = null;
+            this.isPlayingAudio = false;
             this.updateSendButtonState();
             
-            // 继续尝试播放下一个
-            setTimeout(() => this.playNextAudio(), 300);
-        });
-        
-        // 开始播放
-        this.currentAudio.play().catch(e => {
-            console.error('音频播放失败:', e);
-            URL.revokeObjectURL(audioUrl);
-            this.currentAudio = null;
-            
-            // 更新发送按钮状态
-            this.updateSendButtonState();
-            
-            // 继续尝试播放下一个
-            setTimeout(() => this.playNextAudio(), 300);
-        });
+            // 出错后尝试继续队列
+            setTimeout(() => this.playNextAudio(), 500);
+        }
     }
 
     // 添加日志到暂停音频的方法
@@ -3011,7 +3157,8 @@ class CozeChat {
         
         // 重置播放状态
         this.isAudioPlaying = false;
-        console.log("已将isAudioPlaying设置为false");
+        this.isPlayingAudio = false;
+        console.log("已将isAudioPlaying和isPlayingAudio设置为false");
         
         // 恢复发送按钮
         this.updateSendButtonState();
