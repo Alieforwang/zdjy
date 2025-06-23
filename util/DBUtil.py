@@ -717,3 +717,23 @@ def hash_password(self, password):
     import hashlib
     # 简单的MD5加密，实际应用中应使用更安全的算法如bcrypt
     return hashlib.md5(password.encode()).hexdigest()
+
+def verify_password(self, password, stored_password):
+    """
+    验证密码是否匹配
+    
+    参数:
+        password: 用户输入的明文密码
+        stored_password: 数据库中存储的密码（可能是哈希值）
+    
+    返回值:
+        密码是否匹配
+    """
+    # 如果数据库中的密码是明文存储的（不建议），直接比较
+    if len(stored_password) < 32:  # 不是MD5哈希
+        return password == stored_password
+    
+    # 如果是哈希存储，对输入密码进行哈希后比较
+    import hashlib
+    hashed_input = hashlib.md5(password.encode()).hexdigest()
+    return hashed_input == stored_password

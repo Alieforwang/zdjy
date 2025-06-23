@@ -609,7 +609,6 @@ def login():
                     if is_admin and not user_is_admin:
                         return jsonify({'success': False, 'message': '您不是管理员用户'})
                     
-                    
                     # 如果是普通用户登录但尝试以管理员身份登录
                     if not is_admin and user_is_admin:
                         return jsonify({'success': False, 'message': '请使用管理员登录入口'})
@@ -624,6 +623,7 @@ def login():
                     session['is_admin'] = user_is_admin
                     session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     session['login_ip'] = request.remote_addr
+                    session['logged_in'] = True
                     session.modified = True
                     
                     # 记录登录成功
@@ -2618,7 +2618,7 @@ def change_password():
     """
     修改当前用户密码
     """
-    if not session.get('logged_in'):
+    if 'user_id' not in session:
         return jsonify({'success': False, 'message': '请先登录'}), 401
     
     data = request.json
@@ -4346,15 +4346,24 @@ def set_confidence_threshold():
         cursor = conn.cursor()
         
         try:
-            # 检查settings表是否存在，不存在则创建
+            # 检查settings表是否存在
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS settings (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL UNIQUE,
-                    value TEXT,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() 
+                AND table_name = 'settings'
             """)
+            
+            # 表不存在时才创建表
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS settings (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL UNIQUE,
+                        value TEXT,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
             
             # 更新置信度阈值 - 使用MySQL参数占位符
             cursor.execute(
@@ -6075,15 +6084,24 @@ def save_settings_to_db():
     cursor = conn.cursor()
     
     try:
-        # 检查settings表是否存在，不存在则创建
+        # 检查settings表是否存在
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS settings (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL UNIQUE,
-                value TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE() 
+            AND table_name = 'settings'
         """)
+        
+        # 表不存在时才创建表
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL UNIQUE,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
         
         # 保存设置，使用全局变量
         global DETECTION_CONFIDENCE_THRESHOLD
