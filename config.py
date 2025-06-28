@@ -1,10 +1,12 @@
+import os
+
 # 数据库配置
 DB_CONFIG = {
-    'host': '127.0.0.1',
-    'user': 'root',
-    'password': '123456',
-    'database': 'tiaozhanbei',
-    'port': 3306,
+    'host': os.environ.get('MYSQL_HOST', '127.0.0.1'),
+    'user': os.environ.get('MYSQL_USER', 'root'),
+    'password': os.environ.get('MYSQL_PASSWORD', '123456'),
+    'database': os.environ.get('MYSQL_DATABASE', 'tiaozhanbei'),
+    'port': int(os.environ.get('MYSQL_PORT', 3306)),
     'charset': 'utf8mb4',
     'pool_size': 30,
     'pool_name': 'mypool',
