@@ -47,7 +47,9 @@ def get_connection_pool(pool_size=10, pool_name="mysql_pool"):
                     pool_config = DB_CONFIG.copy()
                     pool_config.update({
                         "pool_size": pool_size,
-                        "pool_name": pool_name
+                        "pool_name": pool_name,
+                        "pool_reset_session": True,
+                        "autocommit": True
                     })
                     
                     connection_pool = pooling.MySQLConnectionPool(**pool_config)
@@ -71,27 +73,44 @@ class DatabaseManager():
         self.connection = None
         self._use_pool = True  # 默认使用连接池
         self._pool_size = DB_CONFIG['pool_size']   # 使用配置文件中的池大小
+        self._connection_lifetime = 1800  # 连接生命周期(30分钟)
+        self._last_connection_time = 0  # 上次获取连接的时间
         
         # 初始化时就确保连接池存在
         if self._use_pool:
             get_connection_pool(self._pool_size)
 
+    def _should_reconnect(self):
+        """检查是否需要重新获取连接"""
+        if not self.connection:
+            return True
+        
+        # 检查连接是否超过生命周期
+        current_time = time.time()
+        if current_time - self._last_connection_time > self._connection_lifetime:
+            return True
+            
+        # 检查连接是否有效
+        try:
+            if not hasattr(self.connection, 'is_connected') or not self.connection.is_connected():
+                return True
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            return False
+        except:
+            return True
+
     def connect(self):
         """从连接池获取连接或直接创建新连接"""
         try:
-            if self.connection and hasattr(self.connection, 'is_connected') and self.connection.is_connected():
-                # 已有活跃连接，先检查连接是否有效
-                try:
-                    # 执行一个轻量级查询验证连接
-                    cursor = self.connection.cursor()
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-                    cursor.close()
-                    return
-                except Error:
-                    # 连接无效，需要关闭并重新获取
-                    self.disconnect()
-                    
+            if not self._should_reconnect():
+                return
+                
+            # 先确保旧连接已关闭
+            self.disconnect()
+            
             if self._use_pool:
                 # 从连接池获取连接
                 pool = get_connection_pool(self._pool_size)
@@ -100,6 +119,9 @@ class DatabaseManager():
                 for attempt in range(retries):
                     try:
                         self.connection = pool.get_connection()
+                        self._last_connection_time = time.time()
+                        if not hasattr(self.connection, 'is_connected') or not self.connection.is_connected():
+                            raise Error("获取的连接无效")
                         break
                     except Error as e:
                         if attempt < retries - 1:
@@ -107,19 +129,12 @@ class DatabaseManager():
                             time.sleep(1)  # 等待1秒再重试
                         else:
                             raise  # 重试耗尽，抛出异常
-                
-                if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
-                    return
             else:
-                # 直接创建连接（使用config.py中的完整配置）
-                connection_config = DB_CONFIG.copy()
-                # 移除连接池特有的配置项
-                pool_config_keys = ['pool_size', 'pool_name', 'pool_reset_session']
-                for key in pool_config_keys:
-                    if key in connection_config:
-                        connection_config.pop(key)
-                
+                # 直接创建连接
+                connection_config = {k: v for k, v in DB_CONFIG.items() 
+                                  if k not in ['pool_size', 'pool_name', 'pool_reset_session']}
                 self.connection = mysql.connector.connect(**connection_config)
+                self._last_connection_time = time.time()
                 
         except Error as e:
             print(f"数据库连接错误: {e}")
@@ -133,15 +148,10 @@ class DatabaseManager():
                         pool = get_connection_pool(self._pool_size)
                         self.connection = pool.get_connection()
                     else:
-                        # 使用与初始连接相同的配置
-                        connection_config = DB_CONFIG.copy()
-                        # 移除连接池特有的配置项
-                        pool_config_keys = ['pool_size', 'pool_name', 'pool_reset_session']
-                        for key in pool_config_keys:
-                            if key in connection_config:
-                                connection_config.pop(key)
-                        
+                        connection_config = {k: v for k, v in DB_CONFIG.items() 
+                                          if k not in ['pool_size', 'pool_name', 'pool_reset_session']}
                         self.connection = mysql.connector.connect(**connection_config)
+                    self._last_connection_time = time.time()
                     if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
                         print("重新连接成功")
                         return
@@ -153,35 +163,27 @@ class DatabaseManager():
         """关闭连接，如果使用连接池则将连接归还池中"""
         try:
             if self.connection:
-                if hasattr(self.connection, 'is_connected'):
-                    try:
-                        # 检查连接是否仍然有效
-                        if self.connection.is_connected():
-                            if self._use_pool:
-                                self.connection.close()  # 将连接归还池中
-                            else:
-                                self.connection.close()  # 直接关闭连接
-                    except Error as e:
-                        print(f"检查连接状态时出错: {e}")
-                        # 尝试无条件关闭连接
-                        try:
-                            self.connection.close()  
-                        except:
-                            pass
-                self.connection = None
-        except Error as e:
-            print(f"关闭数据库连接错误: {e}")
-            self.connection = None  # 确保引用被清除
+                try:
+                    if hasattr(self.connection, 'is_connected') and self.connection.is_connected():
+                        self.connection.close()
+                except:
+                    pass  # 忽略关闭时的错误
+                finally:
+                    self.connection = None
+                    self._last_connection_time = 0
+        except:
+            self.connection = None
+            self._last_connection_time = 0
 
     def query_data(self, query, params=None):
         """执行SELECT查询"""
-        if not self.connection or not hasattr(self.connection, 'is_connected') or not self.connection.is_connected():
+        if self._should_reconnect():
             self.connect()
         
         cursor = None
         try:
             cursor = self.connection.cursor(buffered=True)
-            cursor.execute(query, params)
+            cursor.execute(query, params or ())
             result = cursor.fetchall()
             return result
         except Error as e:
@@ -196,7 +198,7 @@ class DatabaseManager():
                 if cursor:
                     cursor.close()
                 cursor = self.connection.cursor(buffered=True)
-                cursor.execute(query, params)
+                cursor.execute(query, params or ())
                 result = cursor.fetchall()
                 return result
             except Error as retry_error:
@@ -204,29 +206,29 @@ class DatabaseManager():
                 raise Exception(f"数据库查询失败: {str(e)}")
         finally:
             if cursor:
-                cursor.close()
+                try:
+                    cursor.close()
+                except:
+                    pass  # 忽略关闭cursor时的错误
 
     def update_data(self, query, params=None):
         """执行INSERT/UPDATE操作"""
-        if not self.connection or not hasattr(self.connection, 'is_connected') or not self.connection.is_connected():
+        if self._should_reconnect():
             self.connect()
             
         cursor = None
         try:
             cursor = self.connection.cursor()
-            # 关闭警告，避免类型错误
             cursor.execute("SET sql_notes = 0")
             
-            # 确保query是字符串类型
             if not isinstance(query, str):
                 query = str(query)
                 
-            cursor.execute(query, params)
-            if not self._use_pool:  # 如果使用连接池，autocommit已启用
+            cursor.execute(query, params or ())
+            if not self._use_pool and self.connection:
                 self.connection.commit()
             affected_rows = cursor.rowcount
             
-            # 恢复警告设置
             cursor.execute("SET sql_notes = 1")
             return affected_rows
         except Error as e:
@@ -234,8 +236,11 @@ class DatabaseManager():
             print(f"更新语句: {query}")
             if params:
                 print(f"参数: {params}")
-            if not self._use_pool:
-                self.connection.rollback()
+            if not self._use_pool and self.connection:
+                try:
+                    self.connection.rollback()
+                except:
+                    pass
             # 尝试重新连接并重试
             try:
                 self.disconnect()
@@ -243,17 +248,15 @@ class DatabaseManager():
                 if cursor:
                     cursor.close()
                 cursor = self.connection.cursor()
-                # 关闭警告
                 cursor.execute("SET sql_notes = 0")
                 
                 if not isinstance(query, str):
                     query = str(query)
                     
-                cursor.execute(query, params)
-                # 恢复警告设置
+                cursor.execute(query, params or ())
                 cursor.execute("SET sql_notes = 1")
                 
-                if not self._use_pool:
+                if not self._use_pool and self.connection:
                     self.connection.commit()
                 affected_rows = cursor.rowcount
                 return affected_rows
@@ -262,7 +265,10 @@ class DatabaseManager():
                 raise Exception(f"数据库更新失败: {str(e)}")
         finally:
             if cursor:
-                cursor.close()
+                try:
+                    cursor.close()
+                except:
+                    pass  # 忽略关闭cursor时的错误
 
     def delete_data(self, query, params=None):
         """执行DELETE操作"""
@@ -711,3 +717,23 @@ def hash_password(self, password):
     import hashlib
     # 简单的MD5加密，实际应用中应使用更安全的算法如bcrypt
     return hashlib.md5(password.encode()).hexdigest()
+
+def verify_password(self, password, stored_password):
+    """
+    验证密码是否匹配
+    
+    参数:
+        password: 用户输入的明文密码
+        stored_password: 数据库中存储的密码（可能是哈希值）
+    
+    返回值:
+        密码是否匹配
+    """
+    # 如果数据库中的密码是明文存储的（不建议），直接比较
+    if len(stored_password) < 32:  # 不是MD5哈希
+        return password == stored_password
+    
+    # 如果是哈希存储，对输入密码进行哈希后比较
+    import hashlib
+    hashed_input = hashlib.md5(password.encode()).hexdigest()
+    return hashed_input == stored_password

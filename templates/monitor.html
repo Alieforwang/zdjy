@@ -413,93 +413,121 @@
             });
         }
 
+        // 添加获取设置的函数
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+                
+                if (response.ok && data.settings) {
+                    // 更新置信度滑块
+                    const confidenceSlider = document.getElementById('confidenceSlider');
+                    const confidenceValue = document.getElementById('confidenceValue');
+                    const threshold = parseFloat(data.settings.confidence_threshold);
+                    
+                    // 将0-1的值转换为10-90的滑块值
+                    confidenceSlider.value = Math.round(threshold * 100);
+                    confidenceValue.textContent = threshold.toFixed(2);
+                }
+            } catch (error) {
+                console.error('加载设置失败:', error);
+            }
+        }
+
         // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             console.log('DOM加载完成，准备初始化...');
             
-            // 初始化UI更新计时器
-            setInterval(updateTimestamps, 1000);
-            
-            // 更新视频状态
-            updateVideoStatus(false);
-            
-            // 检查视频流是否加载成功
-            const videoStream1 = document.getElementById('videoStream1');
-            const aiVideoStream = document.getElementById('aiVideoStream');
-            
-            // 为图像添加加载事件
-            videoStream1.onload = function() {
-                document.getElementById('videoStatus1').textContent = '正在播放';
-                document.getElementById('status1').textContent = '正在播放';
-            };
-            
-            videoStream1.onerror = function() {
-                console.error('视频流加载失败');
-                document.getElementById('videoStatus1').textContent = '连接错误';
-                document.getElementById('status1').textContent = '连接失败';
+            try {
+                // 先加载设置
+                await loadSettings();
                 
-                // 5秒后自动重试
-                setTimeout(() => {
-                    if (videoStream1.src) {
-                        console.log('尝试重新加载视频流...');
-                        refreshVideoStreams();
-                    }
-                }, 5000);
-            };
-            
-            aiVideoStream.onload = function() {
-                document.getElementById('videoStatus2').textContent = '正在分析';
-                document.getElementById('status2').textContent = '正在分析';
-            };
-            
-            aiVideoStream.onerror = function() {
-                console.error('AI视频流加载失败');
-                document.getElementById('videoStatus2').textContent = '分析失败';
-                document.getElementById('status2').textContent = '连接失败';
+                // 初始化UI更新计时器
+                setInterval(updateTimestamps, 1000);
                 
-                // 5秒后自动重试
-                setTimeout(() => {
-                    if (aiVideoStream.src) {
-                        console.log('尝试重新加载AI视频流...');
-                        refreshVideoStreams();
-                    }
-                }, 5000);
-            };
-            
-            // 添加按钮事件监听器
-            document.getElementById('startCameraBtn').addEventListener('click', startCamera);
-            document.getElementById('stopCameraBtn').addEventListener('click', stopCamera);
-            
-            // 布局和全屏按钮
-            const layoutBtn = document.getElementById('layoutBtn');
-            if (layoutBtn) {
-                layoutBtn.addEventListener('click', toggleLayout);
+                // 更新视频状态
+                updateVideoStatus(false);
+                
+                // 检查视频流是否加载成功
+                const videoStream1 = document.getElementById('videoStream1');
+                const aiVideoStream = document.getElementById('aiVideoStream');
+                
+                // 为图像添加加载事件
+                videoStream1.onload = function() {
+                    document.getElementById('videoStatus1').textContent = '正在播放';
+                    document.getElementById('status1').textContent = '正在播放';
+                };
+                
+                videoStream1.onerror = function() {
+                    console.error('视频流加载失败');
+                    document.getElementById('videoStatus1').textContent = '连接错误';
+                    document.getElementById('status1').textContent = '连接失败';
+                    
+                    // 5秒后自动重试
+                    setTimeout(() => {
+                        if (videoStream1.src) {
+                            console.log('尝试重新加载视频流...');
+                            refreshVideoStreams();
+                        }
+                    }, 5000);
+                };
+                
+                aiVideoStream.onload = function() {
+                    document.getElementById('videoStatus2').textContent = '正在分析';
+                    document.getElementById('status2').textContent = '正在分析';
+                };
+                
+                aiVideoStream.onerror = function() {
+                    console.error('AI视频流加载失败');
+                    document.getElementById('videoStatus2').textContent = '分析失败';
+                    document.getElementById('status2').textContent = '连接失败';
+                    
+                    // 5秒后自动重试
+                    setTimeout(() => {
+                        if (aiVideoStream.src) {
+                            console.log('尝试重新加载AI视频流...');
+                            refreshVideoStreams();
+                        }
+                    }, 5000);
+                };
+                
+                // 添加按钮事件监听器
+                document.getElementById('startCameraBtn').addEventListener('click', startCamera);
+                document.getElementById('stopCameraBtn').addEventListener('click', stopCamera);
+                
+                // 布局和全屏按钮
+                const layoutBtn = document.getElementById('layoutBtn');
+                if (layoutBtn) {
+                    layoutBtn.addEventListener('click', toggleLayout);
+                }
+                
+                const fullscreenBtn = document.getElementById('fullscreenBtn');
+                if (fullscreenBtn) {
+                    fullscreenBtn.addEventListener('click', toggleFullscreen);
+                }
+                
+                const captureBtn = document.getElementById('captureBtn');
+                if (captureBtn) {
+                    captureBtn.addEventListener('click', captureFrame);
+                }
+                
+                const refreshBtn = document.getElementById('refreshBtn');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', refreshVideoStreams);
+                }
+                
+                // 设置自动刷新视频流的定时器(每60秒刷新一次以确保流畅)
+                setInterval(refreshVideoStreams, 60000);
+                
+                // 自动启动摄像头
+                await startCamera().catch(error => {
+                    console.error('自动启动摄像头失败:', error);
+                    // 显示错误但不显示弹窗以免干扰用户
+                    document.getElementById('systemStatus').textContent = '启动失败';
+                });
+            } catch (error) {
+                console.error('初始化失败:', error);
             }
-            
-            const fullscreenBtn = document.getElementById('fullscreenBtn');
-            if (fullscreenBtn) {
-                fullscreenBtn.addEventListener('click', toggleFullscreen);
-            }
-            
-            const captureBtn = document.getElementById('captureBtn');
-            if (captureBtn) {
-                captureBtn.addEventListener('click', captureFrame);
-            }
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', refreshVideoStreams);
-            }
-            
-            // 设置自动刷新视频流的定时器(每60秒刷新一次以确保流畅)
-            setInterval(refreshVideoStreams, 60000);
-            
-            // 自动启动摄像头
-            startCamera().catch(error => {
-                console.error('自动启动摄像头失败:', error);
-                // 显示错误但不显示弹窗以免干扰用户
-                document.getElementById('systemStatus').textContent = '启动失败';
-            });
         });
 
         // 切换布局函数
@@ -617,7 +645,7 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ threshold: threshold })
+                        body: JSON.stringify({ confidence_threshold: threshold })
                     });
                     
                     const data = await response.json();
@@ -629,7 +657,7 @@
                         alertDiv.innerHTML = `
                             <div class="alert-content">
                                 <span class="alert-title">置信度阈值已更新!</span>
-                                <span class="alert-info">新阈值: ${data.threshold.toFixed(2)}</span>
+                                <span class="alert-info">新阈值: ${data.threshold ? data.threshold.toFixed(2) : threshold.toFixed(2)}</span>
                             </div>
                         `;
                         document.body.appendChild(alertDiv);

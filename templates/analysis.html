@@ -32,6 +32,84 @@
         justify-content: center;
     }
 
+    .loading-spinner {
+        display: inline-block;
+        width: 22px;
+        height: 22px;
+        border: 3px solid #1890ff;
+        border-top: 3px solid transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: middle;
+        margin-left: 8px;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .error-container {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: rgba(255, 76, 76, 0.1);
+        border-left: 3px solid #ff4c4c;
+        border-radius: 4px;
+        color: #ff8f8f;
+    }
+    
+    .error-container h4 {
+        margin-top: 0;
+        color: #ff6b6b;
+        display: flex;
+        align-items: center;
+    }
+    
+    .error-container h4 .error-icon {
+        margin-right: 8px;
+    }
+    
+    .error-details {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+        color: #ccc;
+        font-size: 12px;
+        max-height: 100px;
+        overflow-y: auto;
+    }
+    
+    .error-solution {
+        margin-top: 15px;
+        padding: 10px;
+        background-color: rgba(24, 144, 255, 0.1);
+        border-radius: 3px;
+        color: #b7c4d5;
+    }
+    
+    .error-solution a {
+        color: #1890ff;
+        text-decoration: underline;
+    }
+    
+    .error-actions {
+        margin-top: 15px;
+    }
+    
+    .retry-btn {
+        background-color: transparent;
+        color: #1890ff;
+        border: 1px solid #1890ff;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .retry-btn:hover {
+        background-color: rgba(24, 144, 255, 0.1);
+    }
+
     .upload-content {
         width: 100%;
     }

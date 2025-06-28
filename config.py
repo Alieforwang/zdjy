@@ -6,15 +6,15 @@ DB_CONFIG = {
     'database': 'tiaozhanbei',
     'port': 3306,
     'charset': 'utf8mb4',
-    'pool_size': 10,
-    'pool_name': 'mysql_pool',
+    'pool_size': 30,
+    'pool_name': 'mypool',
     'pool_reset_session': True,
     'autocommit': True,
     'use_pure': True,
-    'connection_timeout': 60,
+    'connection_timeout': 30,
     'buffered': True,
-    'get_warnings': False,
-    'raise_on_warnings': False,
+    'get_warnings': True,
+    'raise_on_warnings': True,
     'time_zone': '+8:00'
 }
 
@@ -41,6 +41,8 @@ APP_CONFIG = {
     'TEMP_FOLDER': 'static/temp',  # 临时文件存储目录
     'MAX_CONTENT_LENGTH': 100 * 1024 * 1024,  # 最大上传文件大小(100MB)
     'ALLOWED_EXTENSIONS': {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi'},  # 允许上传的文件类型
+    'MODEL_PATH': 'models/best.pt',  # 模型文件路径
+    'DETECTION_CONFIDENCE_THRESHOLD': 0.25,  # 检测置信度阈值
 }
 
 # 日志配置

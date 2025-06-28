@@ -3,156 +3,18 @@
   "stateHistory": [
     {
       "from": "initial",
-      "command": "init",
-      "timestamp": "2025-06-18T07:12:38.405Z",
-      "args": [
-        {
-          "workingDirectory": "/d:/桌面文件/文件夹/zhandojingy/zdjy"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
-      "command": "init",
-      "timestamp": "2025-06-18T07:12:43.658Z",
-      "args": [
-        {
-          "workingDirectory": "D:/桌面文件/文件夹/zhandojingy/zdjy"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
       "command": "hello",
-      "timestamp": "2025-06-18T07:12:49.030Z",
-      "args": []
-    },
-    {
-      "from": "role_discovery",
-      "command": "init",
-      "timestamp": "2025-06-18T07:22:52.866Z",
-      "args": [
-        {
-          "workingDirectory": "D:/桌面文件/文件夹/zhandojingy/zdjy"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
-      "command": "hello",
-      "timestamp": "2025-06-18T07:23:05.064Z",
+      "timestamp": "2025-06-20T01:43:01.428Z",
       "args": []
     },
     {
       "from": "role_discovery",
       "command": "action",
-      "timestamp": "2025-06-18T07:23:14.558Z",
-      "args": [
-        "nuwa"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "init",
-      "timestamp": "2025-06-18T07:27:12.013Z",
-      "args": [
-        {
-          "workingDirectory": "D:/桌面文件/文件夹/zhandojingy/zdjy"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
-      "command": "hello",
-      "timestamp": "2025-06-18T07:27:20.307Z",
-      "args": []
-    },
-    {
-      "from": "role_discovery",
-      "command": "action",
-      "timestamp": "2025-06-18T07:28:31.750Z",
-      "args": [
-        "frontend-engineer"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "action",
-      "timestamp": "2025-06-18T07:46:43.341Z",
-      "args": [
-        "nuwa"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "action",
-      "timestamp": "2025-06-18T07:47:48.470Z",
-      "args": [
-        "nuwa"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "init",
-      "timestamp": "2025-06-18T07:50:08.517Z",
-      "args": [
-        {
-          "workingDirectory": "D:/桌面文件/文件夹/zhandojingy/zdjy"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
-      "command": "hello",
-      "timestamp": "2025-06-18T07:50:17.390Z",
-      "args": []
-    },
-    {
-      "from": "role_discovery",
-      "command": "action",
-      "timestamp": "2025-06-18T07:50:44.258Z",
-      "args": [
-        "backend-engineer"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "hello",
-      "timestamp": "2025-06-18T08:39:17.053Z",
-      "args": []
-    },
-    {
-      "from": "role_discovery",
-      "command": "action",
-      "timestamp": "2025-06-18T08:40:01.934Z",
-      "args": [
-        "frontend-engineer"
-      ]
-    },
-    {
-      "from": "role_activated_with_memory",
-      "command": "init",
-      "timestamp": "2025-06-18T13:51:40.128Z",
-      "args": [
-        {
-          "workingDirectory": "/d:/桌面文件/文件夹/zhandojingy/zdjy"
-        }
-      ]
-    },
-    {
-      "from": "initialized",
-      "command": "hello",
-      "timestamp": "2025-06-18T13:51:47.795Z",
-      "args": []
-    },
-    {
-      "from": "role_discovery",
-      "command": "action",
-      "timestamp": "2025-06-18T13:51:55.491Z",
+      "timestamp": "2025-06-20T01:43:23.516Z",
       "args": [
         "assistant"
       ]
     }
   ],
-  "lastUpdated": "2025-06-18T13:51:55.505Z"
+  "lastUpdated": "2025-06-20T01:43:23.529Z"
 }

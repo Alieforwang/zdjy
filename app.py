@@ -1,4 +1,4 @@
-from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response, send_file, make_response
+from flask import Flask, session, jsonify, redirect, url_for, request, render_template, send_from_directory, flash, Response, send_file, make_response, stream_with_context
 from flask_cors import CORS
 import util.DBUtil as DBM
 import os
@@ -12,7 +12,7 @@ from ultralytics import YOLO
 import random
 import decimal
 import json
-from config import AMAP_CONFIG, DB_CONFIG, APP_CONFIG, LOG_CONFIG
+from config import AMAP_CONFIG, DB_CONFIG, APP_CONFIG, LOG_CONFIG, DIFY_CONFIG
 import concurrent.futures
 import threading
 import sys
@@ -54,15 +54,13 @@ import sys
 import os
 import re  # 添加正则表达式模块导入
 import math  # 添加math模块导入
-
+from config import APP_CONFIG 
 # 添加项目根目录到系统路径，以便导入project_dify中的模块
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from project_dify.tts.xunfei_tts import tts  # 导入讯飞TTS模块的tts函数
 
-
-# 设置环境变量以解决Matplotlib和Ultralytics的临时目录警告
-os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib_config'
-os.environ['YOLO_CONFIG_DIR'] = '/tmp/ultralytics_config'
+# 全局变量定义
+DETECTION_CONFIDENCE_THRESHOLD = APP_CONFIG.get('DETECTION_CONFIDENCE_THRESHOLD', 0.25)  # 默认置信度阈值
 
 # 配置日志
 logging.basicConfig(
@@ -72,10 +70,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 确保临时目录存在
-for dir_path in ['/tmp/matplotlib_config', '/tmp/ultralytics_config']:
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path, exist_ok=True)
+
 
 # 线程池管理
 thread_pool_lock = threading.RLock()  # 使用可重入锁来保护线程池的创建和访问
@@ -118,19 +113,39 @@ def get_model():
     if global_model is None:
         logging.info("尝试加载YOLO模型...")
         try:
-            # 确定当前工作目录和模型路径
+            # 获取配置的模型路径，如果不存在则使用默认路径
+            config_model_path = app.config.get('MODEL_PATH')
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            model_path = os.path.join(base_dir, 'models', 'best.pt')
+            
+            # 确定模型路径
+            if config_model_path:
+                # 如果是相对路径，则相对于base_dir解析
+                if not os.path.isabs(config_model_path):
+                    model_path = os.path.join(base_dir, config_model_path)
+                else:
+                    model_path = config_model_path
+            else:
+                # 使用默认路径
+                model_path = os.path.join(base_dir, 'models', 'best.pt')
+            
             abs_model_path = os.path.abspath(model_path)
             
-            logging.info(f"尝试加载模型，相对路径: {model_path}")
+            logging.info(f"尝试加载模型，配置路径: {config_model_path}")
+            logging.info(f"尝试加载模型，解析路径: {model_path}")
             logging.info(f"尝试加载模型，绝对路径: {abs_model_path}")
             
             # 检查模型文件是否存在
             if not os.path.exists(model_path):
                 logging.error(f"模型文件不存在: {model_path}")
-                # 如果文件不存在，返回None而不是抛出异常
-                return None
+                # 尝试使用默认路径
+                default_model_path = os.path.join(base_dir, 'models', 'best.pt')
+                if os.path.exists(default_model_path) and model_path != default_model_path:
+                    logging.info(f"尝试使用默认模型路径: {default_model_path}")
+                    model_path = default_model_path
+                else:
+                    # 如果默认路径也不存在，返回None
+                    logging.error("默认模型文件也不存在，无法加载模型")
+                    return None
             
             # 检测设备类型
             if device == 'cuda':
@@ -155,6 +170,7 @@ def get_model():
             
         except Exception as e:
             logging.error(f"加载模型时出错: {str(e)}")
+            logging.error(traceback.format_exc())
             # 如果出现异常，设置global_model为None并返回None
             global_model = None
             return None
@@ -245,19 +261,19 @@ def setup_db_connection_maintenance():
     from util.DBUtil import reset_connection_pool
     
     def reset_pool_periodically():
-        # 每小时重置一次连接池，避免连接池耗尽问题
+        # 每30分钟重置一次连接池，避免连接池耗尽问题
         import threading
         last_success = time.time()  # 记录上次成功重置的时间
         
         while True:
             try:
-                # 检查距离上次成功重置是否已经超过30分钟
+                # 检查距离上次成功重置是否已经超过15分钟
                 current_time = time.time()
-                # 如果上次重置失败，且已经过了30分钟，则尝试更频繁地重置
-                if current_time - last_success > 1800:  # 30分钟
-                    sleep_time = 600  # 10分钟
+                # 如果上次重置失败，且已经过了15分钟，则尝试更频繁地重置
+                if current_time - last_success > 900:  # 15分钟
+                    sleep_time = 300  # 5分钟
                 else:
-                    sleep_time = 3600  # 1小时
+                    sleep_time = 1800  # 30分钟
                 
                 # 睡眠指定时间
                 logger.info(f"下次数据库连接池维护将在 {sleep_time} 秒后进行")
@@ -271,8 +287,8 @@ def setup_db_connection_maintenance():
                 )
                 reset_thread.start()
                 
-                # 等待重置完成，但最多等待2分钟
-                reset_thread.join(timeout=120)
+                # 等待重置完成，但最多等待1分钟
+                reset_thread.join(timeout=60)
                 
                 # 如果线程仍在运行，说明重置超时
                 if reset_thread.is_alive():
@@ -283,7 +299,7 @@ def setup_db_connection_maintenance():
             except Exception as e:
                 logger.error(f"连接池维护线程异常: {str(e)}")
                 # 发生异常时，短暂休眠后继续
-                time.sleep(60)
+                time.sleep(30)  # 减少异常后的等待时间
     
     def _do_reset_with_timeout():
         """带超时保护的重置连接池操作"""
@@ -381,15 +397,10 @@ def make_session_permanent():
 def ensure_directories():
     """确保所有必要的目录存在"""
     directories = [
-        'sessions',
+       
         'static/uploads',
-        'static/results',
         'static/@results',
-        'static/temp',
-        'static/tmp',
-        'tmp',
-        'tmp/uploads',
-        'tmp/results'
+        
     ]
     
     for directory in directories:
@@ -598,7 +609,6 @@ def login():
                     if is_admin and not user_is_admin:
                         return jsonify({'success': False, 'message': '您不是管理员用户'})
                     
-                    
                     # 如果是普通用户登录但尝试以管理员身份登录
                     if not is_admin and user_is_admin:
                         return jsonify({'success': False, 'message': '请使用管理员登录入口'})
@@ -613,6 +623,7 @@ def login():
                     session['is_admin'] = user_is_admin
                     session['login_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     session['login_ip'] = request.remote_addr
+                    session['logged_in'] = True
                     session.modified = True
                     
                     # 记录登录成功
@@ -1868,7 +1879,7 @@ def analyze_frame():
         # 进行预测 - 使用YOLOv8接口
         results = model.predict(
             img=frame,
-            conf_threshold=0.3  # 置信度阈值
+            conf_threshold=DETECTION_CONFIDENCE_THRESHOLD  # 使用全局置信度阈值
         )
         
         # 检查是否有结果返回
@@ -2531,6 +2542,10 @@ def shutdown_thread_pool(exception=None):
 def init_app():
     """初始化应用配置和资源"""
     try:
+        # 从APP_CONFIG中获取MODEL_PATH配置
+        app.config['MODEL_PATH'] = APP_CONFIG.get('MODEL_PATH', 'models/best.pt')
+        logger.info(f"设置模型路径: {app.config['MODEL_PATH']}")
+        
         # 设置数据库连接池维护
         setup_db_connection_maintenance()
         logger.info("数据库连接池维护任务已设置")
@@ -2603,7 +2618,7 @@ def change_password():
     """
     修改当前用户密码
     """
-    if not session.get('logged_in'):
+    if 'user_id' not in session:
         return jsonify({'success': False, 'message': '请先登录'}), 401
     
     data = request.json
@@ -3092,8 +3107,11 @@ def inference():
         if model is None:
             return jsonify({'status': 'error', 'message': '模型加载失败'})
             
+        # 使用全局置信度阈值
+        global DETECTION_CONFIDENCE_THRESHOLD
+        
         # 使用YOLOv8进行推理
-        results = model.predict(img=image_cv, conf_threshold=0.25)
+        results = model.predict(img=image_cv, conf_threshold=DETECTION_CONFIDENCE_THRESHOLD)
         
         # 检查是否有结果
         if results is None or len(results) == 0:
@@ -3495,7 +3513,7 @@ def process_camera_frame():
             return jsonify({"status": "error", "message": "模型加载失败"}), 400
             
         # 使用YOLOv8类的预测接口
-        results = model.predict(img=image_cv, conf_threshold=0.25)
+        results = model.predict(img=image_cv, conf_threshold=DETECTION_CONFIDENCE_THRESHOLD)
         
         if results is None or len(results) == 0:
             return jsonify({"status": "error", "message": "No detection results"}), 400
@@ -3716,22 +3734,21 @@ def save_detection_result():
         logger.error(f"保存检测结果时出错: {str(e)}")
         return jsonify({'status': 'error', 'message': f'保存失败: {str(e)}'}), 500
 
-# SQLite数据库连接函数
+# 添加MySQL连接函数，替换原有SQLite连接函数
 def get_db_connection():
     """
-    获取SQLite数据库连接
+    获取MySQL数据库连接
     """
     try:
-        # 确保数据库文件所在目录存在
-        db_dir = os.path.dirname('database.db')
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
-            
-        # 创建连接
-        conn = sqlite3.connect('database.db')
-        # 设置行工厂为字典，使查询结果可以通过列名访问
-        conn.row_factory = sqlite3.Row
-        return conn
+        # 导入数据库管理器
+        from util.DBUtil import DatabaseManager
+        
+        # 创建数据库管理器实例
+        db = DatabaseManager()
+        db.connect()
+        
+        # 返回连接对象
+        return db.connection
     except Exception as e:
         logger.error(f"获取数据库连接失败: {str(e)}")
         raise e
@@ -4306,35 +4323,73 @@ DETECTION_CONFIDENCE_THRESHOLD = 0.25  # 默认置信度阈值
 # 添加一个API端点用于设置置信度阈值
 @app.route('/api/set_confidence_threshold', methods=['POST'])
 def set_confidence_threshold():
-    """设置检测的置信度阈值"""
-    global DETECTION_CONFIDENCE_THRESHOLD
-    
     try:
-        # 获取请求数据
-        data = request.get_json()
-        if not data or 'threshold' not in data:
-            return jsonify({"status": "error", "message": "未提供置信度阈值"}), 400
+        data = request.json
+        # 同时支持两种参数名称，确保与monitor.html和settings.js的调用兼容
+        if 'threshold' in data:
+            confidence_threshold = float(data['threshold'])
+        elif 'confidence_threshold' in data:
+            confidence_threshold = float(data['confidence_threshold'])
+        else:
+            return jsonify({'status': 'error', 'message': '缺少置信度阈值参数'}), 400
+            
+        if not (0.0 <= confidence_threshold <= 1.0):
+            return jsonify({'status': 'error', 'message': '置信度阈值必须在0到1之间'}), 400
+            
+        # 更新全局变量和应用配置
+        global DETECTION_CONFIDENCE_THRESHOLD
+        DETECTION_CONFIDENCE_THRESHOLD = confidence_threshold
+        app.config['CONFIDENCE_THRESHOLD'] = confidence_threshold
         
-        # 获取新的阈值
-        new_threshold = float(data['threshold'])
+        # 保存到数据库
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        # 验证阈值是否在有效范围内
-        if new_threshold < 0.1 or new_threshold > 0.9:
-            return jsonify({"status": "error", "message": "置信度阈值必须在0.1到0.9之间"}), 400
-        
-        # 更新阈值
-        DETECTION_CONFIDENCE_THRESHOLD = new_threshold
-        logger.info(f"置信度阈值已更新为: {DETECTION_CONFIDENCE_THRESHOLD}")
-        
+        try:
+            # 检查settings表是否存在
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() 
+                AND table_name = 'settings'
+            """)
+            
+            # 表不存在时才创建表
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS settings (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL UNIQUE,
+                        value TEXT,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+            
+            # 更新置信度阈值 - 使用MySQL参数占位符
+            cursor.execute(
+                "REPLACE INTO settings (name, value) VALUES (%s, %s)",
+                ('confidence_threshold', str(confidence_threshold))
+            )
+            
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            app.logger.error(f"保存置信度阈值到数据库时出错: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'保存置信度阈值失败: {str(e)}'}), 500
+        finally:
+            cursor.close()
+            conn.close()
+            
+        # 返回响应，同时包含阈值，以便前端显示
         return jsonify({
-            "status": "success",
-            "message": f"置信度阈值已设置为: {DETECTION_CONFIDENCE_THRESHOLD}",
-            "threshold": DETECTION_CONFIDENCE_THRESHOLD
+            'status': 'success', 
+            'message': '置信度阈值已更新',
+            'threshold': confidence_threshold
         })
-        
     except Exception as e:
-        logger.error(f"设置置信度阈值时出错: {str(e)}")
-        return jsonify({"status": "error", "message": f"设置置信度阈值时出错: {str(e)}"}), 500
+        app.logger.error(f"设置置信度阈值时出错: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'status': 'error', 'message': f'设置置信度阈值失败: {str(e)}'}), 500
     
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -5163,8 +5218,8 @@ def monthly_detection_stats():
         }
         
         # 连接数据库
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        db = DBM.DatabaseManager()
+        db.connect()
         
         # 查询过去12个月的数据
         for i in range(12):
@@ -5176,37 +5231,40 @@ def monthly_detection_stats():
                 year -= 1
             
             # 计算该月的开始和结束时间
-            start_date = f"{year}-{month:02d}-01 00:00:00"
+            start_date = datetime(year, month, 1).strftime('%Y-%m-%d')
             
             # 计算下个月的第一天作为结束时间
-            next_month = month + 1
-            next_year = year
-            if next_month > 12:
+            if month == 12:
+                next_year = year + 1
                 next_month = 1
-                next_year += 1
-            end_date = f"{next_year}-{next_month:02d}-01 00:00:00"
+            else:
+                next_year = year
+                next_month = month + 1
+            end_date = datetime(next_year, next_month, 1).strftime('%Y-%m-%d')
             
             # 查询流动摊位数据
-            cursor.execute("""
-                SELECT COUNT(*) FROM detections 
-                WHERE timestamp >= ? AND timestamp < ? 
-                AND detection_type LIKE '%流动%'
-            """, (start_date, end_date))
-            flowing_count = cursor.fetchone()[0] or 0
+            flowing_query = """
+                SELECT COUNT(*) FROM analysis_records 
+                WHERE created_at >= %s AND created_at < %s 
+                AND detect_type = 'zdjy_ld'
+            """
+            flowing_result = db.query_data(flowing_query, (start_date, end_date))
+            flowing_count = int(flowing_result[0][0]) if flowing_result else 0
             
             # 查询固定摊位数据
-            cursor.execute("""
-                SELECT COUNT(*) FROM detections 
-                WHERE timestamp >= ? AND timestamp < ? 
-                AND detection_type LIKE '%固定%'
-            """, (start_date, end_date))
-            fixed_count = cursor.fetchone()[0] or 0
+            fixed_query = """
+                SELECT COUNT(*) FROM analysis_records 
+                WHERE created_at >= %s AND created_at < %s 
+                AND detect_type = 'zdjy_gd'
+            """
+            fixed_result = db.query_data(fixed_query, (start_date, end_date))
+            fixed_count = int(fixed_result[0][0]) if fixed_result else 0
             
             # 存储数据（逆序存储，使最新的月份在数组最后）
             monthly_data["flowing"][11-i] = flowing_count
             monthly_data["fixed"][11-i] = fixed_count
         
-        conn.close()
+        db.disconnect()
         
         # 如果数据库中没有数据，生成模拟数据
         if sum(monthly_data["flowing"]) == 0 and sum(monthly_data["fixed"]) == 0:
@@ -5774,6 +5832,460 @@ def get_market_period_distribution():
         return jsonify({
             'success': False,
             'error': f"获取数据失败: {str(e)}"
+        }), 500
+
+# 获取当前设置
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    try:
+        # 获取当前置信度阈值，优先使用全局变量
+        global DETECTION_CONFIDENCE_THRESHOLD
+        confidence_threshold = DETECTION_CONFIDENCE_THRESHOLD
+        
+        # 获取最小检测尺寸，提供默认值
+        min_detection_size = app.config.get('MIN_DETECTION_SIZE', 50)
+        
+        # 获取实时检测状态，提供默认值
+        realtime_detection_enabled = app.config.get('REALTIME_DETECTION_ENABLED', True)
+        
+        # 获取自动清理天数，提供默认值
+        cleanup_days = app.config.get('CLEANUP_DAYS', 7)
+        
+        # 获取模型路径，提供默认值
+        model_path = app.config.get('MODEL_PATH', 'models/yolov8n.pt')
+        
+        # 获取Dify配置，确保DIFY_CONFIG存在
+        dify_config = {}
+        try:
+            # 从全局导入的DIFY_CONFIG获取配置，提供默认值以防止出错
+            dify_config = {
+                'api_key': DIFY_CONFIG.get('API_KEY', 'app-9HGYkNQbCdy7cuCNMEc6xA9g'),
+                'api_url': DIFY_CONFIG.get('API_URL', 'http://8.137.48.26:8000/v1/chat-messages')
+            }
+        except Exception as e:
+            app.logger.error(f"获取DIFY_CONFIG时出错: {str(e)}")
+            # 提供默认值
+            dify_config = {
+                'api_key': 'app-9HGYkNQbCdy7cuCNMEc6xA9g',
+                'api_url': 'http://8.137.48.26:8000/v1/chat-messages'
+            }
+        
+        # 获取存储使用情况
+        try:
+            storage_info = get_storage_usage()
+        except Exception as e:
+            app.logger.error(f"获取存储使用情况时出错: {str(e)}")
+            storage_info = {
+                'used': 0,
+                'total': 10 * 1024 * 1024 * 1024,  # 10GB
+                'percentage': 0,
+                'details': {
+                    'uploads': 0,
+                    'results': 0,
+                    'temp': 0
+                }
+            }
+        
+        return jsonify({
+            'confidence_threshold': confidence_threshold,
+            'min_detection_size': min_detection_size,
+            'realtime_detection_enabled': realtime_detection_enabled,
+            'cleanup_days': cleanup_days,
+            'model_path': model_path,
+            'dify_config': dify_config,
+            'storage_info': storage_info
+        })
+    except Exception as e:
+        app.logger.error(f"获取设置时出错: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({
+            'error': f"获取设置失败: {str(e)}"
+        }), 500
+
+# 更新设置
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    try:
+        data = request.json
+        
+        # 更新置信度阈值
+        if 'confidence_threshold' in data:
+            confidence_threshold = float(data['confidence_threshold'])
+            if 0.0 <= confidence_threshold <= 1.0:
+                global DETECTION_CONFIDENCE_THRESHOLD
+                DETECTION_CONFIDENCE_THRESHOLD = confidence_threshold
+        
+        # 更新配置
+        if 'min_detection_size' in data:
+            app.config['MIN_DETECTION_SIZE'] = data['min_detection_size']
+        
+        if 'realtime_detection_enabled' in data:
+            app.config['REALTIME_DETECTION_ENABLED'] = data['realtime_detection_enabled']
+        
+        if 'cleanup_days' in data:
+            app.config['CLEANUP_DAYS'] = data['cleanup_days']
+        
+        if 'model_path' in data:
+            old_model_path = app.config.get('MODEL_PATH', 'models/yolov8n.pt')
+            new_model_path = data['model_path']
+            app.config['MODEL_PATH'] = new_model_path
+            
+            # 如果模型路径改变，重新加载模型
+            try:
+                if old_model_path != new_model_path:
+                    app.logger.info(f"模型路径已更改，从 {old_model_path} 到 {new_model_path}，正在重新加载模型...")
+                    
+                    # 释放旧模型资源
+                    global global_model
+                    if global_model is not None:
+                        try:
+                            del global_model
+                            import gc
+                            gc.collect()  # 强制垃圾回收
+                            global_model = None
+                            app.logger.info("已释放旧模型资源")
+                        except Exception as e:
+                            app.logger.warning(f"释放旧模型资源时出错: {str(e)}")
+                    
+                    # 加载新模型
+                    new_model = get_model()
+                    if new_model is None:
+                        app.logger.error(f"无法加载新模型: {new_model_path}")
+                        # 恢复旧路径
+                        app.config['MODEL_PATH'] = old_model_path
+                        return jsonify({'status': 'error', 'message': f'无法加载新模型: {new_model_path}，已恢复旧模型路径'})
+                    else:
+                        app.logger.info(f"新模型加载成功: {new_model_path}")
+            except Exception as e:
+                app.logger.error(f"重新加载模型失败: {str(e)}")
+                app.logger.error(traceback.format_exc())
+                # 恢复旧路径
+                app.config['MODEL_PATH'] = old_model_path
+                return jsonify({'status': 'error', 'message': f'模型加载失败: {str(e)}，已恢复旧模型路径'})
+        
+        if 'dify_config' in data:
+            try:
+                # 确保DIFY_CONFIG存在于全局范围
+                global DIFY_CONFIG
+                
+                # 更新Dify配置
+                if 'api_key' in data['dify_config']:
+                    DIFY_CONFIG['API_KEY'] = data['dify_config']['api_key']
+                if 'api_url' in data['dify_config']:
+                    DIFY_CONFIG['API_URL'] = data['dify_config']['api_url']
+            except Exception as e:
+                app.logger.error(f"更新DIFY_CONFIG时出错: {str(e)}")
+                return jsonify({'status': 'error', 'message': f'更新Dify配置失败: {str(e)}'})
+        
+        # 保存设置到数据库
+        try:
+            save_settings_to_db()
+        except Exception as e:
+            app.logger.error(f"保存设置到数据库时出错: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'保存设置到数据库失败: {str(e)}'})
+        
+        return jsonify({'status': 'success', 'message': '设置已更新'})
+    except Exception as e:
+        app.logger.error(f"更新设置时出错: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({'status': 'error', 'message': f'更新设置失败: {str(e)}'}), 500
+
+# 获取目录内容
+@app.route('/api/browse_files', methods=['GET'])
+def browse_files():
+    path = request.args.get('path', '')
+    
+    # 安全检查，防止目录遍历攻击
+    if '..' in path:
+        return jsonify({'status': 'error', 'message': '无效的路径'})
+    
+    # 如果路径为空，则列出根目录
+    if not path:
+        # 在Windows上列出所有驱动器
+        if os.name == 'nt':
+            import win32api
+            drives = win32api.GetLogicalDriveStrings()
+            drives = drives.split('\000')[:-1]
+            return jsonify({
+                'status': 'success',
+                'path': '',
+                'parent': '',
+                'is_root': True,
+                'items': [{'name': d, 'type': 'directory'} for d in drives]
+            })
+        else:
+            # 在Linux/Mac上列出根目录
+            path = '/'
+    
+    try:
+        # 获取目录内容
+        items = []
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            item_type = 'directory' if os.path.isdir(item_path) else 'file'
+            items.append({'name': item, 'type': item_type})
+        
+        # 按类型和名称排序
+        items.sort(key=lambda x: (0 if x['type'] == 'directory' else 1, x['name']))
+        
+        # 获取父目录
+        parent = os.path.dirname(path) if path else ''
+        
+        return jsonify({
+            'status': 'success',
+            'path': path,
+            'parent': parent,
+            'is_root': path == '/' or (os.name == 'nt' and len(path) <= 3),
+            'items': items
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# 获取存储使用情况
+def get_storage_usage():
+    upload_folder = APP_CONFIG['UPLOAD_FOLDER']
+    result_folder = APP_CONFIG['RESULT_FOLDER']
+    temp_folder = APP_CONFIG['TEMP_FOLDER']
+    
+    upload_size = get_directory_size(upload_folder)
+    result_size = get_directory_size(result_folder)
+    temp_size = get_directory_size(temp_folder)
+    
+    total_size = upload_size + result_size + temp_size
+    max_size = 10 * 1024 * 1024 * 1024  # 10GB
+    
+    return {
+        'used': total_size,
+        'total': max_size,
+        'percentage': (total_size / max_size) * 100,
+        'details': {
+            'uploads': upload_size,
+            'results': result_size,
+            'temp': temp_size
+        }
+    }
+
+# 计算目录大小
+def get_directory_size(directory):
+    total_size = 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(directory):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if os.path.exists(fp):
+                    total_size += os.path.getsize(fp)
+    except Exception as e:
+        app.logger.error(f"计算目录大小时出错: {str(e)}")
+    return total_size
+
+# 保存设置到数据库
+def save_settings_to_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 检查settings表是否存在
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE() 
+            AND table_name = 'settings'
+        """)
+        
+        # 表不存在时才创建表
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL UNIQUE,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+        
+        # 保存设置，使用全局变量
+        global DETECTION_CONFIDENCE_THRESHOLD
+        settings = {
+            'confidence_threshold': DETECTION_CONFIDENCE_THRESHOLD,
+            'min_detection_size': app.config.get('MIN_DETECTION_SIZE', 50),
+            'realtime_detection_enabled': app.config.get('REALTIME_DETECTION_ENABLED', True),
+            'cleanup_days': app.config.get('CLEANUP_DAYS', 7),
+            'model_path': app.config.get('MODEL_PATH', 'models/yolov8n.pt'),
+            'dify_api_key': DIFY_CONFIG['API_KEY'],
+            'dify_api_url': DIFY_CONFIG['API_URL']
+        }
+        
+        for name, value in settings.items():
+            # 将布尔值转换为0/1
+            if isinstance(value, bool):
+                value = 1 if value else 0
+                
+            # 使用REPLACE INTO确保设置被更新
+            cursor.execute(
+                "REPLACE INTO settings (name, value) VALUES (%s, %s)",
+                (name, str(value))
+            )
+        
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"保存设置到数据库时出错: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# 从数据库加载设置
+def load_settings_from_db():
+    """从数据库加载设置"""
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 检查settings表是否存在
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE() 
+            AND table_name = 'settings'
+        """)
+        
+        if cursor.fetchone()[0] == 0:
+            app.logger.info("设置表不存在，将使用默认设置")
+            return
+        
+        # 查询所有设置
+        cursor.execute("SELECT name, value FROM settings")
+        settings = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        # 应用设置
+        if 'confidence_threshold' in settings:
+            try:
+                global DETECTION_CONFIDENCE_THRESHOLD
+                DETECTION_CONFIDENCE_THRESHOLD = float(settings['confidence_threshold'])
+                app.config['CONFIDENCE_THRESHOLD'] = DETECTION_CONFIDENCE_THRESHOLD
+                app.logger.info(f"从数据库加载置信度阈值: {DETECTION_CONFIDENCE_THRESHOLD}")
+            except (ValueError, TypeError) as e:
+                app.logger.error(f"解析置信度阈值时出错: {str(e)}")
+        
+        if 'min_detection_size' in settings:
+            try:
+                app.config['MIN_DETECTION_SIZE'] = int(settings['min_detection_size'])
+            except (ValueError, TypeError) as e:
+                app.logger.error(f"解析最小检测尺寸时出错: {str(e)}")
+        
+        if 'realtime_detection_enabled' in settings:
+            try:
+                app.config['REALTIME_DETECTION_ENABLED'] = bool(int(settings['realtime_detection_enabled']))
+            except (ValueError, TypeError) as e:
+                app.logger.error(f"解析实时检测状态时出错: {str(e)}")
+        
+        if 'cleanup_days' in settings:
+            try:
+                app.config['CLEANUP_DAYS'] = int(settings['cleanup_days'])
+            except (ValueError, TypeError) as e:
+                app.logger.error(f"解析清理天数时出错: {str(e)}")
+        
+        if 'model_path' in settings:
+            app.config['MODEL_PATH'] = settings['model_path']
+        
+        # 加载Dify配置
+        try:
+            from config import DIFY_CONFIG
+            if 'dify_api_key' in settings and settings['dify_api_key']:
+                DIFY_CONFIG['API_KEY'] = settings['dify_api_key']
+            
+            if 'dify_api_url' in settings and settings['dify_api_url']:
+                DIFY_CONFIG['API_URL'] = settings['dify_api_url']
+                
+            app.logger.info("已从数据库加载Dify配置")
+        except Exception as e:
+            app.logger.error(f"更新DIFY_CONFIG时出错: {str(e)}")
+        
+        app.logger.info("已从数据库加载设置")
+        
+    except Exception as e:
+        app.logger.error(f"从数据库加载设置时出错: {str(e)}")
+        app.logger.error(traceback.format_exc())
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+# 在init_app函数中添加初始化设置的调用
+def init_app():
+    # ... existing code ...
+    
+    # 初始化数据库表
+    init_db_user()
+    init_detection_tables()
+    
+    # 加载设置
+    load_settings_from_db()
+    
+    # ... existing code ...
+
+# 检查模型路径是否有效
+@app.route('/api/check_model_path', methods=['POST'])
+def check_model_path():
+    try:
+        data = request.json
+        if 'model_path' not in data:
+            return jsonify({'status': 'error', 'message': '缺少模型路径参数'}), 400
+            
+        model_path = data['model_path']
+        
+        # 如果是相对路径，转换为绝对路径
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        if not os.path.isabs(model_path):
+            abs_model_path = os.path.join(base_dir, model_path)
+        else:
+            abs_model_path = model_path
+            
+        # 检查文件是否存在
+        if not os.path.exists(abs_model_path):
+            return jsonify({
+                'status': 'error', 
+                'message': f'模型文件不存在: {model_path}',
+                'exists': False
+            })
+            
+        # 检查文件扩展名
+        file_extension = os.path.splitext(model_path)[1].lower()
+        if file_extension not in ['.pt', '.pth']:
+            return jsonify({
+                'status': 'error', 
+                'message': f'不支持的模型文件格式: {file_extension}，请使用.pt或.pth格式',
+                'valid_format': False
+            })
+            
+        # 检查文件大小
+        file_size = os.path.getsize(abs_model_path)
+        if file_size < 1024 * 1024:  # 小于1MB的文件可能不是有效模型
+            return jsonify({
+                'status': 'warning', 
+                'message': f'模型文件大小异常: {file_size / (1024*1024):.2f} MB，可能不是有效的模型文件',
+                'valid_size': False
+            })
+            
+        # 所有检查通过
+        return jsonify({
+            'status': 'success', 
+            'message': '模型文件有效',
+            'exists': True,
+            'valid_format': True,
+            'valid_size': True,
+            'file_size': file_size,
+            'file_size_mb': f'{file_size / (1024*1024):.2f} MB'
+        })
+            
+    except Exception as e:
+        app.logger.error(f"检查模型路径时出错: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({
+            'status': 'error', 
+            'message': f'检查模型路径时出错: {str(e)}'
         }), 500
 
 
