@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.8.1+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![YOLOv8](https://img.shields.io/badge/YOLOv8-93%25%20mAP-orange.svg)
 ![DeepSeek](https://img.shields.io/badge/DeepSeek-R1--32B-red.svg)
@@ -64,7 +64,7 @@
 ## 📋 系统要求
 
 ### 最低配置
-- **Python**: 3.8.1+ (推荐 3.13+)
+- **Python**: 3.10+ (推荐 3.13+)
 - **内存**: 2GB+ (推荐 8GB+)
 - **存储**: 5GB+ 可用空间
 - **数据库**: MySQL 5.7+

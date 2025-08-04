@@ -4,7 +4,7 @@
 
 ![Time](https://img.shields.io/badge/所需时间-5分钟-blue.svg)
 ![Difficulty](https://img.shields.io/badge/难度-简单-green.svg)
-![Prerequisites](https://img.shields.io/badge/前置条件-Python%203.8+-orange.svg)
+![Prerequisites](https://img.shields.io/badge/前置条件-Python%203.10+-orange.svg)
 
 *5分钟快速体验灵瞳智能检测平台*
 
@@ -18,7 +18,7 @@
 
 ```bash
 # 确保Python版本符合要求
-python --version  # 需要 3.8.1+
+python --version  # 需要 3.10+
 
 # 克隆项目
 git clone https://github.com/Alieforwang/zdjy.git

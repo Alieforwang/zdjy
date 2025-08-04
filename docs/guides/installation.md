@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.8.1+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Platform](https://img.shields.io/badge/平台-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)
 ![Status](https://img.shields.io/badge/状态-稳定-green.svg)
 
@@ -18,7 +18,7 @@
 | 组件 | 要求 |
 |------|------|
 | **操作系统** | Windows 10+, Ubuntu 18.04+, macOS 10.15+ |
-| **Python** | 3.8.1+ (推荐 3.13+) |
+| **Python** | 3.10+ (推荐 3.13+) |
 | **内存** | 2GB+ (推荐 8GB+) |
 | **存储** | 5GB+ 可用空间 |
 | **网络** | 稳定的互联网连接 |
