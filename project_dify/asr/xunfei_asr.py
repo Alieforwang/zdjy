@@ -13,10 +13,15 @@ import keyboard
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 语音识别服务凭证信息
-XUNFEI_APP_ID = "506341da"  
-XUNFEI_API_KEY = "711523167504dd0a9925dffb34dbb96f"
-XUNFEI_API_SECRET = "OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2"
+# 语音识别服务凭证信息 - 从配置文件导入
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from config import XUNFEI_CONFIG
+
+XUNFEI_APP_ID = XUNFEI_CONFIG['APP_ID']  
+XUNFEI_API_KEY = XUNFEI_CONFIG['ASR_API_KEY']
+XUNFEI_API_SECRET = XUNFEI_CONFIG['ASR_API_SECRET']
 
 class RealTimeASRClient():
     def __init__(self, result_callback=None):

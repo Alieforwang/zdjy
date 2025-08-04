@@ -30,7 +30,13 @@ def record_audio_to_bytes(record_seconds=10, device_index=None, save_file=False)
     CHUNK = 1024
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
-    RATE = 16000  # 讯飞ASR要求16kHz采样率
+    # 从配置文件获取采样率
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from config import XUNFEI_CONFIG
+    
+    RATE = XUNFEI_CONFIG['SAMPLE_RATE']  # 讯飞ASR要求的采样率
     SILENCE_THRESHOLD = 100  # 降低静音阈值，使其更容易检测到声音
 
     p = pyaudio.PyAudio()

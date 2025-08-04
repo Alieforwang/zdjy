@@ -59,4 +59,16 @@ DIFY_CONFIG = {
     'HEADERS': {
         'Content-Type': 'application/json'
     }
+}
+
+# 讯飞API配置
+XUNFEI_CONFIG = {
+    'APP_ID': '506341da',  # 讯飞应用ID
+    'ASR_API_KEY': '711523167504dd0a9925dffb34dbb96f',  # 语音识别API Key
+    'ASR_API_SECRET': 'OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2',  # 语音识别API Secret
+    'TTS_API_KEY': '6dddc782ff39ecac9da6a255b6ba4713',  # 语音合成API Key
+    'TTS_API_SECRET': 'OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2',  # 语音合成API Secret
+    'TTS_VOICE': 'x4_yezi',  # 默认发音人
+    'SAMPLE_RATE': 16000,  # 采样率
+    'MAX_TEXT_LENGTH': 8000  # 最大文本长度
 } 

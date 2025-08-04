@@ -1,319 +1,373 @@
-# 灵瞳YOLOv8-DeepSeek多模态街景治理实时检测平台
+# 灵瞳 - YOLOv8-DeepSeek 多模态街景治理实时检测平台
 
-##  项目简介
-- 本研究针对城市占道经营的实时检测与决策支持需求，提出"灵瞳—YOLOv8-DeepSeek"多模态监测平台。
-- 平台基于YOLOv8n模型实现93% mAP@0.5和平衡速度166.7 FPS的实时检测，并集成DeepSeek-R1大语言模型提供智能问答及辅助决策。
-- 采用Ollama框架与混合精度量化技术实现隐私安全的边缘部署（响应延迟≤287ms），昆明试点验证平台有效提升治理效率，具备良好扩展性。
+<div align="center">
 
-## 主要功能
-- 📷 实时图像/视频检测
-- 📊 数据统计与分析
-- 📝 历史记录管理
-- 🗺️ 地理位置展示
-- 👥 用户权限管理
-- 📈 可视化数据展示
-- 🤖 DeepSeek智能问答助手
+![Python](https://img.shields.io/badge/Python-3.8.1+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![YOLOv8](https://img.shields.io/badge/YOLOv8-93%25%20mAP-orange.svg)
+![DeepSeek](https://img.shields.io/badge/DeepSeek-R1--32B-red.svg)
+![Performance](https://img.shields.io/badge/Speed-166.7%20FPS-brightgreen.svg)
 
-## 系统架构
+*基于 YOLOv8 和 DeepSeek-R1 的智能化城市治理解决方案*
 
-### 整体架构
-本系统采用前后端分离架构，主要包含以下几个核心模块：
-- 检测引擎：基于YOLOv8的目标检测模块
-- Web服务：基于Flask的后端服务
-- 数据存储：MySQL数据库
-- 智能助手：基于DeepSeek-R1的多模态决策支持引擎
+[快速开始](#快速开始) • [演示视频](#演示视频) • [完整文档](docs/README.md) • [API文档](docs/api/README.md) • [贡献指南](#贡献指南)
 
-### 技术栈
-- 后端：Flask
-- 前端：HTML5 + CSS3 + JavaScript
-- 数据库：MySQL
-- 深度学习：YOLOv8
-- 图像处理：OpenCV
-- 大语言模型：DeepSeek-R1-32B
+</div>
 
-### 目录结构
-```
-├── app.py              # 主应用程序
-├── config.py           # 配置文件
-├── requirements.txt    # 依赖包列表
-├── static/            # 静态文件目录
-│   ├── css/          # CSS样式文件
-│   ├── js/           # JavaScript文件
-│   ├── images/       # 图片资源
-│   └── uploads/      # 上传文件目录
-├── templates/         # HTML模板文件
-├── models/           # 模型文件目录
-└── util/             # 工具函数目录
-```
+---
 
-## 系统要求
-- Python 3.8+
-- MySQL 5.7+
-- CUDA支持（推荐用于GPU加速）
+## 🚀 项目简介
 
-## 安装步骤
+**灵瞳** 是一个专为城市占道经营实时检测与决策支持而设计的多模态监测平台。系统基于先进的 YOLOv8n 模型实现 **93% mAP@0.5** 和平衡速度 **166.7 FPS** 的实时检测能力，并深度集成 DeepSeek-R1 大语言模型提供智能问答及辅助决策功能。
 
-1. 克隆项目到本地
+### 🎯 核心特性
+
+- **🔍 高精度检测**: YOLOv8n 模型，93% mAP@0.5 检测精度
+- **⚡ 实时处理**: 166.7 FPS 处理速度，支持实时视频流
+- **🧠 智能决策**: DeepSeek-R1-32B 多模态决策支持引擎
+- **🏠 边缘部署**: Ollama + 混合精度量化，响应延迟 ≤287ms
+- **🔒 隐私安全**: 本地化部署，符合 GB/T 35273-2020 规范
+- **📊 可视化分析**: 实时数据统计与趋势分析
+- **🎙️ 多模态交互**: 支持语音识别与语音合成
+
+### 🏆 技术亮点
+
+| 特性 | 指标 |
+|------|------|
+| 检测精度 | 93% mAP@0.5 |
+| 处理速度 | 166.7 FPS |
+| 响应延迟 | ≤287ms |
+| 支持格式 | 图片、视频、实时流 |
+| 部署方式 | 云端 + 边缘 |
+
+---
+
+## 🛠️ 技术栈
+
+<div align="center">
+
+| 类别 | 技术 |
+|------|------|
+| **后端框架** | Flask + Gunicorn |
+| **前端技术** | HTML5 + CSS3 + JavaScript |
+| **深度学习** | YOLOv8 + PyTorch |
+| **计算机视觉** | OpenCV + Ultralytics |
+| **大语言模型** | DeepSeek-R1-32B |
+| **数据库** | MySQL 5.7+ |
+| **语音技术** | 讯飞语音识别/合成 |
+| **部署工具** | Docker + Ollama |
+
+</div>
+
+---
+
+## 📋 系统要求
+
+### 最低配置
+- **Python**: 3.8.1+ (推荐 3.13+)
+- **内存**: 2GB+ (推荐 8GB+)
+- **存储**: 5GB+ 可用空间
+- **数据库**: MySQL 5.7+
+
+### 推荐配置
+- **GPU**: NVIDIA GPU (CUDA 支持)
+- **内存**: 16GB+
+- **CPU**: 4核心+
+- **网络**: 稳定互联网连接
+
+### 包管理器
+- **uv** (推荐): 比 pip 快 10-100x 的现代 Python 包管理器
+- **pip**: 传统包管理器 (备选方案)
+
+---
+
+## 🚀 快速开始
+
+### 方式一：使用 uv (推荐)
+
 ```bash
-git clone [项目地址]
-cd [项目目录]
-```
+# 1. 安装 uv
+curl -LsSf https://astral.sh/uv/install.sh | sh  # Linux/Mac
+# 或 PowerShell (Windows): iwr https://astral.sh/uv/install.ps1 | iex
 
-2. 创建并激活虚拟环境（推荐）
-```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-```
+# 2. 克隆项目
+git clone https://github.com/your-username/zdjy.git
+cd zdjy
 
-3. 安装依赖包
-```bash
-pip install -r requirements.txt
-```
+# 3. 一键安装依赖
+uv sync
 
-4. 配置数据库
-- 创建MySQL数据库
-- 修改配置文件中的数据库连接信息
+# 4. 激活环境
+source .venv/bin/activate  # Linux/Mac
+# 或 .venv\Scripts\activate  # Windows
 
-5. 初始化系统
-```bash
+# 5. 配置数据库 (见下方配置说明)
+
+# 6. 启动应用
 python app.py
 ```
 
-## 使用说明
+### 方式二：传统安装
 
-### 系统登录
-- 默认管理员账号：admin
-- 默认密码：admin
-
-### 主要功能模块
-1. **实时检测**
-   - 支持图片上传检测
-   - 支持视频文件检测
-   - 支持实时视频流检测
-
-2. **数据分析**
-   - 检测趋势分析
-   - 类型分布统计
-   - 置信度分析
-
-3. **历史记录**
-   - 检测结果查询
-   - 结果图片/视频查看
-   - 数据导出功能
-
-4. **智能助手系统**
-   - 城市管理法规解读
-   - 占道经营分类标准
-   - 治理措施建议
-   - 数据分析解读
-   - 趋势预测与方案比较
-
-5. **系统管理**
-   - 用户管理
-   - 权限配置
-   - 系统设置
-
-## 智能助手系统
-
-### 概述
-智能助手基于DeepSeek-R1大语言模型构建多模态决策支持引擎，采用"感知-认知-决策"三阶段架构，为系统提供智能增强服务。系统深度融合领域知识，提供技术指导、故障诊断、性能优化及数据解读等核心功能，助力用户实现高效系统运维与智能化决策。
-
-不熟悉系统的用户可以通过智能助手了解占道经营定义、相关法律法规、结合系统的实时检测和数据统计功能，帮助相关部门进行智能化、人情化决策。
-
-### 技术架构
-
-系统采用本地部署方案，具体实现如下：
-
-#### 部署方案
-基于Ollama和Dify开源框架构建，核心模型采用deepseek-r1-32b。通过混合精度量化与层间融合技术，实现大模型本地化部署，确保数据隐私与实时响应：
-
-1. **隐私计算保障**
-   - 基于同态加密构建模型数据安全通道
-   - 满足GB/T 35273-2020个人信息安全规范
-
-2. **实时响应优化**
-   - 采用动态批处理与流式推理技术
-   - 实现平均响应延迟≤287ms
-
-#### 知识增强机制
-通过三级知识增强机制提升模型能力：
-
-1. **结构化知识嵌入**
-   - 构建街景治理知识图谱
-   - 采用TransR算法实现知识向量化
-
-2. **非结构化数据增强**
-   - 基于RAG架构构建检索系统
-   - 对历史案例数据建立向量索引库
-
-3. **对齐强化训练**
-   - 采用DPO方法进行指令微调
-   - 提升模型与业务需求的语义对齐度
-
-#### 部署教程链接
-- Dify与Ollama本地部署详见： [知乎专栏教程](https://zhuanlan.zhihu.com/p/28744712219)
-
-#### 对话智能体创建
-使用Dify控制台或Ollama CLI创建对话型智能体：
-1. 登录Dify控制台或启动Ollama环境
-2. 选择模型 `DeepSeek-R1-32B`
-3. 定义对话意图、槽位和示例对话
-4. 完成部署并获取 `agent_id` 与 `api_token`
-
-#### 智能体API接入
-1. 在 `config.py` 中配置：
-```python
-AGENT_API_URL = "http://localhost:3000/api/agent/{agent_id}/chat"
-AGENT_API_TOKEN = "your_api_token_here"
-```
-2. 在 `templates/chat_ai.html` 中调用：
-```html
-<script>
-async function sendMessage(msg) {
-  const res = await fetch(AGENT_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${AGENT_API_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ message: msg })
-  });
-  const data = await res.json();
-  appendChat(data.reply);
-}
-</script>
-```
-
-## 低内存环境部署指南
-
-适用于2核心2G内存服务器的优化部署方案。
-
-### 系统要求
-- CPU: 2核心
-- 内存: 2GB
-- 操作系统: Linux (推荐Ubuntu 18.04或更高版本)
-
-### 快速部署
 ```bash
-# 克隆代码仓库
-git clone <代码仓库URL>
+# 1. 克隆项目
+git clone https://github.com/your-username/zdjy.git
 cd zdjy
 
-# 执行部署脚本
-chmod +x deploy.sh
-./deploy.sh
+# 2. 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或 venv\Scripts\activate  # Windows
+
+# 3. 安装依赖
+pip install -r requirements.txt
+
+# 4. 启动应用
+python app.py
 ```
 
-### 性能优化设置
+### 🔧 数据库配置
 
-1. **内存优化**
-   - 使用全局单例模型实例
-   - 数据库连接池优化
-   - 图像处理优化
-   - 服务器配置优化
+1. **创建数据库**
+```sql
+CREATE DATABASE tiaozhanbei CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
-2. **自动化运维**
-   - 内存监控自动重启
-   - 日志分级管理
+2. **修改配置文件**
+```python
+# config.py
+DB_CONFIG = {
+    'host': 'your_host',
+    'user': 'your_username',
+    'password': 'your_password',
+    'database': 'tiaozhanbei',
+    'port': 3306
+}
+```
 
-### 模型优化策略
-针对低内存环境的模型优化建议：
+---
 
-1. **模型裁剪**
-   - 使用YOLOv8提供的模型剪枝功能
+## 📚 功能模块
 
-2. **模型量化**
-   - 将模型量化为INT8，显著减少内存占用
+### 🎯 核心功能
 
-3. **延迟加载**
-   - 需要时才加载模型到内存
+| 模块 | 功能描述 | 状态 |
+|------|----------|------|
+| **实时检测** | 图片/视频/流媒体检测 | ✅ 已完成 |
+| **数据分析** | 检测趋势与统计分析 | ✅ 已完成 |
+| **智能问答** | DeepSeek-R1 决策支持 | ✅ 已完成 |
+| **语音交互** | 语音识别与合成 | ✅ 已完成 |
+| **用户管理** | 权限控制与认证 | ✅ 已完成 |
+| **历史记录** | 检测结果存储查询 | ✅ 已完成 |
 
-## 运维工具
+### 🤖 智能助手系统
 
-### 自动化运维脚本
-系统提供了一套完整的自动化运维脚本：
+基于 **DeepSeek-R1** 构建的多模态决策支持引擎，采用"感知-认知-决策"三阶段架构：
 
-1. **部署脚本 (deploy.sh)**
-   - 系统部署与更新
-   - 数据库备份与恢复
-   - 系统健康检查
+- **📖 法规解读**: 城市管理法规智能解读
+- **🏷️ 分类标准**: 占道经营分类与识别标准
+- **💡 治理建议**: 个性化治理措施推荐
+- **📊 数据解读**: 检测数据智能分析
+- **🔮 趋势预测**: 基于历史数据的趋势预测
 
-2. **监控脚本 (monitor.sh)**
-   - 系统资源监控
-   - 服务自动恢复
+---
 
-3. **数据库连接池监控 (db_monitor.sh)**
-   - 检测数据库连接池状态
-   - 必要时重启应用服务
+## 🎬 系统演示视频 {#演示视频}
 
-## 注意事项
-1. 首次运行时请确保已正确配置数据库连接信息
-2. 确保系统有足够的存储空间用于保存上传的图片和视频文件
-3. 建议使用支持GPU的环境以获得更好的检测性能
-4. 定期清理uploads目录下的临时文件
+<div align="center">
 
-## 常见问题
-1. 如遇到数据库连接错误，请检查数据库配置信息
-2. 如遇到模型加载错误，请确认models目录下是否存在模型文件
-3. 上传文件失败时，请检查目录权限和存储空间
+### 📺 完整功能演示
+[![完整功能演示](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+*点击观看完整功能演示视频*
 
+### 🎯 实时检测演示
+[![实时检测演示](docs/videos/detection-demo-thumbnail.jpg)](docs/videos/real-time-detection.mp4)
+*实时检测功能演示 - 展示YOLOv8模型的检测效果*
 
+### 🤖 智能助手演示
+[![智能助手演示](docs/videos/ai-assistant-thumbnail.jpg)](docs/videos/ai-assistant-demo.mp4)
+*DeepSeek-R1智能助手对话演示*
 
+### 📊 数据分析演示
+[![数据分析演示](docs/videos/analytics-thumbnail.jpg)](docs/videos/data-analysis-demo.mp4)
+*可视化数据分析与报表生成*
 
+> 💡 **提示**: 如果视频无法播放，请访问 [项目文档](docs/README.md) 查看详细的功能说明和使用指南。
 
-# 数据库连接池监控脚本
+</div>
 
-## 项目说明
+---
 
-此项目包含用于监控和修复数据库连接池维护线程的脚本。当数据库连接池维护线程停止工作时，脚本会自动检测并执行必要的操作来恢复正常运行。
+## 🔧 开发指南
 
-## 功能特点
+### 开发环境设置
 
-- 自动检测数据库连接池维护线程状态
-- 当维护线程超过2小时未执行时发出警告
-- 自动尝试重置数据库连接池
-- 必要时重启应用服务
-- 自动清理旧日志文件
-- 详细的日志记录
-- 支持Linux和Windows系统
+```bash
+# 安装完整开发环境
+uv sync --extra dev --extra docs
 
-## 脚本文件
+# 代码格式化
+black .
 
-- `db_monitor.sh` - Linux/Unix系统的Bash脚本
-- `db_monitor.bat` - Windows系统的批处理脚本
+# 代码风格检查
+flake8 .
 
-## 使用方法
+# 类型检查
+mypy .
 
-### Linux/Unix系统
+# 运行测试
+pytest --cov=zdjy --cov-report=html
+```
 
-1. 确保脚本具有执行权限：
-   ```bash
-   chmod +x db_monitor.sh
-   ```
+### 常用命令
 
-2. 手动执行脚本：
-   ```bash
-   ./db_monitor.sh
-   ```
+```bash
+# 依赖管理
+uv add package_name          # 添加依赖
+uv add --dev package_name    # 添加开发依赖
+uv remove package_name       # 移除依赖
+uv sync --upgrade           # 更新所有依赖
 
-3. 添加到crontab定期执行（每10分钟）：
-   ```bash
-   crontab -e
-   ```
-   添加以下行：
-   ```
-   */10 * * * * /路径/到/db_monitor.sh >> /dev/null 2>&1
-   ```
+# 项目管理
+uv tree                     # 查看依赖树
+uv pip list --outdated     # 检查过期依赖
+```
 
-### Windows系统
+### 项目结构
 
-1. 手动执行脚本：
-   - 双击`db_monitor.bat`文件，或
-   
+```
+zdjy/
+├── 📁 app.py                 # 🚀 主应用入口
+├── 📁 config.py              # ⚙️ 配置文件
+├── 📁 pyproject.toml         # 📦 项目配置
+├── 📁 requirements.txt       # 📋 依赖列表
+├── 📁 uv.lock               # 🔒 版本锁定
+├── 📁 models/               # 🧠 AI模型文件
+├── 📁 static/               # 🎨 静态资源
+├── 📁 templates/            # 📄 HTML模板
+├── 📁 util/                 # 🔧 工具函数
+└── 📁 project_dify/         # 🤖 智能模块
+    ├── 📁 asr/              # 🎙️ 语音识别
+    ├── 📁 nlp/              # 💬 自然语言处理
+    └── 📁 tts/              # 🔊 语音合成
+```
 
-## 联系方式
-如有任何问题或建议，请联系系统管理员。
-   
+---
+
+## 🚀 部署指南
+
+### Docker 部署 (推荐)
+
+```bash
+# 构建镜像
+docker build -t zdjy:latest .
+
+# 运行容器
+docker run -d \
+  --name zdjy-app \
+  -p 5000:5000 \
+  -v $(pwd)/models:/app/models \
+  -e DB_HOST=your_db_host \
+  zdjy:latest
+```
+
+### 低内存服务器部署
+
+适用于 **2核2G** 内存的服务器:
+
+```bash
+# 快速部署脚本
+curl -fsSL https://raw.githubusercontent.com/your-repo/zdjy/main/deploy.sh | sh
+
+# 或手动部署
+git clone https://github.com/your-repo/zdjy.git
+cd zdjy
+uv sync
+source .venv/bin/activate
+python app.py
+```
+
+---
+
+## 📈 性能优化
+
+### 内存优化策略
+
+- **模型单例**: 全局单例模型实例
+- **连接池**: 数据库连接池优化
+- **图像处理**: 流式处理减少内存占用
+- **缓存机制**: 智能缓存策略
+
+### GPU 加速
+
+```bash
+# 安装GPU版本
+uv sync --extra gpu
+
+# 验证CUDA支持
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+---
+
+## 🤝 贡献指南
+
+我们欢迎所有形式的贡献！请查看 [贡献指南](CONTRIBUTING.md) 了解详细信息。
+
+### 贡献流程
+
+1. **Fork** 项目到您的账户
+2. **创建** 功能分支: `git checkout -b feature/amazing-feature`
+3. **提交** 更改: `git commit -m 'Add amazing feature'`
+4. **推送** 分支: `git push origin feature/amazing-feature`
+5. **创建** Pull Request
+
+### 开发规范
+
+- 遵循 [PEP 8](https://pep8.org/) 编码规范
+- 添加必要的测试用例
+- 更新相关文档
+- 确保所有测试通过
+
+---
+
+## 📜 许可证
+
+本项目采用 [MIT License](LICENSE) 开源协议。
+
+---
+
+## 🙏 致谢
+
+- [YOLOv8](https://github.com/ultralytics/ultralytics) - 目标检测框架
+- [DeepSeek](https://github.com/deepseek-ai) - 大语言模型
+- [Flask](https://flask.palletsprojects.com/) - Web框架
+- [OpenCV](https://opencv.org/) - 计算机视觉库
+
+---
+
+## 📞 联系我们
+
+- **作者**: Alieforwang
+- **邮箱**: 154425450+Alieforwang@users.noreply.github.com
+- **项目主页**: [GitHub Repository](https://github.com/Alieforwang/zdjy)
+- **问题反馈**: [Issues](https://github.com/Alieforwang/zdjy/issues)
+- **功能请求**: [Feature Requests](https://github.com/Alieforwang/zdjy/issues/new?template=feature_request.md)
+
+---
+
+## 📊 项目统计
+
+![GitHub stars](https://img.shields.io/github/stars/Alieforwang/zdjy?style=social)
+![GitHub forks](https://img.shields.io/github/forks/Alieforwang/zdjy?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/Alieforwang/zdjy?style=social)
+
+---
+
+<div align="center">
+
+**⭐ 如果这个项目对您有帮助，请给我们一个星标！**
+
+Made with ❤️ by [Alieforwang](https://github.com/Alieforwang)
+
+</div>

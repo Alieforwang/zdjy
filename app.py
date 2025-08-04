@@ -12,7 +12,7 @@ from ultralytics import YOLO
 import random
 import decimal
 import json
-from config import AMAP_CONFIG, DB_CONFIG, APP_CONFIG, LOG_CONFIG, DIFY_CONFIG
+from config import AMAP_CONFIG, DB_CONFIG, APP_CONFIG, LOG_CONFIG, DIFY_CONFIG, XUNFEI_CONFIG
 import concurrent.futures
 import threading
 import sys
@@ -4832,10 +4832,10 @@ def text_to_speech():
 
 def generate_speech_sync(text, voice="x4_yezi"):
     """同步版本的讯飞TTS接口"""
-    # 讯飞API参数
-    APPID = '506341da'
-    APIKey = '6dddc782ff39ecac9da6a255b6ba4713'
-    APISecret = 'OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2'
+    # 讯飞API参数 - 从配置文件获取
+    APPID = XUNFEI_CONFIG['APP_ID']
+    APIKey = XUNFEI_CONFIG['TTS_API_KEY']
+    APISecret = XUNFEI_CONFIG['TTS_API_SECRET']
     
     # 记录请求开始
     logger.info(f"开始TTS请求: 文本长度: {len(text)}, 发音人: {voice}")
@@ -5194,7 +5194,7 @@ def split_text_into_sentences(text):
 # 辅助函数：清理文本用于TTS
 def clean_sentence_for_tts(text):
     # 清理文本，保留中文、英文、数字和常用标点
-    clean_text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9.,，。!?！？;:；：、""''()（）《》<>【】\s]', '', text)
+    clean_text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9.,，。!?！？;:；：、""''()（）《》<>【】\\s]', '', text)
     # 删除重复的标点符号
     clean_text = re.sub(r'([.,，。!?！？;:；：])\1+', r'\1', clean_text)
     return clean_text.strip()

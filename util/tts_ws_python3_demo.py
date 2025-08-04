@@ -244,9 +244,13 @@ def on_open(ws):
 
 
 if __name__ == "__main__":
-    # 测试时候在此处正确填写相关信息即可运行
-    wsParam = Ws_Param(APPID='506341da', APISecret='OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2',
-                       APIKey='6dddc782ff39ecac9da6a255b6ba4713',
+    # 从配置文件获取API配置
+    from config import XUNFEI_CONFIG
+    
+    # 测试时候使用配置文件中的信息
+    wsParam = Ws_Param(APPID=XUNFEI_CONFIG['APP_ID'], 
+                       APISecret=XUNFEI_CONFIG['TTS_API_SECRET'],
+                       APIKey=XUNFEI_CONFIG['TTS_API_KEY'],
                        Text="这是一个流式语音合成示例")
     websocket.enableTrace(False)
     wsUrl = wsParam.create_url()

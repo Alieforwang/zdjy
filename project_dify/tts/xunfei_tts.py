@@ -24,10 +24,14 @@ load_dotenv()
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# 从环境变量读取讯飞TTS凭证信息
-TTS_APP_ID = os.environ.get("XUNFEI_TTS_APP_ID", "506341da")
-TTS_API_KEY = os.environ.get("XUNFEI_TTS_API_KEY", "6dddc782ff39ecac9da6a255b6ba4713")
-TTS_API_SECRET = os.environ.get("XUNFEI_TTS_API_SECRET", "OTEwZjJkNGZmMDVkMTc3NGY4MDYwZjU2")
+# 从配置文件读取讯飞TTS凭证信息
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from config import XUNFEI_CONFIG
+
+TTS_APP_ID = XUNFEI_CONFIG['APP_ID']
+TTS_API_KEY = XUNFEI_CONFIG['TTS_API_KEY']
+TTS_API_SECRET = XUNFEI_CONFIG['TTS_API_SECRET']
 
 class MandarinTTS:
 

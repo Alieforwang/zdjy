@@ -14,8 +14,13 @@ from tts.play_sound import play_audio_bytes
 logger = logging.getLogger(__name__)
 
 # 从配置文件获取API配置
-API_KEY = "app-9HGYkNQbCdy7cuCNMEc6xA9g"
-url = "http://8.137.48.26:8000/v1/chat-messages"
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from config import DIFY_CONFIG
+
+API_KEY = DIFY_CONFIG['API_KEY']
+url = DIFY_CONFIG['API_URL']
 
 headers = {
     'Authorization': f'Bearer {API_KEY}',
