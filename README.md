@@ -13,35 +13,32 @@
 
 ## 快速部署
 
-### Windows环境
+### 本地环境部署
 
 ```bash
-# 进入docker目录
-cd docker
+# 克隆项目
+git clone https://github.com/Alieforwang/zdjy.git
+cd zdjy
 
-# 运行启动脚本
-start.bat
-```
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 
-### Linux环境
+# 安装依赖
+pip install -r requirements.txt
 
-```bash
-# 步骤1：初始化环境（仅首次运行需要）
-cd docker
-chmod +x setup.sh
-./setup.sh
-
-# 步骤2：启动所有服务
-docker compose up -d
+# 启动应用
+python app.py
 ```
 
 ## 系统要求
 
 - **操作系统**：Windows 10/11 或 Linux
-- **Docker**：最新版Docker和Docker Compose
+- **Python**：3.10+ (推荐 3.13+)
 - **硬件**：
-  - 最低配置：4核CPU，8GB内存
-  - 推荐配置：8核CPU，16GB内存，NVIDIA GPU (CUDA 11.7+)
+  - 最低配置：2核CPU，4GB内存
+  - 推荐配置：4核CPU，8GB内存，NVIDIA GPU (CUDA 11.7+)
 
 ## 目录结构
 
@@ -51,10 +48,13 @@ project/
 ├── config.py             # 配置文件
 ├── yolov8.py             # YOLOv8检测模块
 ├── models/               # 模型文件目录
-├── docker/               # Docker部署文件
 ├── static/               # 静态资源
 ├── templates/            # 前端模板
-└── scripts/              # 辅助脚本
+├── util/                 # 工具函数
+└── project_dify/         # AI智能模块
+    ├── asr/              # 语音识别
+    ├── nlp/              # 自然语言处理
+    └── tts/              # 语音合成
 ```
 
 ## 使用说明
@@ -216,9 +216,9 @@ pip install -r requirements.txt
 python app.py
 ```
 
-### 🔧 数据库配置
+### 🔧 配置说明
 
-1. **创建数据库**
+1. **数据库配置**
 ```sql
 CREATE DATABASE tiaozhanbei CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
@@ -233,6 +233,13 @@ DB_CONFIG = {
     'database': 'tiaozhanbei',
     'port': 3306
 }
+```
+
+3. **AI模型配置**
+```python
+# 下载YOLOv8模型文件到models目录
+# 配置DeepSeek API密钥（如使用云端API）
+# 或配置本地Ollama服务（推荐）
 ```
 
 ---
@@ -254,11 +261,19 @@ DB_CONFIG = {
 
 基于 **DeepSeek-R1** 构建的多模态决策支持引擎，采用"感知-认知-决策"三阶段架构：
 
-- **📖 法规解读**: 城市管理法规智能解读
-- **🏷️ 分类标准**: 占道经营分类与识别标准
-- **💡 治理建议**: 个性化治理措施推荐
-- **📊 数据解读**: 检测数据智能分析
-- **🔮 趋势预测**: 基于历史数据的趋势预测
+#### 🧠 AI技术架构
+- **视觉感知层**: YOLOv8n目标检测模型，实现93% mAP@0.5精度
+- **语言理解层**: DeepSeek-R1-32B大语言模型，支持多模态理解
+- **决策支持层**: 基于知识图谱的智能推理引擎
+- **交互界面层**: 语音识别(ASR) + 语音合成(TTS) + Web界面
+
+#### 🔧 核心功能
+- **📖 法规解读**: 城市管理法规智能解读与条文检索
+- **🏷️ 分类标准**: 占道经营分类与识别标准自动匹配
+- **💡 治理建议**: 个性化治理措施推荐与执法指导
+- **📊 数据解读**: 检测数据智能分析与可视化报告
+- **🔮 趋势预测**: 基于历史数据的趋势预测与风险评估
+- **🎙️ 语音交互**: 支持语音问答，提升现场执法效率
 
 ---
 
@@ -346,19 +361,15 @@ zdjy/
 
 ## 🚀 部署指南
 
-### Docker 部署 (推荐)
+### 生产环境部署
 
 ```bash
-# 构建镜像
-docker build -t zdjy:latest .
+# 使用Gunicorn部署
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
 
-# 运行容器
-docker run -d \
-  --name zdjy-app \
-  -p 5000:5000 \
-  -v $(pwd)/models:/app/models \
-  -e DB_HOST=your_db_host \
-  zdjy:latest
+# 使用Nginx反向代理（可选）
+# 配置SSL证书和域名
 ```
 
 ### 低内存服务器部署
@@ -366,14 +377,18 @@ docker run -d \
 适用于 **2核2G** 内存的服务器:
 
 ```bash
-# 快速部署脚本
-curl -fsSL https://raw.githubusercontent.com/your-repo/zdjy/main/deploy.sh | sh
-
-# 或手动部署
-git clone https://github.com/your-repo/zdjy.git
+# 克隆项目
+git clone https://github.com/Alieforwang/zdjy.git
 cd zdjy
-uv sync
-source .venv/bin/activate
+
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动应用
 python app.py
 ```
 
