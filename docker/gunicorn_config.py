@@ -1,0 +1,11 @@
+bind = "0.0.0.0:8888"
+workers = 2
+worker_class = "gevent"
+worker_connections = 500
+timeout = 60
+keepalive = 2
+max_requests = 500
+max_requests_jitter = 50
+accesslog = "-"
+errorlog = "-"
+loglevel = "info" 
