@@ -1060,7 +1060,14 @@ class CozeChat {
                                 <button class="coze-chat-close" id="coze-chat-close" title="关闭">×</button>
                             </div>
                         </div>
-                        <div class="coze-chat-box" id="coze-chat-box"></div>
+                        <div class="coze-chat-box" id="coze-chat-box">
+                            <!-- Dify风格的欢迎界面 -->
+                            <iframe src="http://8.137.48.26:8000/chat/y8c7gAPThfBLRgDF" 
+                                    style="width: 100%; height: 100%; border: none; border-radius: 10px;" 
+                                    frameborder="0" 
+                                    allowfullscreen>
+                            </iframe>
+                        </div>
                         <div class="coze-chat-input">
                             <input type="text" id="coze-user-input" placeholder="请输入您的问题..." autocomplete="off">
                             <button class="coze-voice-btn" id="coze-voice-btn" title="语音输入">
@@ -1494,31 +1501,24 @@ class CozeChat {
     
     // 保存会话消息
     saveConversationMessages() {
-        // 保存当前会话的消息
-        this.messageHistory[this.currentConversationId] = this.elements.chatBox.innerHTML;
-        
-        // 保存到localStorage
-        localStorage.setItem('coze_message_history', JSON.stringify(this.messageHistory));
+        // 注释：现在聊天框是iframe，不需要保存消息
+        // this.messageHistory[this.currentConversationId] = this.elements.chatBox.innerHTML;
+        // localStorage.setItem('coze_message_history', JSON.stringify(this.messageHistory));
     }
     
     // 加载会话消息
     loadConversationMessages() {
-        // 从localStorage加载所有会话的消息历史
-        const savedMessageHistory = localStorage.getItem('coze_message_history');
-        if (savedMessageHistory) {
-            this.messageHistory = JSON.parse(savedMessageHistory);
-        }
-        
-        // 清空当前消息框
-        this.elements.chatBox.innerHTML = '';
-        
-        // 加载当前会话的消息
-        if (this.messageHistory[this.currentConversationId]) {
-            this.elements.chatBox.innerHTML = this.messageHistory[this.currentConversationId];
-        } else {
-            // 如果是新会话，显示欢迎消息
-            this.addWelcomeMessage();
-        }
+        // 注释：现在聊天框是iframe，不需要加载消息
+        // const savedMessageHistory = localStorage.getItem('coze_message_history');
+        // if (savedMessageHistory) {
+        //     this.messageHistory = JSON.parse(savedMessageHistory);
+        // }
+        // this.elements.chatBox.innerHTML = '';
+        // if (this.messageHistory[this.currentConversationId]) {
+        //     this.elements.chatBox.innerHTML = this.messageHistory[this.currentConversationId];
+        // } else {
+        //     this.addWelcomeMessage();
+        // }
         
         // 滚动到底部
         this.scrollToBottom();
@@ -1650,46 +1650,16 @@ class CozeChat {
     
     // 添加欢迎消息
     addWelcomeMessage() {
-        // 首先检查是否已经有欢迎消息
-        const welcomeMessages = this.elements.chatBox.querySelectorAll('.coze-chat-bot-message');
-        let hasWelcomeMessage = false;
-        
-        if (welcomeMessages.length > 0) {
-            // 检查第一条消息是否包含欢迎信息关键词
-            const firstMessage = welcomeMessages[0];
-            const messageContent = firstMessage.querySelector('.coze-message-content').textContent || '';
-            
-            if (messageContent.includes('欢迎使用灵瞳') || 
-                messageContent.includes('YOLOv8-DeepSeek多模态街景治理实时检测平台')) {
-                hasWelcomeMessage = true;
-            }
+        // 注释：现在聊天框直接是iframe，不添加任何欢迎消息以保持iframe内容
+        return;
+    }
+    
+    // 清除Dify欢迎界面
+    clearDifyWelcome() {
+        const welcomeContainer = this.elements.chatBox.querySelector('.dify-welcome-container');
+        if (welcomeContainer) {
+            welcomeContainer.remove();
         }
-        
-        // 如果已经有欢迎消息，就不再添加
-        if (hasWelcomeMessage) {
-            return;
-        }
-        
-        const welcomeMessage = `
-欢迎使用灵瞳——YOLOv8-DeepSeek多模态街景治理实时检测平台！我是您的专属智能顾问。如需以下方面的帮助，请随时咨询：
-
-1. 系统功能模块解析
-2. 实时数据分析方法
-3. 智能预警机制说明
-4. 设备运维指导建议
-5. 识别算法优化方案
-        `;
-        
-        this.elements.chatBox.innerHTML += `
-            <div class="coze-chat-message coze-chat-bot-message">
-                <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                <div class="coze-message-content">
-                    ${welcomeMessage.replace(/\n/g, '<br>')}
-                </div>
-            </div>`;
-            
-        // 保存欢迎消息
-        this.saveConversationMessages();
     }
     
     // 发送消息
@@ -1697,14 +1667,11 @@ class CozeChat {
         const message = this.elements.userInput.value.trim();
         if (!message) return;
         
-        // 显示用户消息 - 移除"您:"前缀
-        this.elements.chatBox.innerHTML += `
-            <div class="coze-chat-message coze-chat-user-message">
-                <img src="${this.config.userAvatar}" class="coze-avatar" alt="User">
-                <div class="coze-message-content">
-                    ${message}
-                </div>
-            </div>`;
+        // 注释：现在聊天框直接是iframe，不需要清除欢迎界面
+        // this.clearDifyWelcome();
+        
+        // 注释：现在聊天框是iframe，不在此处显示用户消息
+        // this.elements.chatBox.innerHTML += `...`;
         
         // 更新消息计数器
         if (!this.messageCounter[this.currentConversationId]) {
@@ -1881,14 +1848,8 @@ class CozeChat {
         } catch (error) {
             console.error('请求失败:', error);
             
-            // 显示错误
-            this.elements.chatBox.innerHTML += `
-                <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
-                    <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                    <div class="coze-message-content">
-                        无法检查AI服务状态: ${error.message}
-                    </div>
-                </div>`;
+            // 注释：现在聊天框是iframe，不在此处显示错误消息
+            // this.elements.chatBox.innerHTML += `...`;
             
             // 清除思考动画
             responseElement.innerHTML = `<span style="color: red;">错误: ${error.message}</span>`;
@@ -2013,15 +1974,8 @@ class CozeChat {
                 statusIndicator.className = 'coze-status-unavailable';
                 statusIndicator.textContent = '不可用';
                 
-                // 显示详细错误
-                this.elements.chatBox.innerHTML += `
-                    <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
-                        <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                        <div class="coze-message-content">
-                            AI服务状态检查: ${result.message}
-                            <br>服务地址: ${result.url}
-                        </div>
-                    </div>`;
+                // 注释：现在聊天框是iframe，不在此处显示错误消息
+                // this.elements.chatBox.innerHTML += `...`;
                 
                 // 保存消息
                 this.saveConversationMessages();
@@ -2032,15 +1986,8 @@ class CozeChat {
                 statusIndicator.className = 'coze-status-error';
                 statusIndicator.textContent = '错误';
                 
-                // 显示详细错误
-                this.elements.chatBox.innerHTML += `
-                    <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
-                        <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                        <div class="coze-message-content">
-                            AI服务状态检查: ${result.message}
-                            <br>服务地址: ${result.url}
-                        </div>
-                    </div>`;
+                // 注释：现在聊天框是iframe，不在此处显示错误消息
+                // this.elements.chatBox.innerHTML += `...`;
                 
                 // 保存消息
                 this.saveConversationMessages();
@@ -2053,14 +2000,8 @@ class CozeChat {
             statusIndicator.className = 'coze-status-error';
             statusIndicator.textContent = '检查失败';
             
-            // 显示错误
-            this.elements.chatBox.innerHTML += `
-                <div class="coze-chat-message coze-chat-bot-message coze-chat-error">
-                    <img src="${this.config.botAvatar}" class="coze-avatar" alt="AI">
-                    <div class="coze-message-content">
-                        无法检查AI服务状态: ${error.message}
-                    </div>
-                </div>`;
+            // 注释：现在聊天框是iframe，不在此处显示错误消息
+            // this.elements.chatBox.innerHTML += `...`;
             
             // 保存消息
             this.saveConversationMessages();
